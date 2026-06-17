@@ -6,6 +6,7 @@ import { errorHandler } from './middleware/errorHandler';
 import healthRouter from './routes/health';
 import pricingRouter from './routes/pricing';
 import bookingsRouter from './routes/bookings';
+import availabilityRouter from './routes/availability';
 
 const app = express();
 
@@ -16,6 +17,7 @@ app.use(requestLogger);
 app.use('/health', healthRouter);
 app.use('/pricing', pricingRouter);
 app.use('/bookings', bookingsRouter);
+app.use('/availability', availabilityRouter);
 
 app.use(errorHandler);
 

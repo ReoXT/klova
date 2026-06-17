@@ -154,6 +154,7 @@ Base URL (production): `https://klova-production.up.railway.app`
 | GET | `/health` | Returns `{ ok: true }` |
 | GET | `/pricing` | Full pricing grid + add-on list for the frontend calculator |
 | POST | `/bookings` | Creates a pending booking, returns `booking_id` + server-computed total |
+| GET | `/availability/alternatives` | `?zone_slug=lekki-ajah&date=2026-07-01` → next available dates in zone (next 14 days) |
 
 ### POST /bookings
 
@@ -198,7 +199,13 @@ Base URL (production): `https://klova-production.up.railway.app`
 - `matchCleaner(booking)` → `string[] | 'NO_MATCH'` — pure selection, no DB writes. Returns ALL candidates in priority order: [P1 requested?, ...P2 preferred sorted, ...P3 rest sorted]. The full list is passed to `assignCleaner()` so Postgres can try fallbacks. Exports `NO_MATCH` const, `MatchResult` type, `BookingForMatch` interface.
 
 ### `assignmentService.ts`
-- `assignCleaner(bookingId, booking)` → `'matched' | 'no_match'` — calls `matchCleaner()` then invokes the `assign_cleaner` Postgres RPC with the ranked list. The RPC handles all DB writes (is_booked flip, booking status update) inside a single transaction with `SELECT FOR UPDATE` locking.
+- `assignCleaner(bookingId, booking, paystackReference?)` → `'matched' | 'no_match'` — calls `matchCleaner()` then invokes the `assign_cleaner` Postgres RPC. Pass `paystackReference` when payment is already captured; on any no_match path, `issueRefund()` is called automatically.
+
+### `availabilityService.ts`
+- `getAlternativeDates(zoneSlug, requestedDate, days=14)` → `string[]` — finds dates in the next N days where at least one active cleaner in the zone has a free slot. Returns deduplicated, sorted YYYY-MM-DD strings. Returns `[]` gracefully if zone unknown or no cleaners exist.
+
+### `refundService.ts`
+- `issueRefund(paystackReference)` → stub, logs intent. Wire to `POST https://api.paystack.co/refund` in the payments prompt.
 
 ### `bookingService.ts`
 - `validateBookingInput(body)` → `BookingInput` — pure sync, no DB. Collects ALL field errors before throwing `FieldValidationError`.
@@ -304,9 +311,10 @@ Loaded in `app/layout.tsx` via `next/font/google`, exposed as CSS variables:
 | 3.1 Pricing service | ✅ Done | computePrice(), GET /pricing, 5 passing tests |
 | 3.2 Booking creation | ✅ Done | POST /bookings, field-level validation, 17 passing tests total |
 | 3.3 Matching algorithm | ✅ Done | matchCleaner() in matchingService.ts, returns ranked string[] for fallback |
-| 3.4 Concurrency-safe assignment | ✅ Done | assignCleaner() + assign_cleaner Postgres fn (SELECT FOR UPDATE), 30 tests |
+| 3.4 Concurrency-safe assignment | ✅ Done | assignCleaner() + assign_cleaner Postgres fn (SELECT FOR UPDATE), now accepts paystackReference |
+| 3.5 No-availability experience | ✅ Done | getAlternativeDates(), issueRefund() stub, GET /availability/alternatives, 39 tests |
 
-**Next prompt to run: Prompt 3.5 — Paystack webhook (payment confirmation triggers assignment)**
+**Next prompt to run: Prompt 3.6 — Paystack webhook (payment confirmation triggers assignment)**
 
 ---
 

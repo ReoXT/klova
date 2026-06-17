@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { matchCleaner, NO_MATCH, type BookingForMatch } from './matchingService';
+import { issueRefund } from './refundService';
 
 export type AssignResult = 'matched' | 'no_match';
 
@@ -11,11 +12,16 @@ export type AssignResult = 'matched' | 'no_match';
  *   SELECT FOR UPDATE, claiming the first slot still free. If a candidate was
  *   taken by a concurrent booking, it falls back to the next in the list.
  *
+ * Pass paystackReference when payment has already been captured — a no_match
+ * outcome will trigger issueRefund() so the customer is never charged for a
+ * booking that couldn't be fulfilled.
+ *
  * On return: booking.status is 'matched' (cleaner assigned) or 'no_match'.
  */
 export async function assignCleaner(
   bookingId: string,
   booking: BookingForMatch,
+  paystackReference?: string,
 ): Promise<AssignResult> {
   const candidates = await matchCleaner(booking);
 
@@ -25,6 +31,7 @@ export async function assignCleaner(
       .update({ status: 'no_match', updated_at: new Date().toISOString() })
       .eq('id', bookingId);
     if (error) throw error;
+    if (paystackReference) await issueRefund(paystackReference);
     return 'no_match';
   }
 
@@ -36,5 +43,7 @@ export async function assignCleaner(
 
   if (error) throw error;
 
-  return (data as string).startsWith('matched') ? 'matched' : 'no_match';
+  const result: AssignResult = (data as string).startsWith('matched') ? 'matched' : 'no_match';
+  if (result === 'no_match' && paystackReference) await issueRefund(paystackReference);
+  return result;
 }

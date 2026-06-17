@@ -11,8 +11,14 @@ vi.mock('../services/matchingService', () => ({
   matchCleaner: vi.fn(),
 }));
 
+// Mock refundService so we can assert it's called without side effects
+vi.mock('../services/refundService', () => ({
+  issueRefund: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { supabase } from '../lib/supabase';
 import { matchCleaner, NO_MATCH } from '../services/matchingService';
+import { issueRefund } from '../services/refundService';
 import { assignCleaner } from '../services/assignmentService';
 
 // ─── Mock helpers ─────────────────────────────────────────────────────────────
@@ -118,5 +124,36 @@ describe('assignCleaner — concurrency', () => {
 
     // The RPC must have been called twice — once per booking
     expect(mockRpc()).toHaveBeenCalledTimes(2);
+  });
+});
+
+// ─── Refund on no_match ───────────────────────────────────────────────────────
+
+describe('assignCleaner — refund on no_match', () => {
+  it('calls issueRefund when NO_MATCH from matchCleaner and a reference is supplied', async () => {
+    mockMatchCleaner().mockResolvedValueOnce(NO_MATCH);
+    mockFrom().mockReturnValueOnce(chain({ data: null, error: null }) as any);
+
+    await assignCleaner(BOOKING_ID, bookingCtx, 'txn_abc123');
+
+    expect(vi.mocked(issueRefund)).toHaveBeenCalledWith('txn_abc123');
+  });
+
+  it('calls issueRefund when the Postgres RPC returns no_match and a reference is supplied', async () => {
+    mockMatchCleaner().mockResolvedValueOnce(['c1']);
+    mockRpc().mockResolvedValueOnce({ data: 'no_match', error: null } as any);
+
+    await assignCleaner(BOOKING_ID, bookingCtx, 'txn_xyz789');
+
+    expect(vi.mocked(issueRefund)).toHaveBeenCalledWith('txn_xyz789');
+  });
+
+  it('does not call issueRefund when no paystackReference is provided', async () => {
+    mockMatchCleaner().mockResolvedValueOnce(['c1']);
+    mockRpc().mockResolvedValueOnce({ data: 'no_match', error: null } as any);
+
+    await assignCleaner(BOOKING_ID, bookingCtx); // no reference
+
+    expect(vi.mocked(issueRefund)).not.toHaveBeenCalled();
   });
 });
