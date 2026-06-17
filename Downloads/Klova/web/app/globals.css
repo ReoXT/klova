@@ -72,6 +72,12 @@ body {
   font-optical-sizing: auto;
 }
 
+/* ── Klova wordmark — reused everywhere the brand name appears ── */
+.wordmark {
+  font-family: var(--font-dm-serif), Georgia, serif;
+  letter-spacing: -0.015em;
+}
+
 /* ── Badge text alignment ────────────────────────────────── */
 /* Plus Jakarta Sans has a tall line box that fights daisyUI's
    fixed-height badge centering. Collapsing line-height to 1

@@ -16,7 +16,7 @@ export function SiteFooter() {
 
           {/* Brand */}
           <div className="space-y-2.5">
-            <p className="text-xl text-primary">Klova</p>
+            <p className="wordmark text-2xl text-primary">Klova</p>
             <p className="text-sm text-base-content/55 leading-relaxed max-w-xs">
               On-demand home cleaning for Lagos.<br />
               Vetted, rated, and NIN-verified cleaners.

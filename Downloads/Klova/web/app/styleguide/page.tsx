@@ -103,7 +103,7 @@ export default function StyleGuidePage() {
       <nav className="sticky top-0 z-10 bg-base-100/90 backdrop-blur-sm border-b border-base-300">
         <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link href="/" className="text-lg text-primary">Klova</Link>
+            <Link href="/" className="wordmark text-xl text-primary">Klova</Link>
             <span className="text-base-content/30 select-none">/</span>
             <span className="text-sm text-base-content/50">Design System</span>
           </div>

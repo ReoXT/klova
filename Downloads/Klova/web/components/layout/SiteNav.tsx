@@ -36,7 +36,7 @@ export function SiteNav() {
           {/* Logo */}
           <Link
             href="/"
-            className="text-xl text-primary shrink-0 focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 rounded-sm"
+            className="wordmark text-2xl text-primary shrink-0 focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 rounded-sm"
           >
             Klova
           </Link>
@@ -110,7 +110,7 @@ export function SiteNav() {
       >
         {/* Drawer header */}
         <div className="flex items-center justify-between px-5 h-16 border-b border-base-300 shrink-0">
-          <span className="text-xl text-primary">Klova</span>
+          <span className="wordmark text-2xl text-primary">Klova</span>
           <button
             onClick={() => setOpen(false)}
             className="btn btn-ghost btn-square btn-sm"
