@@ -1,27 +1,24 @@
 import { supabase } from '../lib/supabase';
 import { matchCleaner, NO_MATCH, type BookingForMatch } from './matchingService';
-import { issueRefund } from './refundService';
 
-export type AssignResult = 'matched' | 'no_match';
+export type AssignResult =
+  | { outcome: 'matched'; cleanerId: string }
+  | { outcome: 'no_match' };
 
 /**
  * Selects the best available cleaner for a booking and atomically assigns them.
  *
- * Step 1 — matchCleaner(): produces a ranked candidate list (read-only queries).
+ * Called at booking creation — the cleaner is shown to the customer before
+ * they pay. Payment confirmation (webhook) then flips the booking to 'confirmed'.
+ *
+ * Step 1 — matchCleaner(): produces a ranked candidate list (read-only).
  * Step 2 — assign_cleaner RPC: Postgres function that iterates the list with
- *   SELECT FOR UPDATE, claiming the first slot still free. If a candidate was
- *   taken by a concurrent booking, it falls back to the next in the list.
- *
- * Pass paystackReference when payment has already been captured — a no_match
- * outcome will trigger issueRefund() so the customer is never charged for a
- * booking that couldn't be fulfilled.
- *
- * On return: booking.status is 'matched' (cleaner assigned) or 'no_match'.
+ *   SELECT FOR UPDATE, claiming the first slot still free. Handles concurrent
+ *   bookings racing for the same cleaner + date.
  */
 export async function assignCleaner(
   bookingId: string,
   booking: BookingForMatch,
-  paystackReference?: string,
 ): Promise<AssignResult> {
   const candidates = await matchCleaner(booking);
 
@@ -31,8 +28,7 @@ export async function assignCleaner(
       .update({ status: 'no_match', updated_at: new Date().toISOString() })
       .eq('id', bookingId);
     if (error) throw error;
-    if (paystackReference) await issueRefund(bookingId, paystackReference);
-    return 'no_match';
+    return { outcome: 'no_match' };
   }
 
   const { data, error } = await supabase.rpc('assign_cleaner', {
@@ -43,7 +39,10 @@ export async function assignCleaner(
 
   if (error) throw error;
 
-  const result: AssignResult = (data as string).startsWith('matched') ? 'matched' : 'no_match';
-  if (result === 'no_match' && paystackReference) await issueRefund(bookingId, paystackReference);
-  return result;
+  const raw = data as string;
+  if (raw.startsWith('matched:')) {
+    return { outcome: 'matched', cleanerId: raw.slice('matched:'.length) };
+  }
+
+  return { outcome: 'no_match' };
 }

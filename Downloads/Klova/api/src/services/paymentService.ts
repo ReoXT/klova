@@ -40,8 +40,8 @@ export async function initializePayment(bookingId: string): Promise<PaymentInitR
   if (bookingErr || !booking) {
     throw new PaymentError('Booking not found.', 404);
   }
-  if (booking.status !== 'pending_payment') {
-    throw new PaymentError('Booking is not awaiting payment.', 400);
+  if (booking.status !== 'matched') {
+    throw new PaymentError('Booking is not ready for payment.', 400);
   }
 
   // Supabase returns the joined row as a nested object (many-to-one FK)

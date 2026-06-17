@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { computePrice, ValidationError } from './pricingService';
+import { assignCleaner } from './assignmentService';
 
 // ─── Error types ─────────────────────────────────────────────────────────────
 
@@ -13,7 +14,15 @@ export class FieldValidationError extends Error {
   }
 }
 
-// ─── Input types ─────────────────────────────────────────────────────────────
+export class NoAvailabilityError extends Error {
+  readonly status = 409;
+  constructor(zoneSlug: string, date: string) {
+    super(`No cleaners available in ${zoneSlug} on ${date}. Try a different date.`);
+    this.name = 'NoAvailabilityError';
+  }
+}
+
+// ─── Input / output types ─────────────────────────────────────────────────────
 
 export interface BookingInput {
   first_name: string;
@@ -29,11 +38,21 @@ export interface BookingInput {
   requested_cleaner_id?: string;
 }
 
+export interface CleanerProfile {
+  id: string;
+  first_name: string;
+  last_name: string;
+  photo_url: string | null;
+  rating: number | null;
+  total_jobs: number;
+}
+
 export interface BookingResult {
   booking_id: string;
   total_amount: number;      // NGN
   commission_amount: number; // NGN
   commission_rate: number;
+  cleaner: CleanerProfile;
 }
 
 // ─── Validation ──────────────────────────────────────────────────────────────
@@ -122,7 +141,6 @@ export async function createBooking(input: BookingInput): Promise<BookingResult>
   }
 
   // 2. Compute price server-side — also validates service, bedrooms, add-ons
-  //    Re-wrap ValidationError as a field error so the response shape is consistent
   let breakdown;
   try {
     breakdown = await computePrice(input.service_slug, input.bedrooms, input.addon_slugs);
@@ -155,7 +173,7 @@ export async function createBooking(input: BookingInput): Promise<BookingResult>
     throw customerErr ?? new Error('Failed to create customer record.');
   }
 
-  // 4. Insert booking row (no cleaner, no payment yet)
+  // 4. Insert booking row at pending_payment — assignment runs next
   const totalKobo = Math.round(breakdown.total_amount * 100);
   const commissionKobo = Math.round(breakdown.commission_amount * 100);
 
@@ -188,10 +206,41 @@ export async function createBooking(input: BookingInput): Promise<BookingResult>
     if (addonErr) throw addonErr;
   }
 
+  // 6. Assign cleaner immediately — customer sees who's coming before paying
+  const assignment = await assignCleaner(booking.id, {
+    zone_id: zone.id,
+    customer_id: customer.id,
+    booking_date: input.booking_date,
+    requested_cleaner_id: input.requested_cleaner_id ?? null,
+  });
+
+  if (assignment.outcome === 'no_match') {
+    throw new NoAvailabilityError(input.zone_slug, input.booking_date);
+  }
+
+  // 7. Fetch cleaner profile to return to the frontend
+  const { data: cleaner, error: cleanerErr } = await supabase
+    .from('cleaners')
+    .select('id, first_name, last_name, photo_url, rating, total_jobs')
+    .eq('id', assignment.cleanerId)
+    .single();
+
+  if (cleanerErr || !cleaner) {
+    throw cleanerErr ?? new Error('Failed to load cleaner profile.');
+  }
+
   return {
     booking_id: booking.id,
     total_amount: breakdown.total_amount,
     commission_amount: breakdown.commission_amount,
     commission_rate: breakdown.commission_rate,
+    cleaner: {
+      id: cleaner.id,
+      first_name: cleaner.first_name,
+      last_name: cleaner.last_name,
+      photo_url: cleaner.photo_url ?? null,
+      rating: cleaner.rating ?? null,
+      total_jobs: cleaner.total_jobs,
+    },
   };
 }
