@@ -31,7 +31,7 @@ export async function assignCleaner(
       .update({ status: 'no_match', updated_at: new Date().toISOString() })
       .eq('id', bookingId);
     if (error) throw error;
-    if (paystackReference) await issueRefund(paystackReference);
+    if (paystackReference) await issueRefund(bookingId, paystackReference);
     return 'no_match';
   }
 
@@ -44,6 +44,6 @@ export async function assignCleaner(
   if (error) throw error;
 
   const result: AssignResult = (data as string).startsWith('matched') ? 'matched' : 'no_match';
-  if (result === 'no_match' && paystackReference) await issueRefund(paystackReference);
+  if (result === 'no_match' && paystackReference) await issueRefund(bookingId, paystackReference);
   return result;
 }

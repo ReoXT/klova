@@ -136,7 +136,7 @@ describe('assignCleaner — refund on no_match', () => {
 
     await assignCleaner(BOOKING_ID, bookingCtx, 'txn_abc123');
 
-    expect(vi.mocked(issueRefund)).toHaveBeenCalledWith('txn_abc123');
+    expect(vi.mocked(issueRefund)).toHaveBeenCalledWith(BOOKING_ID, 'txn_abc123');
   });
 
   it('calls issueRefund when the Postgres RPC returns no_match and a reference is supplied', async () => {
@@ -145,7 +145,18 @@ describe('assignCleaner — refund on no_match', () => {
 
     await assignCleaner(BOOKING_ID, bookingCtx, 'txn_xyz789');
 
-    expect(vi.mocked(issueRefund)).toHaveBeenCalledWith('txn_xyz789');
+    expect(vi.mocked(issueRefund)).toHaveBeenCalledWith(BOOKING_ID, 'txn_xyz789');
+  });
+
+  it('calls issueRefund exactly once when a paid booking results in no_match via the RPC', async () => {
+    mockMatchCleaner().mockResolvedValueOnce(['c1', 'c2']);
+    mockRpc().mockResolvedValueOnce({ data: 'no_match', error: null } as any);
+
+    const result = await assignCleaner(BOOKING_ID, bookingCtx, 'txn_paid_nomatch');
+
+    expect(result).toBe('no_match');
+    expect(vi.mocked(issueRefund)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(issueRefund)).toHaveBeenCalledWith(BOOKING_ID, 'txn_paid_nomatch');
   });
 
   it('does not call issueRefund when no paystackReference is provided', async () => {
