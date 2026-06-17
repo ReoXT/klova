@@ -91,7 +91,8 @@ Klova/
 │   │   │   ├── pricingController.ts
 │   │   │   ├── bookingController.ts
 │   │   │   ├── availabilityController.ts    # GET /availability/alternatives
-│   │   │   └── paymentController.ts         # POST /payments/initiate
+│   │   │   ├── paymentController.ts         # POST /payments/initiate
+│   │   │   └── webhookController.ts         # POST /webhooks/paystack
 │   │   ├── lib/
 │   │   │   └── supabase.ts                  # service-role client (bypasses RLS)
 │   │   ├── middleware/
@@ -102,7 +103,8 @@ Klova/
 │   │   │   ├── pricing.ts
 │   │   │   ├── bookings.ts
 │   │   │   ├── availability.ts              # GET /alternatives
-│   │   │   └── payments.ts                  # POST /initiate
+│   │   │   ├── payments.ts                  # POST /initiate
+│   │   │   └── webhooks.ts                  # POST /paystack
 │   │   ├── services/
 │   │   │   ├── pricingService.ts            # computePrice(), getPricingGrid()
 │   │   │   ├── bookingService.ts            # validateBookingInput(), createBooking()
@@ -110,6 +112,7 @@ Klova/
 │   │   │   ├── assignmentService.ts         # assignCleaner() → calls RPC + refund stub
 │   │   │   ├── availabilityService.ts       # getAlternativeDates()
 │   │   │   ├── paymentService.ts            # initializePayment() → Paystack /transaction/initialize
+│   │   │   ├── notificationService.ts       # stubs: notifyCustomerAssigned/AdminAssigned/AdminNoMatch
 │   │   │   └── refundService.ts             # issueRefund() stub — wire to Paystack next
 │   │   ├── app.ts
 │   │   ├── config.ts
@@ -169,6 +172,7 @@ Base URL (production): `https://klova-production.up.railway.app`
 | POST | `/bookings` | Creates a pending booking, returns `booking_id` + server-computed total |
 | GET | `/availability/alternatives` | `?zone_slug=lekki-ajah&date=2026-07-01` → next available dates in zone (next 14 days) |
 | POST | `/payments/initiate` | `{ booking_id }` → Paystack `authorization_url` + `reference`; stores reference on booking |
+| POST | `/webhooks/paystack` | Paystack webhook — verifies HMAC, on `charge.success` flips booking to `paid` and runs assignment |
 
 ### POST /bookings
 
@@ -332,8 +336,9 @@ Loaded in `app/layout.tsx` via `next/font/google`, exposed as CSS variables:
 | 3.4 Concurrency-safe assignment | ✅ Done | assignCleaner() + assign_cleaner Postgres fn (SELECT FOR UPDATE), now accepts paystackReference |
 | 3.5 No-availability experience | ✅ Done | getAlternativeDates(), issueRefund() stub, GET /availability/alternatives, 39 tests |
 | 3.6a Paystack payment init | ✅ Done | POST /payments/initiate — calls Paystack, stores reference on booking; 39 tests still pass |
+| 3.6b Paystack webhook | ✅ Done | POST /webhooks/paystack — HMAC verify, idempotent claim, assignment, notification stubs |
 
-**Next prompt to run: Prompt 3.6b — Paystack webhook (payment confirmation triggers assignment)**
+**Next prompt to run: Prompt 4.1 — Booking flow frontend (multi-step form: service → date → customer details → pay)**
 
 ---
 

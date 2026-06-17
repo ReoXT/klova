@@ -8,12 +8,18 @@ import pricingRouter from './routes/pricing';
 import bookingsRouter from './routes/bookings';
 import availabilityRouter from './routes/availability';
 import paymentsRouter from './routes/payments';
+import webhooksRouter from './routes/webhooks';
 
 const app = express();
 
 app.use(cors({ origin: config.frontendOrigin }));
-app.use(express.json());
 app.use(requestLogger);
+
+// Webhooks must receive the raw request body for HMAC signature verification.
+// Mount this route BEFORE express.json() so the body stream isn't consumed first.
+app.use('/webhooks', express.raw({ type: 'application/json' }), webhooksRouter);
+
+app.use(express.json());
 
 app.use('/health', healthRouter);
 app.use('/pricing', pricingRouter);
