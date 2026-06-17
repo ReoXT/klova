@@ -91,18 +91,19 @@ describe('matchCleaner — NO_MATCH', () => {
 // ─── Priority 1: requested cleaner ───────────────────────────────────────────
 
 describe('matchCleaner — Priority 1: requested cleaner', () => {
-  it('picks the requested cleaner when they are in the candidate set', async () => {
-    // c1 is requested; c2 has a higher rating but should not win
-    mockFrom()
-      .mockReturnValueOnce(chain({ data: [{ cleaner_id: 'c1' }, { cleaner_id: 'c2' }], error: null }) as any)
-      .mockReturnValueOnce(chain({ data: [{ id: 'c1', rating: 4.5 }, { id: 'c2', rating: 4.9 }], error: null }) as any)
-      .mockReturnValueOnce(chain({ data: [], error: null }) as any); // recent jobs
+  it('puts the requested cleaner first in the ranked list', async () => {
+    // c1 is requested; c2 has a higher rating but is the fallback
+    mockFourCalls(
+      [{ cleaner_id: 'c1' }, { cleaner_id: 'c2' }],
+      [{ id: 'c1', rating: 4.5 }, { id: 'c2', rating: 4.9 }],
+      [],
+      [], // no 5-star ratings — ratings always queried for full fallback list
+    );
 
-    // Ratings query should NOT be reached — Priority 1 fires first
     const result = await matchCleaner(booking({ requested_cleaner_id: 'c1' }));
 
-    expect(result).toBe('c1');
-    expect(mockFrom()).toHaveBeenCalledTimes(3); // no ratings query
+    expect(result[0]).toBe('c1'); // requested cleaner leads
+    expect(result[1]).toBe('c2'); // higher-rated stranger is the fallback
   });
 
   it('falls through when the requested cleaner is not in the candidate set', async () => {
@@ -116,7 +117,7 @@ describe('matchCleaner — Priority 1: requested cleaner', () => {
 
     const result = await matchCleaner(booking({ requested_cleaner_id: 'c-unavailable' }));
 
-    expect(result).toBe('c1'); // Priority 3: only candidate
+    expect(result[0]).toBe('c1'); // Priority 3: only candidate
   });
 });
 
@@ -134,7 +135,7 @@ describe('matchCleaner — Priority 2: 5-star preferred', () => {
 
     const result = await matchCleaner(booking());
 
-    expect(result).toBe('c1');
+    expect(result[0]).toBe('c1');
   });
 
   it('among multiple 5-star preferred cleaners, picks the highest-rated one', async () => {
@@ -148,7 +149,7 @@ describe('matchCleaner — Priority 2: 5-star preferred', () => {
 
     const result = await matchCleaner(booking());
 
-    expect(result).toBe('c2'); // highest rated among preferred
+    expect(result[0]).toBe('c2'); // highest rated among preferred
   });
 
   it('among preferred cleaners with equal rating, picks the one with fewer recent jobs', async () => {
@@ -162,7 +163,7 @@ describe('matchCleaner — Priority 2: 5-star preferred', () => {
 
     const result = await matchCleaner(booking());
 
-    expect(result).toBe('c1'); // same rating, fewer load
+    expect(result[0]).toBe('c1'); // same rating, fewer load
   });
 });
 
@@ -180,7 +181,7 @@ describe('matchCleaner — Priority 3: general pool', () => {
 
     const result = await matchCleaner(booking());
 
-    expect(result).toBe('c2');
+    expect(result[0]).toBe('c2');
   });
 
   it('breaks a rating tie with fewest recent jobs', async () => {
@@ -194,6 +195,6 @@ describe('matchCleaner — Priority 3: general pool', () => {
 
     const result = await matchCleaner(booking());
 
-    expect(result).toBe('c2'); // same rating, c2 is less loaded
+    expect(result[0]).toBe('c2'); // same rating, c2 is less loaded
   });
 });

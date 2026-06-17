@@ -195,7 +195,10 @@ Base URL (production): `https://klova-production.up.railway.app`
 - `getPricingGrid()` → `PricingGrid` — all services with price grids + all add-ons.
 
 ### `matchingService.ts`
-- `matchCleaner(booking)` → `string | 'NO_MATCH'` — pure selection, no DB writes. Takes `{ zone_id, customer_id, booking_date, requested_cleaner_id }`. Priority: (1) requested cleaner if available, (2) 5-star preferred cleaner (rating↓ load↑), (3) general pool (rating↓ load↑). Exports `NO_MATCH` const and `BookingForMatch` interface.
+- `matchCleaner(booking)` → `string[] | 'NO_MATCH'` — pure selection, no DB writes. Returns ALL candidates in priority order: [P1 requested?, ...P2 preferred sorted, ...P3 rest sorted]. The full list is passed to `assignCleaner()` so Postgres can try fallbacks. Exports `NO_MATCH` const, `MatchResult` type, `BookingForMatch` interface.
+
+### `assignmentService.ts`
+- `assignCleaner(bookingId, booking)` → `'matched' | 'no_match'` — calls `matchCleaner()` then invokes the `assign_cleaner` Postgres RPC with the ranked list. The RPC handles all DB writes (is_booked flip, booking status update) inside a single transaction with `SELECT FOR UPDATE` locking.
 
 ### `bookingService.ts`
 - `validateBookingInput(body)` → `BookingInput` — pure sync, no DB. Collects ALL field errors before throwing `FieldValidationError`.
@@ -300,9 +303,10 @@ Loaded in `app/layout.tsx` via `next/font/google`, exposed as CSS variables:
 | 2.4 Row-level security | ✅ Done | RLS on all tables, zero anon access, service role bypasses |
 | 3.1 Pricing service | ✅ Done | computePrice(), GET /pricing, 5 passing tests |
 | 3.2 Booking creation | ✅ Done | POST /bookings, field-level validation, 17 passing tests total |
-| 3.3 Matching algorithm | ✅ Done | matchCleaner() in matchingService.ts, 9 tests, 26 total passing |
+| 3.3 Matching algorithm | ✅ Done | matchCleaner() in matchingService.ts, returns ranked string[] for fallback |
+| 3.4 Concurrency-safe assignment | ✅ Done | assignCleaner() + assign_cleaner Postgres fn (SELECT FOR UPDATE), 30 tests |
 
-**Next prompt to run: Prompt 3.4 — Concurrency-safe cleaner assignment (row locking + DB write)**
+**Next prompt to run: Prompt 3.5 — Paystack webhook (payment confirmation triggers assignment)**
 
 ---
 

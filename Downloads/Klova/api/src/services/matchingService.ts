@@ -1,7 +1,9 @@
 import { supabase } from '../lib/supabase';
 
 export const NO_MATCH = 'NO_MATCH' as const;
-export type MatchResult = string | typeof NO_MATCH;
+
+/** Ordered candidate list (best first) or NO_MATCH if the zone has no one available. */
+export type MatchResult = string[] | typeof NO_MATCH;
 
 export interface BookingForMatch {
   zone_id: string;
@@ -26,6 +28,12 @@ interface Candidate {
  *
  * Returns NO_MATCH if no active, available candidates exist in the zone.
  * Does NOT assign the cleaner — that write (with row locking) is handled by the caller.
+ */
+/**
+ * Returns an ordered list of candidate cleaner IDs for a booking, or NO_MATCH.
+ * The list encodes priority: [P1 requested?, ...P2 preferred, ...P3 rest].
+ * The caller passes this list to assignCleaner(), which tries them in order
+ * with SELECT FOR UPDATE locking — the first one still available wins.
  */
 export async function matchCleaner(booking: BookingForMatch): Promise<MatchResult> {
   // ── Step 1: Collect cleaner IDs with an unbooked slot on the requested date ──
@@ -83,14 +91,8 @@ export async function matchCleaner(booking: BookingForMatch): Promise<MatchResul
 
   const candidateSet = new Set(candidateIds);
 
-  // ── Priority 1: Customer's explicitly requested cleaner ──────────────────────
-  // Only honoured if they're available, active, and in the right zone.
-  if (booking.requested_cleaner_id && candidateSet.has(booking.requested_cleaner_id)) {
-    return booking.requested_cleaner_id;
-  }
-
-  // ── Priority 2: Cleaners this customer has previously rated 5 stars ───────────
-  // Among those, pick the best-rated then least-loaded.
+  // Always fetch 5-star ratings regardless of whether P1 fires — we need the
+  // full ordered list so the Postgres assignment function has fallbacks.
   const { data: fiveStarRatings, error: ratingsErr } = await supabase
     .from('ratings')
     .select('cleaner_id')
@@ -104,13 +106,27 @@ export async function matchCleaner(booking: BookingForMatch): Promise<MatchResul
     (fiveStarRatings ?? []).map((r: { cleaner_id: string }) => r.cleaner_id),
   );
 
-  const preferred = enriched.filter((c) => fiveStarIds.has(c.id));
-  if (preferred.length > 0) {
-    return ranked(preferred)[0].id;
+  const ordered: string[] = [];
+  const added = new Set<string>();
+
+  // ── Priority 1: Customer's explicitly requested cleaner ──────────────────────
+  if (booking.requested_cleaner_id && candidateSet.has(booking.requested_cleaner_id)) {
+    ordered.push(booking.requested_cleaner_id);
+    added.add(booking.requested_cleaner_id);
+  }
+
+  // ── Priority 2: Cleaners this customer has previously rated 5 stars ───────────
+  for (const c of ranked(enriched.filter((c) => fiveStarIds.has(c.id) && !added.has(c.id)))) {
+    ordered.push(c.id);
+    added.add(c.id);
   }
 
   // ── Priority 3: General pool — best rated, then fewest recent jobs ─────────────
-  return ranked(enriched)[0].id;
+  for (const c of ranked(enriched.filter((c) => !added.has(c.id)))) {
+    ordered.push(c.id);
+  }
+
+  return ordered;
 }
 
 function ranked(candidates: Candidate[]): Candidate[] {
