@@ -175,8 +175,9 @@ Loaded in `app/layout.tsx` via `next/font/google`, exposed as CSS variables:
 | 1.3 Shared layout | ✅ Done | SiteNav (mobile drawer), SiteFooter, (site) route group, stub legal pages |
 | 1.4 UI primitives | ✅ Done | Button, FormField, SelectField, Card, Skeleton, EmptyState, Alert — all in styleguide |
 | 2.1 Express server scaffold | ✅ Done | Health endpoint live at https://klova-production.up.railway.app/health |
+| 2.2 Supabase connection | ✅ Done | Service client in api/src/lib/supabase.ts, full Next.js→Express→Supabase chain verified in production |
 
-**Next prompt to run: Prompt 2.2 — Supabase schema**
+**Next prompt to run: Prompt 2.3 — Supabase schema (real tables)**
 
 ---
 
