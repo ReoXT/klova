@@ -3,6 +3,7 @@ import { config } from '../config';
 
 export interface AppError extends Error {
   status?: number;
+  fields?: Record<string, string>; // field-level validation errors
 }
 
 export function errorHandler(
@@ -17,6 +18,7 @@ export function errorHandler(
   res.status(status).json({
     error: {
       message,
+      ...(err.fields && { fields: err.fields }),
       ...(config.nodeEnv !== 'production' && { stack: err.stack }),
     },
   });

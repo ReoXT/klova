@@ -13,6 +13,8 @@ const VALID_BEDROOMS = ['1', '2', '3', '4+'] as const;
 type Bedrooms = (typeof VALID_BEDROOMS)[number];
 
 export interface PriceBreakdown {
+  service_id: string;        // DB id — for booking FK
+  addon_ids: string[];       // DB ids — for booking_addons FK
   base_amount: number;       // NGN
   addons_amount: number;     // NGN
   total_amount: number;      // NGN
@@ -62,6 +64,8 @@ export async function computePrice(
     throw new ValidationError(`Unknown service "${serviceSlug}".`);
   }
 
+  const serviceId: string = service.id;
+
   // Fetch base price for this service + bedroom count
   const { data: pricing, error: priceErr } = await supabase
     .from('pricing')
@@ -80,10 +84,11 @@ export async function computePrice(
 
   // Fetch and validate add-ons
   let addonsKobo = 0;
+  let addonIds: string[] = [];
   if (addonSlugs.length > 0) {
     const { data: addons, error: addonsErr } = await supabase
       .from('addons')
-      .select('slug, amount_kobo')
+      .select('id, slug, amount_kobo')
       .in('slug', addonSlugs);
 
     if (addonsErr) throw addonsErr;
@@ -98,12 +103,15 @@ export async function computePrice(
       (sum: number, a: { amount_kobo: number }) => sum + a.amount_kobo,
       0,
     );
+    addonIds = (addons ?? []).map((a: { id: string }) => a.id);
   }
 
   const totalKobo = baseKobo + addonsKobo;
   const commissionKobo = Math.round(totalKobo * config.commissionRate);
 
   return {
+    service_id: serviceId,
+    addon_ids: addonIds,
     base_amount: baseKobo / 100,
     addons_amount: addonsKobo / 100,
     total_amount: totalKobo / 100,
