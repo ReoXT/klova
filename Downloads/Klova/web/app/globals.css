@@ -1,27 +1,71 @@
 @import "tailwindcss";
 @plugin "daisyui";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* ─────────────────────────────────────────────────────────────
+   KLOVA DESIGN SYSTEM — custom daisyUI theme
+   ───────────────────────────────────────────────────────────── */
+
+[data-theme="klova"] {
+  color-scheme: light;
+
+  /* ── Brand ──────────────────────────────────────────── */
+  /* Primary: deep forest green — trust, cleanliness, premium */
+  --color-primary:          oklch(0.29 0.09 152);
+  --color-primary-content:  oklch(0.97 0.01  152);
+
+  /* Secondary: warm stone — soft, warm complement */
+  --color-secondary:         oklch(0.92 0.015 78);
+  --color-secondary-content: oklch(0.28 0.015 78);
+
+  /* Accent: Lagos amber — energy, aspiration */
+  --color-accent:            oklch(0.68 0.14  67);
+  --color-accent-content:    oklch(0.15 0.02  67);
+
+  /* Neutral: warm gray */
+  --color-neutral:           oklch(0.42 0.012 85);
+  --color-neutral-content:   oklch(0.95 0.005 85);
+
+  /* ── Base (backgrounds & text) ───────────────────────── */
+  --color-base-100:    oklch(0.99 0.004 85);   /* warm near-white */
+  --color-base-200:    oklch(0.96 0.01  85);   /* section bg */
+  --color-base-300:    oklch(0.91 0.015 85);   /* borders, dividers */
+  --color-base-content: oklch(0.18 0.007 85);  /* warm near-black text */
+
+  /* ── Status ──────────────────────────────────────────── */
+  --color-info:             oklch(0.60 0.15  232);
+  --color-info-content:     oklch(0.97 0.005 232);
+  --color-success:          oklch(0.58 0.14  155);
+  --color-success-content:  oklch(0.97 0.005 155);
+  --color-warning:          oklch(0.78 0.15  72);
+  --color-warning-content:  oklch(0.18 0.05  72);
+  --color-error:            oklch(0.57 0.22  25);
+  --color-error-content:    oklch(0.97 0.005 25);
+
+  /* ── Radius — shared rounded language ───────────────── */
+  --radius-selector: 0.375rem;  /* 6px — checkboxes, radios, toggles */
+  --radius-field:    0.5rem;    /* 8px — inputs, selects, textareas */
+  --radius-box:      0.75rem;   /* 12px — cards, alerts, dropdowns */
+
+  /* ── Borders ─────────────────────────────────────────── */
+  --border-field: 1px;
+
+  /* ── Animation ───────────────────────────────────────── */
+  --animation-btn:   0.15s;
+  --animation-input: 0.15s;
 }
 
+/* ── Font tokens (values set at runtime by Next.js) ──────── */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-dm-serif);
+  --font-body:    var(--font-plus-jakarta);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* ── Base typography ─────────────────────────────────────── */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading), Georgia, serif;
+  letter-spacing: -0.015em;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-body), system-ui, sans-serif;
 }
