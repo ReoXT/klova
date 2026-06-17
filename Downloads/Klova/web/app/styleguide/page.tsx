@@ -290,28 +290,94 @@ export default function StyleGuidePage() {
 
         {/* CARDS ──────────────────────────────────────── */}
         <Section id="cards" title="Cards">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card shadow="none">
-              <CardBody>
-                <h3 className="card-title text-base">No shadow</h3>
-                <p className="text-sm text-base-content/60 mt-1">Nested cards or sections inside an already-elevated container.</p>
-                <Tag>shadow="none"</Tag>
-              </CardBody>
-            </Card>
-            <Card>
-              <CardBody>
-                <h3 className="card-title text-base">Default</h3>
-                <p className="text-sm text-base-content/60 mt-1">Most content blocks, booking summaries, service tiles.</p>
-                <Tag>shadow="sm"</Tag>
-              </CardBody>
-            </Card>
-            <Card shadow="md">
-              <CardBody>
-                <h3 className="card-title text-base">Elevated</h3>
-                <p className="text-sm text-base-content/60 mt-1">Modals, dropdowns, prominently featured cards.</p>
-                <Tag>shadow="md"</Tag>
-              </CardBody>
-            </Card>
+          <div className="space-y-4">
+
+            {/* Shadow variants */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card shadow="none">
+                <CardBody>
+                  <h3 className="card-title text-base">No shadow</h3>
+                  <p className="text-sm text-base-content/60 mt-1">Nested or inside an already-elevated container.</p>
+                  <Tag>shadow="none"</Tag>
+                </CardBody>
+              </Card>
+              <Card>
+                <CardBody>
+                  <h3 className="card-title text-base">Default</h3>
+                  <p className="text-sm text-base-content/60 mt-1">Most content blocks, booking summaries, service tiles.</p>
+                  <Tag>shadow="sm"</Tag>
+                </CardBody>
+              </Card>
+              <Card shadow="md">
+                <CardBody>
+                  <h3 className="card-title text-base">Elevated</h3>
+                  <p className="text-sm text-base-content/60 mt-1">Modals, dropdowns, prominently featured cards.</p>
+                  <Tag>shadow="md"</Tag>
+                </CardBody>
+              </Card>
+            </div>
+
+            {/* Real-world examples */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+              {/* Service card */}
+              <Card>
+                <CardBody>
+                  <h3 className="card-title text-lg">Standard Clean</h3>
+                  <p className="text-base-content/70 text-sm leading-relaxed mt-1">
+                    A thorough general clean of all rooms. Ideal for regular upkeep.
+                  </p>
+                  <div className="card-actions justify-between items-center mt-4">
+                    <span className="font-semibold text-primary text-sm">From ₦18,000</span>
+                    <Button size="sm">Select</Button>
+                  </div>
+                </CardBody>
+              </Card>
+
+              {/* Service card with badge */}
+              <Card>
+                <CardBody>
+                  <div className="flex justify-between items-start">
+                    <h3 className="card-title text-lg">Deep Clean</h3>
+                    <span className="badge badge-accent badge-sm">Popular</span>
+                  </div>
+                  <p className="text-base-content/70 text-sm leading-relaxed mt-1">
+                    Top-to-bottom including inside appliances, windows, and grout.
+                  </p>
+                  <div className="card-actions justify-between items-center mt-4">
+                    <span className="font-semibold text-primary text-sm">From ₦32,000</span>
+                    <Button size="sm">Select</Button>
+                  </div>
+                </CardBody>
+              </Card>
+
+              {/* Cleaner profile card */}
+              <Card>
+                <CardBody className="items-center text-center gap-3">
+                  <div className="avatar placeholder">
+                    <div className="bg-primary text-primary-content rounded-full w-14">
+                      <span className="text-xl">AO</span>
+                    </div>
+                  </div>
+                  <div>
+                    <h3 className="card-title justify-center text-lg">Adaeze</h3>
+                    <div className="flex items-center justify-center gap-0.5 text-accent mt-1">
+                      {[...Array(5)].map((_, i) => (
+                        <svg key={i} className="w-4 h-4 fill-current" viewBox="0 0 20 20" aria-hidden="true">
+                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                        </svg>
+                      ))}
+                      <span className="text-sm text-base-content/60 ml-1">5.0</span>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 flex-wrap justify-center">
+                    <span className="badge badge-primary badge-outline badge-sm">84 cleans</span>
+                    <span className="badge badge-success badge-outline badge-sm">NIN Verified</span>
+                  </div>
+                </CardBody>
+              </Card>
+
+            </div>
           </div>
         </Section>
 
