@@ -37,7 +37,7 @@ On-demand home cleaning for Lagos, Nigeria. Customers book a clean, pay online, 
 | Payments | Paystack | — |
 | Notifications | Termii (SMS/WhatsApp) | — |
 | Frontend hosting | Vercel | Live: https://klova-nine.vercel.app |
-| Backend hosting | Railway | (not yet deployed) |
+| Backend hosting | Railway | Live: https://klova-production.up.railway.app |
 | Repo | GitHub | https://github.com/ReoXT/klova.git |
 
 **Critical Tailwind v4 note:** There is NO `tailwind.config.js`. All config lives in `web/app/globals.css` via `@import "tailwindcss"` and `@plugin "daisyui"`. Custom theme tokens are in a `[data-theme="klova"]` CSS block using OKLCH colors.
@@ -174,8 +174,9 @@ Loaded in `app/layout.tsx` via `next/font/google`, exposed as CSS variables:
 | 1.2 Design system | ✅ Done | Custom "klova" theme, DM Serif + Plus Jakarta Sans, styleguide at /styleguide |
 | 1.3 Shared layout | ✅ Done | SiteNav (mobile drawer), SiteFooter, (site) route group, stub legal pages |
 | 1.4 UI primitives | ✅ Done | Button, FormField, SelectField, Card, Skeleton, EmptyState, Alert — all in styleguide |
+| 2.1 Express server scaffold | ✅ Done | Health endpoint live at https://klova-production.up.railway.app/health |
 
-**Next prompt to run: Prompt 2.1 — Express server scaffold & health check**
+**Next prompt to run: Prompt 2.2 — Supabase schema**
 
 ---
 
