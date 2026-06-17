@@ -487,43 +487,52 @@ export default function StyleGuidePage() {
 
         {/* ── ALERTS ─────────────────────────────────── */}
         <Section id="alerts" title="Alerts">
-          <div className="space-y-4">
+          <div className="space-y-3">
 
-            <div role="alert" className="alert alert-info">
-              <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            {/* Info */}
+            <div role="alert" className="flex items-start gap-4 bg-base-100 border border-base-300 border-l-[3px] border-l-info rounded-xl px-5 py-4 shadow-xs">
+              <svg className="h-4.5 w-4.5 shrink-0 text-info mt-px" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <span>
+              <p className="text-sm text-base-content leading-relaxed">
                 No availability on Dec 25 —{" "}
-                <strong>3 nearby dates have open slots.</strong> Choose one below.
-              </span>
+                <strong className="font-semibold">3 nearby dates have open slots.</strong>{" "}
+                Choose one below.
+              </p>
             </div>
 
-            <div role="alert" className="alert alert-success">
-              <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            {/* Success */}
+            <div role="alert" className="flex items-start gap-4 bg-base-100 border border-base-300 border-l-[3px] border-l-success rounded-xl px-5 py-4 shadow-xs">
+              <svg className="h-4.5 w-4.5 shrink-0 text-success mt-px" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <span>
-                Booking confirmed! <strong>Adaeze</strong> arrives Dec 18 between 9:00–9:30 AM.
-                Check your phone for the SMS.
-              </span>
+              <p className="text-sm text-base-content leading-relaxed">
+                Booking confirmed!{" "}
+                <strong className="font-semibold">Adaeze</strong>{" "}
+                arrives Dec 18 between 9:00–9:30 AM. Check your phone for the SMS.
+              </p>
             </div>
 
-            <div role="alert" className="alert alert-warning">
-              <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            {/* Warning */}
+            <div role="alert" className="flex items-start gap-4 bg-base-100 border border-base-300 border-l-[3px] border-l-warning rounded-xl px-5 py-4 shadow-xs">
+              <svg className="h-4.5 w-4.5 shrink-0 text-warning mt-px" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
-              <span>
-                Free cancellation available until <strong>Dec 17 at 9:00 AM.</strong>{" "}
+              <p className="text-sm text-base-content leading-relaxed">
+                Free cancellation available until{" "}
+                <strong className="font-semibold">Dec 17 at 9:00 AM.</strong>{" "}
                 A 50% fee applies after that.
-              </span>
+              </p>
             </div>
 
-            <div role="alert" className="alert alert-error">
-              <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            {/* Error */}
+            <div role="alert" className="flex items-start gap-4 bg-base-100 border border-base-300 border-l-[3px] border-l-error rounded-xl px-5 py-4 shadow-xs">
+              <svg className="h-4.5 w-4.5 shrink-0 text-error mt-px" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <span>Payment failed. Please check your card details and try again.</span>
+              <p className="text-sm text-base-content leading-relaxed">
+                Payment failed. Please check your card details and try again.
+              </p>
             </div>
 
           </div>
