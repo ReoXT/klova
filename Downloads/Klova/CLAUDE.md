@@ -81,24 +81,33 @@ Klova/
 ├── api/                        # Express backend → Railway
 │   ├── src/
 │   │   ├── __tests__/
-│   │   │   ├── pricingService.test.ts   # 5 tests
-│   │   │   └── bookingService.test.ts   # 12 tests
+│   │   │   ├── pricingService.test.ts       # 5 tests
+│   │   │   ├── bookingService.test.ts       # 12 tests
+│   │   │   ├── matchingService.test.ts      # 9 tests
+│   │   │   ├── assignmentService.test.ts    # 7 tests
+│   │   │   └── availabilityService.test.ts  # 6 tests  (39 total)
 │   │   ├── controllers/
 │   │   │   ├── healthController.ts
 │   │   │   ├── pricingController.ts
-│   │   │   └── bookingController.ts
+│   │   │   ├── bookingController.ts
+│   │   │   └── availabilityController.ts    # GET /availability/alternatives
 │   │   ├── lib/
-│   │   │   └── supabase.ts              # service-role client (bypasses RLS)
+│   │   │   └── supabase.ts                  # service-role client (bypasses RLS)
 │   │   ├── middleware/
-│   │   │   ├── errorHandler.ts          # returns { error: { message, fields?, stack? } }
+│   │   │   ├── errorHandler.ts              # returns { error: { message, fields?, stack? } }
 │   │   │   └── requestLogger.ts
 │   │   ├── routes/
 │   │   │   ├── health.ts
 │   │   │   ├── pricing.ts
-│   │   │   └── bookings.ts
+│   │   │   ├── bookings.ts
+│   │   │   └── availability.ts              # GET /alternatives
 │   │   ├── services/
-│   │   │   ├── pricingService.ts        # computePrice(), getPricingGrid()
-│   │   │   └── bookingService.ts        # validateBookingInput(), createBooking()
+│   │   │   ├── pricingService.ts            # computePrice(), getPricingGrid()
+│   │   │   ├── bookingService.ts            # validateBookingInput(), createBooking()
+│   │   │   ├── matchingService.ts           # matchCleaner() → ranked string[]
+│   │   │   ├── assignmentService.ts         # assignCleaner() → calls RPC + refund stub
+│   │   │   ├── availabilityService.ts       # getAlternativeDates()
+│   │   │   └── refundService.ts             # issueRefund() stub — wire to Paystack next
 │   │   ├── app.ts
 │   │   ├── config.ts
 │   │   └── server.ts
@@ -108,7 +117,8 @@ Klova/
 │   └── migrations/
 │       ├── 20260617000001_schema.sql    # all 10 tables
 │       ├── 20260617000002_seed.sql      # zones, services, pricing, addons
-│       └── 20260617000003_rls.sql       # RLS enabled, no permissive policies
+│       ├── 20260617000003_rls.sql       # RLS enabled, no permissive policies
+│       └── 20260617000004_assign_cleaner_fn.sql  # assign_cleaner() Postgres fn — applied ✅
 ├── CLAUDE.md                   # This file — update after every session
 ├── MASTER-ROADMAP.md           # Schema, matching algorithm, pricing (source of truth)
 ├── Klova Prompts.md            # Step-by-step build prompts (Sections 0–13)
