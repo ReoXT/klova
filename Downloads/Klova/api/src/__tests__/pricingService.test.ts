@@ -14,7 +14,7 @@ import { supabase } from '../lib/supabase';
 import { computePrice, ValidationError } from '../services/pricingService';
 
 // Builds a fluent Supabase query chain where terminal calls resolve with `result`.
-function chain(result: { data: unknown; error: null }) {
+function chain(result: { data: unknown; error: null | { code: string; message?: string } }) {
   const b: Record<string, unknown> = {
     single: vi.fn().mockResolvedValue(result),
     in: vi.fn().mockResolvedValue(result),

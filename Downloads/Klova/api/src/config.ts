@@ -15,4 +15,5 @@ export const config = {
   nodeEnv: process.env.NODE_ENV ?? 'development',
   supabaseUrl: required('SUPABASE_URL'),
   supabaseServiceRoleKey: required('SUPABASE_SERVICE_ROLE_KEY'),
+  paystackSecretKey: process.env.PAYSTACK_SECRET_KEY ?? '',
 };

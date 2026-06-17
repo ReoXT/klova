@@ -90,7 +90,8 @@ Klova/
 │   │   │   ├── healthController.ts
 │   │   │   ├── pricingController.ts
 │   │   │   ├── bookingController.ts
-│   │   │   └── availabilityController.ts    # GET /availability/alternatives
+│   │   │   ├── availabilityController.ts    # GET /availability/alternatives
+│   │   │   └── paymentController.ts         # POST /payments/initiate
 │   │   ├── lib/
 │   │   │   └── supabase.ts                  # service-role client (bypasses RLS)
 │   │   ├── middleware/
@@ -100,13 +101,15 @@ Klova/
 │   │   │   ├── health.ts
 │   │   │   ├── pricing.ts
 │   │   │   ├── bookings.ts
-│   │   │   └── availability.ts              # GET /alternatives
+│   │   │   ├── availability.ts              # GET /alternatives
+│   │   │   └── payments.ts                  # POST /initiate
 │   │   ├── services/
 │   │   │   ├── pricingService.ts            # computePrice(), getPricingGrid()
 │   │   │   ├── bookingService.ts            # validateBookingInput(), createBooking()
 │   │   │   ├── matchingService.ts           # matchCleaner() → ranked string[]
 │   │   │   ├── assignmentService.ts         # assignCleaner() → calls RPC + refund stub
 │   │   │   ├── availabilityService.ts       # getAlternativeDates()
+│   │   │   ├── paymentService.ts            # initializePayment() → Paystack /transaction/initialize
 │   │   │   └── refundService.ts             # issueRefund() stub — wire to Paystack next
 │   │   ├── app.ts
 │   │   ├── config.ts
@@ -165,6 +168,7 @@ Base URL (production): `https://klova-production.up.railway.app`
 | GET | `/pricing` | Full pricing grid + add-on list for the frontend calculator |
 | POST | `/bookings` | Creates a pending booking, returns `booking_id` + server-computed total |
 | GET | `/availability/alternatives` | `?zone_slug=lekki-ajah&date=2026-07-01` → next available dates in zone (next 14 days) |
+| POST | `/payments/initiate` | `{ booking_id }` → Paystack `authorization_url` + `reference`; stores reference on booking |
 
 ### POST /bookings
 
@@ -213,6 +217,10 @@ Base URL (production): `https://klova-production.up.railway.app`
 
 ### `availabilityService.ts`
 - `getAlternativeDates(zoneSlug, requestedDate, days=14)` → `string[]` — finds dates in the next N days where at least one active cleaner in the zone has a free slot. Returns deduplicated, sorted YYYY-MM-DD strings. Returns `[]` gracefully if zone unknown or no cleaners exist.
+
+### `paymentService.ts`
+- `initializePayment(bookingId)` → `PaymentInitResult` — looks up booking (must be `pending_payment`), calls `POST https://api.paystack.co/transaction/initialize` with kobo amount + customer email, stores returned reference on the booking row. Throws `PaymentError` (404/400/502/503) for known failure modes.
+- Exports `PaymentError` class (has `.status`), `PaymentInitResult` interface.
 
 ### `refundService.ts`
 - `issueRefund(paystackReference)` → stub, logs intent. Wire to `POST https://api.paystack.co/refund` in the payments prompt.
@@ -323,8 +331,9 @@ Loaded in `app/layout.tsx` via `next/font/google`, exposed as CSS variables:
 | 3.3 Matching algorithm | ✅ Done | matchCleaner() in matchingService.ts, returns ranked string[] for fallback |
 | 3.4 Concurrency-safe assignment | ✅ Done | assignCleaner() + assign_cleaner Postgres fn (SELECT FOR UPDATE), now accepts paystackReference |
 | 3.5 No-availability experience | ✅ Done | getAlternativeDates(), issueRefund() stub, GET /availability/alternatives, 39 tests |
+| 3.6a Paystack payment init | ✅ Done | POST /payments/initiate — calls Paystack, stores reference on booking; 39 tests still pass |
 
-**Next prompt to run: Prompt 3.6 — Paystack webhook (payment confirmation triggers assignment)**
+**Next prompt to run: Prompt 3.6b — Paystack webhook (payment confirmation triggers assignment)**
 
 ---
 
