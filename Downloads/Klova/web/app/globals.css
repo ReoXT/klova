@@ -69,3 +69,12 @@ h1, h2, h3, h4, h5, h6 {
 body {
   font-family: var(--font-body), system-ui, sans-serif;
 }
+
+/* ── Badge text alignment ────────────────────────────────── */
+/* Plus Jakarta Sans has a tall line box that fights daisyUI's
+   fixed-height badge centering. Collapsing line-height to 1
+   makes flex centering act on the actual cap-height. */
+.badge {
+  line-height: 1;
+  padding-bottom: 0.5px;
+}

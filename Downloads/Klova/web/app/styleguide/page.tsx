@@ -101,7 +101,7 @@ export default function StyleGuidePage() {
 
       {/* ── Sticky nav ─────────────────────────────────── */}
       <nav className="sticky top-0 z-10 bg-base-100/90 backdrop-blur-sm border-b border-base-300">
-        <div className="max-w-5xl mx-auto px-6 py-3 flex items-center justify-between">
+        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link href="/" className="text-lg text-primary">Klova</Link>
             <span className="text-base-content/30 select-none">/</span>
@@ -123,13 +123,13 @@ export default function StyleGuidePage() {
 
       {/* ── Hero ───────────────────────────────────────── */}
       <div className="bg-primary text-primary-content">
-        <div className="max-w-5xl mx-auto px-6 py-16">
-          <p className="text-xs tracking-widest uppercase opacity-50 mb-4">Design System · v1.0</p>
-          <h1 className="text-6xl mb-4">Klova</h1>
+        <div className="max-w-5xl mx-auto px-6 py-20">
+          <p className="text-xs tracking-widest uppercase opacity-50 mb-5">Design System · v1.0</p>
+          <h1 className="text-6xl mb-5">Klova</h1>
           <p className="text-lg opacity-75 max-w-lg leading-relaxed">
             Clean, trustworthy, Lagos-premium. The tokens, fonts, and components that build every page.
           </p>
-          <div className="flex gap-6 mt-10 text-sm opacity-60">
+          <div className="flex gap-6 mt-12 text-sm opacity-60">
             <div>
               <p className="font-semibold opacity-100 text-primary-content">DM Serif Display</p>
               <p>Headings</p>
@@ -242,8 +242,8 @@ export default function StyleGuidePage() {
         <Section id="buttons" title="Buttons">
           <div className="space-y-4">
 
-            <div className="card bg-base-100 p-6">
-              <p className="text-xs text-base-content/40 uppercase tracking-wider mb-4">Semantic variants</p>
+            <div className="card bg-base-100 p-8">
+              <p className="text-xs text-base-content/40 uppercase tracking-wider mb-5">Semantic variants</p>
               <div className="flex flex-wrap gap-3">
                 <button className="btn btn-primary">Primary</button>
                 <button className="btn btn-secondary">Secondary</button>
@@ -254,8 +254,8 @@ export default function StyleGuidePage() {
               </div>
             </div>
 
-            <div className="card bg-base-100 p-6">
-              <p className="text-xs text-base-content/40 uppercase tracking-wider mb-4">Outline variants</p>
+            <div className="card bg-base-100 p-8">
+              <p className="text-xs text-base-content/40 uppercase tracking-wider mb-5">Outline variants</p>
               <div className="flex flex-wrap gap-3">
                 <button className="btn btn-primary btn-outline">Primary</button>
                 <button className="btn btn-secondary btn-outline">Secondary</button>
@@ -264,8 +264,8 @@ export default function StyleGuidePage() {
               </div>
             </div>
 
-            <div className="card bg-base-100 p-6">
-              <p className="text-xs text-base-content/40 uppercase tracking-wider mb-4">Sizes</p>
+            <div className="card bg-base-100 p-8">
+              <p className="text-xs text-base-content/40 uppercase tracking-wider mb-5">Sizes</p>
               <div className="flex flex-wrap items-center gap-3">
                 <button className="btn btn-primary btn-lg">Large</button>
                 <button className="btn btn-primary">Default</button>
@@ -274,8 +274,8 @@ export default function StyleGuidePage() {
               </div>
             </div>
 
-            <div className="card bg-base-100 p-6">
-              <p className="text-xs text-base-content/40 uppercase tracking-wider mb-4">States</p>
+            <div className="card bg-base-100 p-8">
+              <p className="text-xs text-base-content/40 uppercase tracking-wider mb-5">States</p>
               <div className="flex flex-wrap gap-3">
                 <button className="btn btn-primary">Default</button>
                 <button className="btn btn-primary" disabled>Disabled</button>
@@ -295,7 +295,7 @@ export default function StyleGuidePage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
             {/* Text inputs */}
-            <div className="card bg-base-100 p-6 space-y-5">
+            <div className="card bg-base-100 p-8 space-y-6">
               <p className="text-xs text-base-content/40 uppercase tracking-wider">Text Inputs</p>
               <FieldRow label="Full name">
                 <input type="text" className="input w-full" placeholder="Adaeze Okonkwo" />
@@ -313,7 +313,7 @@ export default function StyleGuidePage() {
             </div>
 
             {/* Select & Textarea */}
-            <div className="card bg-base-100 p-6 space-y-5">
+            <div className="card bg-base-100 p-8 space-y-6">
               <p className="text-xs text-base-content/40 uppercase tracking-wider">Select & Textarea</p>
               <FieldRow label="Zone">
                 <select className="select w-full">
@@ -340,7 +340,7 @@ export default function StyleGuidePage() {
             </div>
 
             {/* Checkbox & Radio */}
-            <div className="card bg-base-100 p-6 space-y-5 md:col-span-2">
+            <div className="card bg-base-100 p-8 space-y-6 md:col-span-2">
               <p className="text-xs text-base-content/40 uppercase tracking-wider">Checkbox & Radio</p>
               <div className="flex flex-wrap gap-12">
                 <div className="space-y-3">
@@ -449,9 +449,9 @@ export default function StyleGuidePage() {
 
         {/* ── BADGES ─────────────────────────────────── */}
         <Section id="badges" title="Badges">
-          <div className="card bg-base-100 p-6 space-y-4">
+          <div className="card bg-base-100 p-8 space-y-6">
             <div>
-              <p className="text-xs text-base-content/40 uppercase tracking-wider mb-3">Filled</p>
+              <p className="text-xs text-base-content/40 uppercase tracking-wider mb-4">Filled</p>
               <div className="flex flex-wrap gap-2">
                 {["primary","secondary","accent","neutral","info","success","warning","error"].map((c) => (
                   <span key={c} className={`badge badge-${c} capitalize`}>{c}</span>
@@ -459,7 +459,7 @@ export default function StyleGuidePage() {
               </div>
             </div>
             <div>
-              <p className="text-xs text-base-content/40 uppercase tracking-wider mb-3">Booking statuses (outline)</p>
+              <p className="text-xs text-base-content/40 uppercase tracking-wider mb-4">Booking statuses (outline)</p>
               <div className="flex flex-wrap gap-2">
                 {[
                   { label: "Pending", color: "warning" },
@@ -474,7 +474,7 @@ export default function StyleGuidePage() {
               </div>
             </div>
             <div>
-              <p className="text-xs text-base-content/40 uppercase tracking-wider mb-3">Sizes</p>
+              <p className="text-xs text-base-content/40 uppercase tracking-wider mb-4">Sizes</p>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="badge badge-primary badge-lg">Large</span>
                 <span className="badge badge-primary">Default</span>
@@ -487,7 +487,7 @@ export default function StyleGuidePage() {
 
         {/* ── ALERTS ─────────────────────────────────── */}
         <Section id="alerts" title="Alerts">
-          <div className="space-y-3">
+          <div className="space-y-4">
 
             <div role="alert" className="alert alert-info">
               <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -537,9 +537,9 @@ export default function StyleGuidePage() {
               { label: "shadow-sm", desc: "Cards, input wrappers", cls: "shadow-sm" },
               { label: "shadow-md", desc: "Dropdowns, modals", cls: "shadow-md" },
             ].map(({ label, desc, cls }) => (
-              <div key={label} className="card bg-base-100 p-6">
-                <p className="text-xs text-base-content/40 uppercase tracking-wider mb-4">{label}</p>
-                <div className={`bg-base-100 rounded-xl p-5 ${cls}`}>
+              <div key={label} className="card bg-base-100 p-8">
+                <p className="text-xs text-base-content/40 uppercase tracking-wider mb-5">{label}</p>
+                <div className={`bg-base-100 rounded-xl p-6 ${cls}`}>
                   <p className="text-sm font-medium text-base-content">{desc}</p>
                 </div>
               </div>
@@ -549,8 +549,8 @@ export default function StyleGuidePage() {
 
         {/* ── RADIUS ─────────────────────────────────── */}
         <Section id="radius" title="Border Radius">
-          <div className="card bg-base-100 p-6">
-            <div className="flex flex-wrap gap-6 items-end">
+          <div className="card bg-base-100 p-8">
+            <div className="flex flex-wrap gap-8 items-end">
               {[
                 { label: "--radius-selector", value: "6px", cls: "rounded-[6px]", w: "w-12 h-12" },
                 { label: "--radius-field", value: "8px", cls: "rounded-[8px]", w: "w-16 h-12" },
@@ -571,7 +571,7 @@ export default function StyleGuidePage() {
 
       {/* ── Footer ─────────────────────────────────────── */}
       <footer className="border-t border-base-300 bg-base-100 mt-8">
-        <div className="max-w-5xl mx-auto px-6 py-5 flex items-center justify-between">
+        <div className="max-w-5xl mx-auto px-6 py-6 flex items-center justify-between">
           <span className="text-primary text-lg">Klova</span>
           <span className="text-xs text-base-content/40">Design System · Internal · v1.0</span>
         </div>
