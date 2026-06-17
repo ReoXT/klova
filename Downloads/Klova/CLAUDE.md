@@ -194,6 +194,9 @@ Base URL (production): `https://klova-production.up.railway.app`
 - `computePrice(serviceSlug, bedrooms, addonSlugs[])` → `PriceBreakdown` — server-side source of truth. Returns `service_id`, `addon_ids`, `base_amount`, `addons_amount`, `total_amount`, `commission_amount`, `commission_rate` (all NGN). Throws `ValidationError` (400) for unknown service, invalid bedrooms, unknown add-ons.
 - `getPricingGrid()` → `PricingGrid` — all services with price grids + all add-ons.
 
+### `matchingService.ts`
+- `matchCleaner(booking)` → `string | 'NO_MATCH'` — pure selection, no DB writes. Takes `{ zone_id, customer_id, booking_date, requested_cleaner_id }`. Priority: (1) requested cleaner if available, (2) 5-star preferred cleaner (rating↓ load↑), (3) general pool (rating↓ load↑). Exports `NO_MATCH` const and `BookingForMatch` interface.
+
 ### `bookingService.ts`
 - `validateBookingInput(body)` → `BookingInput` — pure sync, no DB. Collects ALL field errors before throwing `FieldValidationError`.
 - `createBooking(input)` → `BookingResult` — validates zone active, calls `computePrice`, upserts customer on phone, inserts booking at `status: 'pending_payment'`, links `booking_addons`. No cleaner assigned yet, no payment yet.
@@ -297,8 +300,9 @@ Loaded in `app/layout.tsx` via `next/font/google`, exposed as CSS variables:
 | 2.4 Row-level security | ✅ Done | RLS on all tables, zero anon access, service role bypasses |
 | 3.1 Pricing service | ✅ Done | computePrice(), GET /pricing, 5 passing tests |
 | 3.2 Booking creation | ✅ Done | POST /bookings, field-level validation, 17 passing tests total |
+| 3.3 Matching algorithm | ✅ Done | matchCleaner() in matchingService.ts, 9 tests, 26 total passing |
 
-**Next prompt to run: Prompt 3.3 — The matching algorithm**
+**Next prompt to run: Prompt 3.4 — Concurrency-safe cleaner assignment (row locking + DB write)**
 
 ---
 
