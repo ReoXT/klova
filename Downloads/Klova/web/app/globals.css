@@ -5,31 +5,68 @@
    KLOVA DESIGN SYSTEM — custom daisyUI theme
    ───────────────────────────────────────────────────────────── */
 
+/* ── Semantic tokens ─────────────────────────────────────────── */
+:root {
+  /* Brand primitives */
+  --klova-primary:         oklch(0.29 0.09 152);
+  --klova-primary-content: oklch(0.97 0.01 152);
+  --klova-primary-soft:    oklch(0.29 0.09 152 / 0.10);
+  --klova-accent:          oklch(0.68 0.14 67);
+  --klova-accent-content:  oklch(0.15 0.02 67);
+  --klova-accent-soft:     oklch(0.68 0.14 67 / 0.12);
+  --klova-success:         oklch(0.58 0.14 155);
+  --klova-success-soft:    oklch(0.58 0.14 155 / 0.10);
+
+  /* Surface aliases */
+  --surface-page:    oklch(0.99 0.004 85);
+  --surface-section: oklch(0.96 0.01 85);
+  --surface-card:    oklch(0.99 0.004 85);
+
+  /* Border aliases */
+  --border-default: oklch(0.91 0.015 85);
+  --border-strong:  oklch(0.84 0.018 85);
+
+  /* Text aliases */
+  --text-strong:     oklch(0.18 0.007 85);
+  --text-body:       oklch(0.18 0.007 85 / 0.78);
+  --text-muted:      oklch(0.18 0.007 85 / 0.55);
+  --text-subtle:     oklch(0.18 0.007 85 / 0.38);
+  --text-on-primary: oklch(0.97 0.01 152);
+
+  /* Radius extras */
+  --radius-lg:   1rem;
+  --radius-xl:   1.5rem;
+  --radius-pill: 9999px;
+
+  /* Shadows — warm-tinted */
+  --shadow-sm:    0 1px 3px oklch(0.18 0.007 85 / 0.07), 0 1px 2px oklch(0.18 0.007 85 / 0.04);
+  --shadow-md:    0 4px 16px oklch(0.18 0.007 85 / 0.08), 0 2px 6px oklch(0.18 0.007 85 / 0.05);
+  --shadow-lg:    0 12px 32px oklch(0.18 0.007 85 / 0.10), 0 4px 12px oklch(0.18 0.007 85 / 0.06);
+  --shadow-float: 0 8px 36px oklch(0.18 0.007 85 / 0.13);
+  --shadow-hero:  0 32px 80px oklch(0.29 0.09 152 / 0.13), 0 4px 16px oklch(0.29 0.09 152 / 0.06);
+}
+
 [data-theme="klova"] {
   color-scheme: light;
 
   /* ── Brand ──────────────────────────────────────────── */
-  /* Primary: deep forest green — trust, cleanliness, premium */
   --color-primary:          oklch(0.29 0.09 152);
   --color-primary-content:  oklch(0.97 0.01  152);
 
-  /* Secondary: warm stone — soft, warm complement */
   --color-secondary:         oklch(0.92 0.015 78);
   --color-secondary-content: oklch(0.28 0.015 78);
 
-  /* Accent: Lagos amber — energy, aspiration */
   --color-accent:            oklch(0.68 0.14  67);
   --color-accent-content:    oklch(0.15 0.02  67);
 
-  /* Neutral: warm gray */
   --color-neutral:           oklch(0.42 0.012 85);
   --color-neutral-content:   oklch(0.95 0.005 85);
 
-  /* ── Base (backgrounds & text) ───────────────────────── */
-  --color-base-100:    oklch(0.99 0.004 85);   /* warm near-white */
-  --color-base-200:    oklch(0.96 0.01  85);   /* section bg */
-  --color-base-300:    oklch(0.91 0.015 85);   /* borders, dividers */
-  --color-base-content: oklch(0.18 0.007 85);  /* warm near-black text */
+  /* ── Base ────────────────────────────────────────────── */
+  --color-base-100:    oklch(0.99 0.004 85);
+  --color-base-200:    oklch(0.96 0.01  85);
+  --color-base-300:    oklch(0.91 0.015 85);
+  --color-base-content: oklch(0.18 0.007 85);
 
   /* ── Status ──────────────────────────────────────────── */
   --color-info:             oklch(0.60 0.15  232);
@@ -41,10 +78,10 @@
   --color-error:            oklch(0.57 0.22  25);
   --color-error-content:    oklch(0.97 0.005 25);
 
-  /* ── Radius — shared rounded language ───────────────── */
-  --radius-selector: 0.375rem;  /* 6px — checkboxes, radios, toggles */
-  --radius-field:    0.5rem;    /* 8px — inputs, selects, textareas */
-  --radius-box:      0.75rem;   /* 12px — cards, alerts, dropdowns */
+  /* ── Radius ──────────────────────────────────────────── */
+  --radius-selector: 0.375rem;
+  --radius-field:    0.5rem;
+  --radius-box:      0.75rem;
 
   /* ── Borders ─────────────────────────────────────────── */
   --border-field: 1px;
@@ -72,22 +109,45 @@ body {
   font-optical-sizing: auto;
 }
 
-/* ── Klova wordmark — reused everywhere the brand name appears ── */
+/* ── Klova wordmark ──────────────────────────────────────── */
 .wordmark {
   font-family: var(--font-dm-serif), Georgia, serif;
   letter-spacing: -0.015em;
 }
 
 /* ── Badge text alignment ────────────────────────────────── */
-/* Plus Jakarta Sans has a tall line box that fights daisyUI's
-   fixed-height badge centering. Collapsing line-height to 1
-   makes flex centering act on the actual cap-height. */
 .badge {
   line-height: 1;
   padding-bottom: 0.5px;
 }
 
-/* ── Landing page animations ─────────────────────────────── */
+/* ── Landing page — responsive section grids ─────────────── */
+.hero-grid  { display: grid; grid-template-columns: 1fr 360px; gap: 5rem; align-items: center; }
+.svc-grid   { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+.trust-grid { display: grid; grid-template-columns: 1fr 340px; gap: 4rem; align-items: start; }
+.trust-card { position: sticky; top: 6rem; }
+.steps-grid { display: grid; grid-template-columns: repeat(4, 1fr); }
+.zones-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4rem; align-items: start; }
+.avail-grid { display: grid; grid-template-columns: auto 1fr; gap: 4rem; align-items: center; }
+.slots-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; }
+
+@media (max-width: 1023px) {
+  .hero-grid  { grid-template-columns: 1fr; gap: 2rem; }
+  .hero-photo { display: none !important; }
+  .svc-grid   { grid-template-columns: repeat(2, 1fr); }
+  .trust-grid { grid-template-columns: 1fr; gap: 3rem; }
+  .trust-card { position: static; max-width: 380px; }
+  .steps-grid { grid-template-columns: repeat(2, 1fr); }
+  .zones-grid { grid-template-columns: 1fr; gap: 2.5rem; }
+  .avail-grid { grid-template-columns: 1fr; gap: 1.5rem; }
+}
+@media (max-width: 560px) {
+  .svc-grid   { grid-template-columns: 1fr; }
+  .steps-grid { grid-template-columns: 1fr; }
+  .slots-grid { grid-template-columns: 1fr; }
+}
+
+/* ── Animations ──────────────────────────────────────────── */
 @keyframes fade-up {
   from { opacity: 0; transform: translateY(18px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -98,7 +158,6 @@ body {
 .fade-up-3 { animation-delay: 0.24s; }
 .fade-up-4 { animation-delay: 0.36s; }
 
-/* Floating elements (hero image badges) */
 @keyframes float {
   0%, 100% { transform: translateY(0px); }
   50%       { transform: translateY(-10px); }
@@ -109,3 +168,10 @@ body {
 }
 .hero-float     { animation: float     5s ease-in-out infinite; }
 .hero-float-alt { animation: float-alt 6s ease-in-out 1.4s infinite; }
+
+/* Zones live indicator */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+.pulse-dot { animation: pulse-dot 1.8s ease-in-out infinite; }
