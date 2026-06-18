@@ -98,42 +98,37 @@ export default function Home() {
 
 function Hero() {
   return (
-    <section className="relative overflow-hidden bg-base-100">
-      {/* Atmospheric glow — top right */}
+    <section className="relative overflow-hidden bg-base-100 min-h-[88vh] flex items-center">
+      {/* Background orb — top right */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute -top-48 -right-48 w-[680px] h-[680px] rounded-full"
-        style={{ background: "radial-gradient(circle, oklch(0.29 0.09 152 / 0.07) 0%, transparent 65%)" }}
+        className="pointer-events-none absolute -top-48 -right-48 w-[700px] h-[700px] rounded-full"
+        style={{ background: "radial-gradient(circle, oklch(0.29 0.09 152 / 0.08) 0%, transparent 60%)" }}
       />
-      {/* Atmospheric glow — bottom left */}
+      {/* Background orb — bottom left */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute -bottom-24 -left-24 w-[480px] h-[480px] rounded-full"
-        style={{ background: "radial-gradient(circle, oklch(0.68 0.14 67 / 0.06) 0%, transparent 65%)" }}
+        className="pointer-events-none absolute -bottom-40 -left-40 w-[520px] h-[520px] rounded-full"
+        style={{ background: "radial-gradient(circle, oklch(0.68 0.14 67 / 0.06) 0%, transparent 60%)" }}
       />
 
-      <div className="max-w-6xl mx-auto px-5 sm:px-6 pt-16 pb-20 lg:pt-24 lg:pb-32">
-        <div className="grid lg:grid-cols-[1fr_340px] gap-10 lg:gap-16 items-center">
+      <div className="max-w-6xl mx-auto px-5 sm:px-6 py-20 lg:py-28 w-full">
+        <div className="grid lg:grid-cols-[1fr_400px] gap-14 lg:gap-20 items-center">
 
           {/* ── Copy ── */}
           <div>
-            <div className="fade-up fade-up-1 inline-flex items-center gap-2 mb-8 px-3.5 py-1.5 rounded-full bg-success/10 border border-success/20 text-sm font-medium text-success">
-              <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse shrink-0" aria-hidden="true" />
-              Now live in Lekki / Ajah
-            </div>
-
-            <h1 className="fade-up fade-up-2 text-5xl sm:text-6xl lg:text-[4.25rem] leading-[1.04] text-primary mb-7">
+            <h1 className="fade-up fade-up-1 text-5xl sm:text-6xl lg:text-[4.5rem] leading-[1.04] text-primary mb-8">
               On-demand<br />
               housekeeping<br />
               you can trust.
             </h1>
 
-            <p className="fade-up fade-up-3 text-lg sm:text-xl text-base-content/60 leading-relaxed max-w-md mb-10">
+            <p className="fade-up fade-up-2 text-lg sm:text-xl text-base-content/60 leading-relaxed max-w-md mb-10">
               Skilled, personally vetted Keepers matched to your home or office in minutes.{" "}
               <span className="text-base-content/80 font-semibold">Standard cleans from ₦5,000.</span>
             </p>
 
-            <div className="fade-up fade-up-4 flex flex-col sm:flex-row gap-3 mb-14">
+            <div className="fade-up fade-up-3 flex flex-col sm:flex-row gap-3 mb-14">
               <Link href="/book" className="btn btn-primary btn-lg gap-2 group sm:px-7">
                 Book a Keeper
                 <svg
@@ -149,24 +144,30 @@ function Hero() {
               </a>
             </div>
 
-            {/* Stats strip */}
-            <div className="fade-up fade-up-4 grid grid-cols-3 gap-5 pt-8 border-t border-base-300">
+            {/* Trust signals */}
+            <div className="fade-up fade-up-4 flex flex-wrap gap-x-7 gap-y-3 pt-7 border-t border-base-300">
               {[
-                { value: "Vetted", label: "Every Keeper, personally" },
-                { value: "4.8★", label: "Average Keeper rating" },
-                { value: "24/7", label: "Available any day" },
-              ].map(({ value, label }) => (
-                <div key={label}>
-                  <p className="wordmark text-2xl text-primary mb-0.5">{value}</p>
-                  <p className="text-xs text-base-content/45 leading-snug">{label}</p>
+                "Personally trained and vetted",
+                "4.8 average rating",
+                "Matched in under 2 minutes",
+              ].map((text) => (
+                <div key={text} className="flex items-center gap-2">
+                  <svg
+                    className="w-3.5 h-3.5 text-primary shrink-0"
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
+                    aria-hidden="true"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span className="text-sm text-base-content/50">{text}</span>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* ── Keeper preview card (desktop only) ── */}
-          <div className="hidden lg:block fade-up fade-up-3">
-            <KeeperCard size="lg" />
+          {/* ── Hero photo (desktop only) ── */}
+          <div className="hidden lg:block fade-up fade-up-2">
+            <HeroPhoto />
           </div>
         </div>
       </div>
@@ -174,7 +175,98 @@ function Hero() {
   );
 }
 
-// ─── Keeper card (reused in Hero + Trust) ────────────────────────────────────
+// ─── Hero photo placeholder ───────────────────────────────────────────────────
+
+function HeroPhoto() {
+  return (
+    <div className="relative">
+      {/* Photo frame */}
+      <div
+        className="relative w-full rounded-3xl overflow-hidden"
+        style={{
+          aspectRatio: "3/4",
+          background: "linear-gradient(155deg, oklch(0.94 0.008 85) 0%, oklch(0.90 0.014 85) 100%)",
+          border: "1px solid oklch(0.90 0.015 85)",
+          boxShadow: "0 32px 80px oklch(0.29 0.09 152 / 0.13), 0 4px 16px oklch(0.29 0.09 152 / 0.06)",
+        }}
+      >
+        {/* Subtle inner vignette */}
+        <div
+          className="absolute inset-0"
+          style={{ background: "radial-gradient(ellipse at 50% 100%, oklch(0.29 0.09 152 / 0.04) 0%, transparent 70%)" }}
+        />
+        {/* Person silhouette */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
+          <div
+            className="w-24 h-24 rounded-full flex items-center justify-center"
+            style={{ background: "oklch(0.86 0.012 85)" }}
+          >
+            <svg
+              className="w-12 h-12"
+              style={{ color: "oklch(0.74 0.012 85)" }}
+              fill="currentColor" viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z" />
+            </svg>
+          </div>
+          <p className="text-xs font-medium tracking-wide" style={{ color: "oklch(0.68 0.01 85)" }}>
+            Keeper photo coming soon
+          </p>
+        </div>
+      </div>
+
+      {/* Floating badge — rating */}
+      <div
+        className="hero-float absolute -left-8 top-[30%] bg-base-100 rounded-2xl border border-base-300 px-4 py-3.5"
+        style={{ boxShadow: "0 8px 36px oklch(0.18 0.007 85 / 0.13)" }}
+      >
+        <div className="flex items-center gap-3">
+          <div
+            className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+            style={{ background: "oklch(0.68 0.14 67 / 0.12)" }}
+          >
+            <svg
+              className="w-4 h-4"
+              style={{ color: "oklch(0.68 0.14 67)", fill: "currentColor" }}
+              viewBox="0 0 24 24" aria-hidden="true"
+            >
+              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-sm font-bold text-base-content leading-none mb-1">4.8 / 5</p>
+            <p className="text-[11px] text-base-content/40 leading-none">Keeper rating</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Floating badge — vetted */}
+      <div
+        className="hero-float-alt absolute -right-6 bottom-[28%] bg-base-100 rounded-2xl border border-base-300 px-4 py-3.5"
+        style={{ boxShadow: "0 8px 36px oklch(0.18 0.007 85 / 0.13)" }}
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-success/10">
+            <svg
+              className="w-4 h-4 text-success"
+              fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
+              aria-hidden="true"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-sm font-bold text-base-content leading-none mb-1">Vetted</p>
+            <p className="text-[11px] text-base-content/40 leading-none">Every Keeper</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Keeper card (reused in Trust section) ────────────────────────────────────
 
 function KeeperCard({ size = "md" }: { size?: "md" | "lg" }) {
   const isLg = size === "lg";

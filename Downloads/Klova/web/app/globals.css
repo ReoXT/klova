@@ -97,3 +97,15 @@ body {
 .fade-up-2 { animation-delay: 0.14s; }
 .fade-up-3 { animation-delay: 0.24s; }
 .fade-up-4 { animation-delay: 0.36s; }
+
+/* Floating elements (hero image badges) */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-10px); }
+}
+@keyframes float-alt {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(9px); }
+}
+.hero-float     { animation: float     5s ease-in-out infinite; }
+.hero-float-alt { animation: float-alt 6s ease-in-out 1.4s infinite; }
