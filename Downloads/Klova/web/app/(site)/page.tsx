@@ -472,22 +472,6 @@ function Trust() {
               ))}
             </div>
 
-            {/* Differentiator callout */}
-            <div
-              className="mt-10 rounded-2xl p-5 border"
-              style={{
-                background: "oklch(0.68 0.14 67 / 0.07)",
-                borderColor: "oklch(0.68 0.14 67 / 0.2)",
-              }}
-            >
-              <p className="text-sm font-semibold text-base-content mb-1">
-                You see who's coming before you pay.
-              </p>
-              <p className="text-sm text-base-content/55 leading-relaxed">
-                Name, photo, star rating, completed jobs. This isn&apos;t a nice-to-have. It&apos;s how
-                Klova works. Every booking, every time.
-              </p>
-            </div>
           </div>
 
           {/* ── Keeper card ── */}
