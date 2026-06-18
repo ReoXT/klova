@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { DayPicker } from "react-day-picker";
+import "react-day-picker/style.css";
 import type { BookingData, TimeSlot } from "../types";
 import { TIME_SLOTS } from "../data";
 import { Button } from "@/components/ui/Button";
@@ -12,156 +14,134 @@ interface Props {
   onBack: () => void;
 }
 
-const DAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+const today = new Date();
+today.setHours(0, 0, 0, 0);
+const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+const threeMonthsOut = new Date(today.getFullYear(), today.getMonth() + 3, 0);
 
-function toYMD(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
-
-function parseYMD(s: string): Date {
-  const [y, m, d] = s.split("-").map(Number);
-  return new Date(y, m - 1, d);
-}
-
-function addMonths(d: Date, n: number): Date {
-  return new Date(d.getFullYear(), d.getMonth() + n, 1);
-}
+const TIME_META: Record<string, string> = {
+  "7am–9am":   "Morning — great for early risers",
+  "9am–12pm":  "Mid-morning — our most popular slot",
+  "12pm–2pm":  "Afternoon — after lunch",
+  "2pm–4pm":   "Late afternoon — wrap up by 4pm",
+};
 
 export default function Step04DateTime({ data, patch, onNext, onBack }: Props) {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const minDate = new Date(today.getTime() + 24 * 60 * 60 * 1000); // tomorrow
-
-  const [viewMonth, setViewMonth] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
   const [error, setError] = useState<string | null>(null);
 
-  const year = viewMonth.getFullYear();
-  const month = viewMonth.getMonth();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const firstDow = new Date(year, month, 1).getDay();
-  const maxDate = new Date(today.getFullYear(), today.getMonth() + 3, 0);
+  const selected = data.bookingDate
+    ? (() => {
+        const [y, m, d] = data.bookingDate.split("-").map(Number);
+        return new Date(y, m - 1, d);
+      })()
+    : undefined;
 
-  function handleDate(d: number) {
-    const date = new Date(year, month, d);
-    if (date < minDate || date > maxDate) return;
-    patch({ bookingDate: toYMD(date), timeSlot: null });
+  function handleSelect(day: Date | undefined) {
+    if (!day) return;
+    const iso = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(day.getDate()).padStart(2, "0")}`;
+    patch({ bookingDate: iso, timeSlot: null });
     setError(null);
   }
 
   function handleNext() {
     if (!data.bookingDate) { setError("Please pick a date."); return; }
-    if (!data.timeSlot) { setError("Please pick a time slot."); return; }
-    setError(null);
+    if (!data.timeSlot)    { setError("Please pick a time slot."); return; }
     onNext();
   }
-
-  const selectedDate = data.bookingDate ? parseYMD(data.bookingDate) : null;
-
-  const prevDisabled = viewMonth <= new Date(today.getFullYear(), today.getMonth(), 1);
-  const nextDisabled = viewMonth >= new Date(today.getFullYear(), today.getMonth() + 3, 1);
 
   return (
     <div className="max-w-lg mx-auto px-4 pt-6 pb-4">
       <h1 className="text-2xl font-semibold mb-1" style={{ color: "var(--text-strong)" }}>
         When should we come?
       </h1>
-      <p className="text-sm mb-6" style={{ color: "var(--text-muted)" }}>
-        Choose a date at least 24 hours from now.
+      <p className="text-sm mb-5" style={{ color: "var(--text-muted)" }}>
+        Pick a date — earliest available is tomorrow.
       </p>
 
       {/* Calendar */}
       <div
-        className="rounded-2xl border p-4 mb-4"
-        style={{ borderColor: "var(--border-default)", background: "var(--surface-card)" }}
+        className="rounded-2xl border flex justify-center py-2 mb-5"
+        style={{
+          borderColor: "var(--border-default)",
+          background: "var(--surface-card)",
+          boxShadow: "var(--shadow-sm)",
+        }}
       >
-        {/* Month nav */}
-        <div className="flex items-center justify-between mb-4">
-          <button
-            type="button"
-            onClick={() => setViewMonth(addMonths(viewMonth, -1))}
-            disabled={prevDisabled}
-            className="btn btn-ghost btn-sm btn-square"
-            aria-label="Previous month"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          <p className="font-semibold text-sm" style={{ color: "var(--text-strong)" }}>
-            {viewMonth.toLocaleDateString("en-NG", { month: "long", year: "numeric" })}
-          </p>
-          <button
-            type="button"
-            onClick={() => setViewMonth(addMonths(viewMonth, 1))}
-            disabled={nextDisabled}
-            className="btn btn-ghost btn-sm btn-square"
-            aria-label="Next month"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
-        </div>
-
-        {/* Day headers */}
-        <div className="grid grid-cols-7 mb-1">
-          {DAYS.map((d) => (
-            <div key={d} className="text-center text-xs font-medium py-1" style={{ color: "var(--text-subtle)" }}>
-              {d}
-            </div>
-          ))}
-        </div>
-
-        {/* Date grid */}
-        <div className="grid grid-cols-7 gap-y-1">
-          {Array.from({ length: firstDow }).map((_, i) => (
-            <div key={`empty-${i}`} />
-          ))}
-          {Array.from({ length: daysInMonth }).map((_, i) => {
-            const dayNum = i + 1;
-            const date = new Date(year, month, dayNum);
-            const isDisabled = date < minDate || date > maxDate;
-            const isSelected = selectedDate
-              ? date.getFullYear() === selectedDate.getFullYear() &&
-                date.getMonth() === selectedDate.getMonth() &&
-                date.getDate() === selectedDate.getDate()
-              : false;
-            const isToday =
-              date.getDate() === today.getDate() &&
-              date.getMonth() === today.getMonth() &&
-              date.getFullYear() === today.getFullYear();
-
-            return (
-              <button
-                key={dayNum}
-                type="button"
-                disabled={isDisabled}
-                onClick={() => handleDate(dayNum)}
-                className="flex items-center justify-center h-9 rounded-lg text-sm font-medium transition-all duration-100"
-                style={
-                  isSelected
-                    ? { background: "var(--klova-primary)", color: "var(--klova-primary-content)" }
-                    : isToday
-                    ? { color: "var(--klova-accent)", fontWeight: 700 }
-                    : isDisabled
-                    ? { color: "var(--text-subtle)", cursor: "not-allowed" }
-                    : { color: "var(--text-body)" }
-                }
-              >
-                {dayNum}
-              </button>
-            );
-          })}
+        <style>{`
+          .klova-cal .rdp-root {
+            --rdp-accent-color: oklch(0.29 0.09 152);
+            --rdp-accent-background-color: oklch(0.29 0.09 152 / 0.10);
+            --rdp-today-color: oklch(0.68 0.14 67);
+            --rdp-day-height: 40px;
+            --rdp-day-width: 40px;
+            --rdp-day_button-height: 38px;
+            --rdp-day_button-width: 38px;
+            --rdp-day_button-border-radius: 10px;
+            font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+            font-size: 0.875rem;
+          }
+          .klova-cal .rdp-month_caption {
+            font-weight: 600;
+            color: var(--text-strong);
+            padding-bottom: 0.5rem;
+          }
+          .klova-cal .rdp-weekday {
+            color: var(--text-subtle);
+            font-weight: 500;
+            font-size: 0.75rem;
+          }
+          .klova-cal .rdp-day {
+            color: var(--text-body);
+          }
+          .klova-cal .rdp-day_button:hover:not([disabled]) {
+            background: var(--surface-section);
+          }
+          .klova-cal .rdp-selected .rdp-day_button {
+            background: oklch(0.29 0.09 152);
+            color: oklch(0.97 0.01 152);
+            font-weight: 600;
+          }
+          .klova-cal .rdp-disabled {
+            opacity: 0.3;
+          }
+          .klova-cal .rdp-nav {
+            top: 0.1rem;
+          }
+          .klova-cal .rdp-button_previous,
+          .klova-cal .rdp-button_next {
+            border-radius: 0.5rem;
+            color: var(--text-muted);
+          }
+          .klova-cal .rdp-button_previous:hover,
+          .klova-cal .rdp-button_next:hover {
+            background: var(--surface-section);
+            color: var(--text-strong);
+          }
+          .klova-cal .rdp-today:not(.rdp-selected) .rdp-day_button {
+            color: oklch(0.68 0.14 67);
+            font-weight: 700;
+            border: 2px solid oklch(0.68 0.14 67 / 0.3);
+          }
+        `}</style>
+        <div className="klova-cal">
+          <DayPicker
+            mode="single"
+            selected={selected}
+            onSelect={handleSelect}
+            disabled={[{ before: tomorrow }, { after: threeMonthsOut }]}
+            startMonth={today}
+            endMonth={threeMonthsOut}
+          />
         </div>
       </div>
 
-      {/* Time slots — appear after date selection */}
+      {/* Time slots — appear after date picked */}
       {data.bookingDate && (
-        <div>
+        <div className="mb-2">
           <p className="text-sm font-medium mb-3" style={{ color: "var(--text-body)" }}>
-            Preferred arrival window
+            Arrival window
           </p>
-          <div className="grid grid-cols-2 gap-2.5">
+          <div className="flex flex-col gap-2.5">
             {TIME_SLOTS.map((slot) => {
               const sel = data.timeSlot === slot;
               return (
@@ -169,21 +149,31 @@ export default function Step04DateTime({ data, patch, onNext, onBack }: Props) {
                   key={slot}
                   type="button"
                   onClick={() => { patch({ timeSlot: slot as TimeSlot }); setError(null); }}
-                  className="rounded-xl border-2 py-3 px-3 text-sm font-medium text-center transition-all duration-150"
+                  className="w-full text-left rounded-xl border-2 px-4 py-3 flex items-center gap-3 transition-all duration-150"
                   style={{
                     borderColor: sel ? "var(--klova-primary)" : "var(--border-default)",
                     background: sel ? "var(--klova-primary-soft)" : "var(--surface-card)",
-                    color: sel ? "var(--klova-primary)" : "var(--text-body)",
                   }}
                 >
-                  {slot}
+                  {/* Radio dot */}
+                  <div
+                    className="w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0"
+                    style={{ borderColor: sel ? "var(--klova-primary)" : "var(--border-strong)" }}
+                  >
+                    {sel && <div className="w-2 h-2 rounded-full" style={{ background: "var(--klova-primary)" }} />}
+                  </div>
+                  <div>
+                    <p className="font-semibold text-sm" style={{ color: sel ? "var(--klova-primary)" : "var(--text-strong)" }}>
+                      {slot}
+                    </p>
+                    <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                      {TIME_META[slot]}
+                    </p>
+                  </div>
                 </button>
               );
             })}
           </div>
-          <p className="text-xs mt-2" style={{ color: "var(--text-subtle)" }}>
-            Your keeper will arrive within the selected window.
-          </p>
         </div>
       )}
 
