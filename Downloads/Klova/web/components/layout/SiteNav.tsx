@@ -37,10 +37,10 @@ export function SiteNav() {
           {/* Logo */}
           <Link
             href="/"
-            className="flex items-center gap-2.5 shrink-0 focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-4 rounded-sm"
+            className="flex items-center gap-2 shrink-0 focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-4 rounded-sm"
             aria-label="Klova home"
           >
-            <Image src="/logo.svg" alt="" width={40} height={35} priority />
+            <Image src="/logo.svg" alt="" width={28} height={28} priority />
             <span className="wordmark text-2xl text-primary">Klova</span>
           </Link>
 
@@ -114,7 +114,7 @@ export function SiteNav() {
         {/* Drawer header */}
         <div className="flex items-center justify-between px-5 h-16 border-b border-base-300 shrink-0">
           <div className="flex items-center gap-2.5">
-            <Image src="/logo.svg" alt="" width={40} height={35} />
+            <Image src="/logo.svg" alt="" width={28} height={28} />
             <span className="wordmark text-2xl text-primary">Klova</span>
           </div>
           <button

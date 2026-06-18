@@ -17,8 +17,8 @@ export function SiteFooter() {
 
           {/* Brand */}
           <div className="space-y-2.5">
-            <div className="flex items-center gap-2.5">
-              <Image src="/logo.svg" alt="" width={44} height={38} />
+            <div className="flex items-center gap-2">
+              <Image src="/logo.svg" alt="" width={28} height={28} />
               <span className="wordmark text-2xl text-primary">Klova</span>
             </div>
             <p className="text-sm text-base-content/55 leading-relaxed max-w-xs">
