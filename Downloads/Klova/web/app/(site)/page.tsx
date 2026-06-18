@@ -7,14 +7,14 @@ const SERVICES = [
     slug: "standard",
     name: "Standard Clean",
     from: "₦5,000",
-    desc: "Regular upkeep — surfaces, floors, bathrooms, kitchen. Great for weekly visits.",
+    desc: "Regular upkeep for any home. Surfaces, floors, bathrooms, kitchen. Great for weekly visits.",
     popular: false,
   },
   {
     slug: "deep",
     name: "Deep Clean",
     from: "₦18,500",
-    desc: "Top-to-bottom intensive. Every corner, every surface — the kind of clean you feel walking in.",
+    desc: "Top-to-bottom intensive. Every corner, every surface. The kind of clean you feel walking in.",
     popular: true,
   },
   {
@@ -28,7 +28,7 @@ const SERVICES = [
     slug: "post",
     name: "Post-construction",
     from: "₦45,000",
-    desc: "Dust, debris, paint residue — completely cleared after any renovation or new build.",
+    desc: "Dust, debris, paint residue. Completely cleared after any renovation or new build.",
     popular: false,
   },
 ] as const;
@@ -42,12 +42,12 @@ const STEPS = [
   {
     n: "02",
     title: "Get matched instantly",
-    body: "Our system finds the best available Keeper in your area — no waiting, no back-and-forth.",
+    body: "Our system finds the best available Keeper in your area. No waiting, no back-and-forth.",
   },
   {
     n: "03",
     title: "See who's coming",
-    body: "Name, photo, star rating, and completed jobs — all visible before you pay a naira.",
+    body: "Name, photo, star rating, and completed jobs. All visible before you pay a naira.",
   },
   {
     n: "04",
@@ -65,12 +65,12 @@ const ZONES = [
 
 const TRUST_POINTS = [
   {
-    title: "Government ID verified",
-    body: "Every Keeper passes a NIN check before their first job. We know exactly who is entering your home.",
+    title: "Personally trained",
+    body: "Every Keeper goes through hands-on training and a skills assessment before their first booking. We know exactly who is entering your home.",
   },
   {
     title: "In-person vetted",
-    body: "Interviewed, skill-assessed, and reference-checked. If they don't meet the bar, they don't join.",
+    body: "Interviewed, skill-assessed, and reference-checked. If they don't meet the standard, they don't join.",
   },
   {
     title: "Rated after every job",
@@ -125,11 +125,11 @@ function Hero() {
             <h1 className="fade-up fade-up-2 text-5xl sm:text-6xl lg:text-[4.25rem] leading-[1.04] text-primary mb-7">
               On-demand<br />
               housekeeping<br />
-              <span style={{ color: "oklch(0.68 0.14 67)" }}>you can trust.</span>
+              you can trust.
             </h1>
 
             <p className="fade-up fade-up-3 text-lg sm:text-xl text-base-content/60 leading-relaxed max-w-md mb-10">
-              Skilled, NIN-verified Keepers — matched to your home or office in minutes.{" "}
+              Skilled, personally vetted Keepers matched to your home or office in minutes.{" "}
               <span className="text-base-content/80 font-semibold">Standard cleans from ₦5,000.</span>
             </p>
 
@@ -152,7 +152,7 @@ function Hero() {
             {/* Stats strip */}
             <div className="fade-up fade-up-4 grid grid-cols-3 gap-5 pt-8 border-t border-base-300">
               {[
-                { value: "NIN", label: "Verified every Keeper" },
+                { value: "Vetted", label: "Every Keeper, personally" },
                 { value: "4.8★", label: "Average Keeper rating" },
                 { value: "24/7", label: "Available any day" },
               ].map(({ value, label }) => (
@@ -200,12 +200,12 @@ function KeeperCard({ size = "md" }: { size?: "md" | "lg" }) {
               <p className="text-sm text-base-content/45 mt-0.5">Lekki / Ajah</p>
             </div>
           </div>
-          {/* NIN badge */}
+          {/* Vetted badge */}
           <span className="flex items-center gap-1 bg-success/10 text-success text-[11px] font-semibold px-2 py-1 rounded-full leading-none">
             <svg className="w-3 h-3 shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
               <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
             </svg>
-            NIN Verified
+            Vetted
           </span>
         </div>
 
@@ -257,7 +257,7 @@ function Services() {
             Whatever the clean,<br className="hidden sm:inline" /> we've got you.
           </h2>
           <p className="text-base-content/60 text-lg leading-relaxed">
-            Homes, offices, new builds, post-construction sites. Any size, any frequency — with add-ons for laundry, ironing, and wardrobe organisation.
+            Homes, offices, new builds, post-construction sites. Any size, any frequency. Add-ons available for laundry, ironing, and wardrobe organisation.
           </p>
         </div>
 
@@ -356,9 +356,8 @@ function Trust() {
               Your Keeper is vetted,<br className="hidden sm:inline" /> not just hired.
             </h2>
             <p className="text-lg text-base-content/60 leading-relaxed mb-10 max-w-lg">
-              We don't send strangers to your home. Every Keeper on Klova has been through a
-              thorough background check, an in-person interview, and skill assessment — before
-              they ever take a booking.
+              We don't send strangers to your home. Every Keeper on Klova has been personally
+              trained, assessed in person, and reference-checked before they ever take a booking.
             </p>
 
             <div className="space-y-8">
@@ -393,7 +392,7 @@ function Trust() {
                 You see who's coming before you pay.
               </p>
               <p className="text-sm text-base-content/55 leading-relaxed">
-                Name, photo, star rating, completed jobs. This isn't a nice-to-have — it's how
+                Name, photo, star rating, completed jobs. This isn&apos;t a nice-to-have. It&apos;s how
                 Klova works. Every booking, every time.
               </p>
             </div>
@@ -506,8 +505,8 @@ function Zones() {
               We're live in<br /> Lekki / Ajah.
             </h2>
             <p className="text-lg text-base-content/60 leading-relaxed mb-6 max-w-md">
-              We launched deliberately in one zone — not because we can't grow faster, but
-              because we won't compromise on quality to do it.
+              We launched deliberately in one zone. Not because we can&apos;t grow faster, but
+              because we won&apos;t compromise on quality to do it.
             </p>
             <p className="text-base text-base-content/50 leading-relaxed max-w-md">
               Every Keeper in Lekki / Ajah has been personally vetted. Every booking is
@@ -522,8 +521,8 @@ function Zones() {
               </svg>
               <p className="text-sm text-base-content/50 leading-relaxed">
                 <span className="font-semibold text-base-content/70">We just launched.</span>{" "}
-                We're running a limited number of bookings per week right now — so every clean
-                gets our full attention. Early customers get the best of what we've built.
+                We&apos;re running a limited number of bookings per week right now, so every clean
+                gets our full attention. Early customers get the best of what we&apos;ve built.
               </p>
             </div>
           </div>
@@ -559,7 +558,7 @@ function Zones() {
             ))}
 
             <p className="text-xs text-base-content/30 px-1 pt-2">
-              Want us in your area sooner? Share Klova with someone in your neighbourhood — demand is how we prioritise the next zone.
+              Want us in your area sooner? Share Klova with someone in your neighbourhood. Demand is how we prioritise the next zone.
             </p>
           </div>
         </div>
@@ -593,7 +592,7 @@ function Availability() {
             <p className="text-xs font-semibold uppercase tracking-widest text-base-content/35 mb-4">Availability</p>
             <h2 className="text-4xl lg:text-5xl text-primary mb-4">Any time. Any day.</h2>
             <p className="text-lg text-base-content/60 leading-relaxed mb-10 max-w-md">
-              Weekday mornings, Sunday afternoons, late evenings after guests leave — Klova is here whenever your home needs attention.
+              Weekday mornings, Sunday afternoons, late evenings after guests leave, Klova is here whenever your home needs attention.
             </p>
 
             {/* Scenario cards */}
@@ -654,7 +653,7 @@ function FinalCTA() {
           className="text-lg sm:text-xl mb-10 max-w-md mx-auto leading-relaxed"
           style={{ color: "oklch(0.97 0.01 152 / 0.55)" }}
         >
-          Meet the Keeper coming to you — and book your first clean today.
+          Meet the Keeper coming to you and book your first clean today.
         </p>
 
         <Link
@@ -681,7 +680,7 @@ function FinalCTA() {
           className="text-sm"
           style={{ color: "oklch(0.97 0.01 152 / 0.30)" }}
         >
-          NIN-verified Keepers · Secure payment via Paystack · No subscription required
+          Personally vetted Keepers · Secure payment via Paystack · No subscription required
         </p>
       </div>
     </section>

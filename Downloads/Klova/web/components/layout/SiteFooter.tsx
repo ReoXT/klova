@@ -19,7 +19,7 @@ export function SiteFooter() {
             <p className="wordmark text-2xl text-primary">Klova</p>
             <p className="text-sm text-base-content/55 leading-relaxed max-w-xs">
               On-demand home cleaning for Lagos.<br />
-              Vetted, rated, and NIN-verified cleaners.
+              Personally trained, vetted, and rated.
             </p>
           </div>
 
