@@ -1,0 +1,191 @@
+import type { ServiceSlug, BedroomCount, BookingData, PriceBreakdown } from "./types";
+
+export const SERVICES = [
+  {
+    slug: "standard" as ServiceSlug,
+    name: "Standard Clean",
+    description: "Regular upkeep — vacuuming, mopping, surface wipes, bathrooms and kitchen cleaned.",
+    pricing: { "1": 5000, "2": 9500, "3": 14000, "4+": 18000 } as Record<BedroomCount, number>,
+  },
+  {
+    slug: "deep" as ServiceSlug,
+    name: "Deep Clean",
+    description: "Thorough scrub of every surface, grout, fixtures and hard-to-reach corners.",
+    pricing: { "1": 18500, "2": 30000, "3": 44000, "4+": 65000 } as Record<BedroomCount, number>,
+  },
+  {
+    slug: "move-in-out" as ServiceSlug,
+    name: "Move-in / Move-out",
+    description: "End-to-end clean for empty apartments — inside appliances and all cupboards.",
+    pricing: { "1": 40000, "2": 56000, "3": 74000, "4+": 90000 } as Record<BedroomCount, number>,
+  },
+  {
+    slug: "post-construction" as ServiceSlug,
+    name: "Post-construction",
+    description: "Removes dust, paint spots, cement residue and construction debris throughout.",
+    pricing: { "1": 45000, "2": 66000, "3": 88000, "4+": 110000 } as Record<BedroomCount, number>,
+  },
+];
+
+export const EXTRAS = [
+  { slug: "ironing",   name: "Ironing",                price: 4600, description: "Clothes ironed and neatly hung" },
+  { slug: "laundry",  name: "Laundry",                price: 3500, description: "Wash and dry your laundry" },
+  { slug: "wardrobe", name: "Wardrobe Organising",    price: 4000, description: "Sort and arrange wardrobe contents" },
+  { slug: "appliances",name:"Appliance Interiors",    price: 1500, description: "₦1,500 per appliance — customise on the next page", perUnit: true },
+  { slug: "cabinets", name: "Cabinet & Drawer Detailing", price: 1500, description: "Deep-clean inside all cabinets and drawers" },
+  { slug: "windows",  name: "Window Cleaning",        price: 2000, description: "Interior glass and frames for all windows" },
+  { slug: "fans",     name: "Fan Cleaning",           price: 1600, description: "Dismantle, clean blades and reassemble all fans" },
+  { slug: "walls",    name: "Wall Washing",           price: 2300, description: "Wipe down all walls from top to bottom" },
+  { slug: "compound", name: "Compound Cleaning",      price: 3000, description: "Sweep and tidy the compound and outdoor areas" },
+];
+
+export const APPLIANCES = [
+  { slug: "oven",           name: "Oven" },
+  { slug: "fridge",         name: "Fridge" },
+  { slug: "freezer",        name: "Freezer" },
+  { slug: "microwave",      name: "Microwave" },
+  { slug: "coffee_machine", name: "Coffee Machine" },
+  { slug: "toaster",        name: "Toaster" },
+];
+
+export const TIME_SLOTS = [
+  "7am–9am",
+  "9am–12pm",
+  "12pm–2pm",
+  "2pm–4pm",
+] as const;
+
+export const ZONES = [
+  { slug: "lekki-ajah", name: "Lekki / Ajah", active: true },
+  { slug: "victoria-island", name: "Victoria Island", active: false },
+  { slug: "ikeja", name: "Ikeja", active: false },
+  { slug: "surulere", name: "Surulere", active: false },
+];
+
+const LEKKI_KEYWORDS = [
+  "lekki", "ajah", "chevron", "vgc", "victoria garden city",
+  "jakande", "sangotedo", "orchid", "megamound", "agungi",
+  "osapa", "ikota", "ologolo", "oniru", "abraham adesanya",
+  "lekki phase", "lekki gardens",
+];
+
+const COMING_SOON: { keywords: string[]; zone: string }[] = [
+  { keywords: ["victoria island", "ikoyi", "oniru estate"], zone: "Victoria Island" },
+  { keywords: ["ikeja", "maryland", "ojodu", "berger", "magodo", "ketu"], zone: "Ikeja" },
+  { keywords: ["surulere", "yaba", "ojuelegba", "eric moore"], zone: "Surulere" },
+  { keywords: ["apapa", "festac", "amuwo", "satellite town"], zone: "Apapa / Festac" },
+  { keywords: ["lagos island", "tinubu", "idumota", "balogun"], zone: "Lagos Island" },
+];
+
+export type AddressResult =
+  | { ok: true; zone: "lekki-ajah" }
+  | { ok: false; comingSoon: true; zoneName: string }
+  | { ok: false; comingSoon: false };
+
+export function validateAddress(raw: string): AddressResult {
+  const lower = raw.toLowerCase();
+  if (LEKKI_KEYWORDS.some((k) => lower.includes(k))) {
+    return { ok: true, zone: "lekki-ajah" };
+  }
+  for (const { keywords, zone } of COMING_SOON) {
+    if (keywords.some((k) => lower.includes(k))) {
+      return { ok: false, comingSoon: true, zoneName: zone };
+    }
+  }
+  return { ok: false, comingSoon: false };
+}
+
+export const INSURANCE_FEE = 2500;
+
+export const PROMO_CODES: Record<string, number> = {
+  KLOVA10: 10,
+  WELCOME5: 5,
+  NEWUSER: 15,
+};
+
+export const DEFAULT_BOOKING: BookingData = {
+  service: null,
+  bedrooms: null,
+  frequency: null,
+  recurringPattern: null,
+  recurringMonths: 1,
+  address: "",
+  bookingDate: null,
+  timeSlot: null,
+  extras: {
+    ironing: false,
+    laundry: false,
+    wardrobe: false,
+    appliances: false,
+    appliance_units: {
+      oven: false,
+      fridge: false,
+      freezer: false,
+      microwave: false,
+      coffee_machine: false,
+      toaster: false,
+    },
+    cabinets: false,
+    windows: false,
+    fans: false,
+    walls: false,
+    compound: false,
+  },
+  hasPets: null,
+  petDetails: "",
+  notes: "",
+  keeperCount: 1,
+  firstName: "",
+  lastName: "",
+  phone: "",
+  email: "",
+  payMonths: 1,
+  wantsInsurance: false,
+  promoCode: "",
+};
+
+export function computePrice(data: BookingData): PriceBreakdown {
+  const service = SERVICES.find((s) => s.slug === data.service);
+  const base = service && data.bedrooms ? service.pricing[data.bedrooms] : 0;
+
+  const keeperSurcharge = (data.keeperCount - 1) * base;
+
+  let extras = 0;
+  const e = data.extras;
+  if (e.ironing)   extras += 4600;
+  if (e.laundry)   extras += 3500;
+  if (e.wardrobe)  extras += 4000;
+  if (e.appliances) {
+    const count = Object.values(e.appliance_units).filter(Boolean).length;
+    extras += count * 1500;
+  }
+  if (e.cabinets)  extras += 1500;
+  if (e.windows)   extras += 2000;
+  if (e.fans)      extras += 1600;
+  if (e.walls)     extras += 2300;
+  if (e.compound)  extras += 3000;
+
+  const insurance = data.wantsInsurance ? INSURANCE_FEE : 0;
+
+  const promo = PROMO_CODES[data.promoCode.toUpperCase()] ?? 0;
+  // discount applied per-visit on the repeatable portion
+  const perVisit = base + keeperSurcharge + extras;
+  const discount = Math.round((perVisit * promo) / 100);
+  const total = perVisit - discount + insurance; // insurance is one-time
+  const monthlyTotal = (perVisit - discount) * data.payMonths + insurance;
+
+  return { base, extras, keeperSurcharge, insurance, discount, total, monthlyTotal };
+}
+
+export function formatNGN(amount: number): string {
+  return `₦${amount.toLocaleString("en-NG")}`;
+}
+
+export const FAKE_KEEPER = {
+  firstName: "Chiamaka",
+  lastName: "Okonkwo",
+  photo: null as string | null,
+  rating: 4.9,
+  totalJobs: 187,
+  ninVerified: true,
+};

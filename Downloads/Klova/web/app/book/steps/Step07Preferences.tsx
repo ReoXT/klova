@@ -1,0 +1,151 @@
+"use client";
+
+import { useState } from "react";
+import type { BookingData } from "../types";
+import { Button } from "@/components/ui/Button";
+import { Alert } from "@/components/ui/Alert";
+
+interface Props {
+  data: BookingData;
+  patch: (p: Partial<BookingData>) => void;
+  onNext: () => void;
+  onBack: () => void;
+}
+
+export default function Step07Preferences({ data, patch, onNext, onBack }: Props) {
+  const [error, setError] = useState<string | null>(null);
+
+  function handleNext() {
+    if (data.hasPets === null) {
+      setError("Please let us know if you have pets at home.");
+      return;
+    }
+    onNext();
+  }
+
+  return (
+    <div className="max-w-lg mx-auto px-4 pt-6 pb-4">
+      <h1 className="text-2xl font-semibold mb-1" style={{ color: "var(--text-strong)" }}>
+        A few preferences
+      </h1>
+      <p className="text-sm mb-6" style={{ color: "var(--text-muted)" }}>
+        Help your keeper prepare for a smooth visit.
+      </p>
+
+      {/* Pets */}
+      <div className="mb-6">
+        <p className="text-sm font-medium mb-3" style={{ color: "var(--text-body)" }}>
+          Do you have pets at home?
+        </p>
+        <div className="flex gap-3">
+          {([true, false] as const).map((val) => {
+            const sel = data.hasPets === val;
+            return (
+              <button
+                key={String(val)}
+                type="button"
+                onClick={() => { patch({ hasPets: val }); setError(null); }}
+                className="flex-1 rounded-xl border-2 py-3 text-sm font-medium transition-all duration-150"
+                style={{
+                  borderColor: sel ? "var(--klova-primary)" : "var(--border-default)",
+                  background: sel ? "var(--klova-primary-soft)" : "var(--surface-card)",
+                  color: sel ? "var(--klova-primary)" : "var(--text-body)",
+                }}
+              >
+                {val ? "Yes" : "No"}
+              </button>
+            );
+          })}
+        </div>
+        {error && (
+          <p className="text-xs text-error mt-1.5">{error}</p>
+        )}
+        {data.hasPets && (
+          <div className="mt-3">
+            <label
+              htmlFor="pet-details"
+              className="block text-xs font-medium mb-1.5"
+              style={{ color: "var(--text-muted)" }}
+            >
+              Any details about your pet(s)? (optional)
+            </label>
+            <input
+              id="pet-details"
+              type="text"
+              placeholder="e.g. One dog who loves cuddles"
+              value={data.petDetails}
+              onChange={(e) => patch({ petDetails: e.target.value })}
+              className="input w-full text-sm"
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Number of keepers */}
+      <div className="mb-6">
+        <p className="text-sm font-medium mb-1" style={{ color: "var(--text-body)" }}>
+          How many keepers do you need?
+        </p>
+        <p className="text-xs mb-3" style={{ color: "var(--text-muted)" }}>
+          Extra keepers double the base price (add-ons excluded).
+        </p>
+        <div className="grid grid-cols-3 gap-2.5">
+          {[1, 2, 3].map((n) => {
+            const sel = data.keeperCount === n;
+            return (
+              <button
+                key={n}
+                type="button"
+                onClick={() => patch({ keeperCount: n })}
+                className="rounded-xl border-2 py-3 text-center text-sm transition-all duration-150"
+                style={{
+                  borderColor: sel ? "var(--klova-primary)" : "var(--border-default)",
+                  background: sel ? "var(--klova-primary-soft)" : "var(--surface-card)",
+                }}
+              >
+                <p className="font-semibold" style={{ color: sel ? "var(--klova-primary)" : "var(--text-strong)" }}>
+                  {n}
+                </p>
+                <p className="text-xs mt-0.5" style={{ color: sel ? "var(--klova-primary)" : "var(--text-muted)" }}>
+                  {n === 1 ? "Keeper" : "Keepers"}
+                </p>
+              </button>
+            );
+          })}
+        </div>
+        {data.keeperCount > 1 && (
+          <Alert variant="info" className="mt-3">
+            {data.keeperCount} keepers requested — the base clean price will be ×{data.keeperCount}.
+          </Alert>
+        )}
+      </div>
+
+      {/* Notes */}
+      <div className="mb-6">
+        <label
+          htmlFor="notes"
+          className="block text-sm font-medium mb-1.5"
+          style={{ color: "var(--text-body)" }}
+        >
+          Anything else your keeper should know? <span style={{ color: "var(--text-subtle)" }}>(optional)</span>
+        </label>
+        <textarea
+          id="notes"
+          rows={3}
+          placeholder="e.g. Gate code is 1234. Please use the back entrance."
+          value={data.notes}
+          onChange={(e) => patch({ notes: e.target.value })}
+          className="textarea w-full resize-none text-sm"
+        />
+        <p className="text-xs mt-1" style={{ color: "var(--text-subtle)" }}>
+          {data.notes.length}/300 characters
+        </p>
+      </div>
+
+      <div className="flex gap-3">
+        <Button variant="ghost" onClick={onBack} className="flex-1">Back</Button>
+        <Button variant="primary" onClick={handleNext} className="flex-1">Continue</Button>
+      </div>
+    </div>
+  );
+}
