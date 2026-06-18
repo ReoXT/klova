@@ -16,4 +16,9 @@ export const config = {
   supabaseUrl: required('SUPABASE_URL'),
   supabaseServiceRoleKey: required('SUPABASE_SERVICE_ROLE_KEY'),
   paystackSecretKey: process.env.PAYSTACK_SECRET_KEY ?? '',
+  // Termii — optional locally; notifications silently skip if unset
+  termiiApiKey: process.env.TERMII_API_KEY,
+  termiiSenderId: process.env.TERMII_SENDER_ID,
+  // Phone to receive the admin confirmation SMS per paid booking
+  adminPhone: process.env.ADMIN_PHONE,
 };
