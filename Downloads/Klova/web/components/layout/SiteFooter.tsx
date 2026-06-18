@@ -17,7 +17,10 @@ export function SiteFooter() {
 
           {/* Brand */}
           <div className="space-y-2.5">
-            <Image src="/logo.svg" alt="Klova" width={48} height={42} />
+            <div className="flex items-center gap-2.5">
+              <Image src="/logo.svg" alt="" width={44} height={38} />
+              <span className="wordmark text-2xl text-primary">Klova</span>
+            </div>
             <p className="text-sm text-base-content/55 leading-relaxed max-w-xs">
               On-demand home cleaning for Lagos.<br />
               Personally trained, vetted, and rated.
