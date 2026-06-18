@@ -106,13 +106,16 @@ function Hero() {
   return (
     <section className="relative overflow-hidden min-h-[82vh] flex items-center" style={{ background: "var(--surface-page)" }}>
       <div aria-hidden="true" className="pointer-events-none absolute -top-48 -right-48 w-[700px] h-[700px] rounded-full" style={{ background: "radial-gradient(circle, oklch(0.29 0.09 152 / 0.08) 0%, transparent 60%)" }} />
-      <div aria-hidden="true" className="pointer-events-none absolute -bottom-40 -left-40 w-[520px] h-[520px] rounded-full" style={{ background: "radial-gradient(circle, oklch(0.68 0.14 67 / 0.06) 0%, transparent 60%)" }} />
+      <div aria-hidden="true" className="pointer-events-none absolute -bottom-40 -left-40 w-[520px] h-[520px] rounded-full" style={{ background: "radial-gradient(circle, oklch(0.68 0.14 67 / 0.10) 0%, transparent 60%)" }} />
 
       <div className="max-w-6xl mx-auto px-5 sm:px-6 py-20 lg:py-28 w-full">
         <div className="hero-grid">
 
           {/* Copy */}
           <div>
+            {/* Amber accent rule — editorial mark above headline */}
+            <div className="fade-up fade-up-1 mb-6" aria-hidden="true" style={{ width: "2.5rem", height: "3px", borderRadius: "9999px", background: "var(--klova-accent)" }} />
+
             <h1 className="fade-up fade-up-1 leading-[1.04] text-primary mb-8" style={{ fontSize: "clamp(2.75rem, 7vw, 4.5rem)" }}>
               On-demand<br />
               housekeeping<br />
@@ -121,7 +124,7 @@ function Hero() {
 
             <p className="fade-up fade-up-2 text-lg sm:text-xl leading-relaxed max-w-md mb-10" style={{ color: "var(--text-muted)" }}>
               Skilled, personally vetted Keepers matched to your home or office in minutes.{" "}
-              <span className="font-semibold" style={{ color: "var(--text-body)" }}>Standard cleans from ₦5,000.</span>
+              <span className="font-semibold" style={{ color: "var(--text-body)" }}>Standard cleans from <span style={{ color: "var(--klova-accent)" }}>₦5,000</span>.</span>
             </p>
 
             <div className="fade-up fade-up-3 flex flex-col sm:flex-row gap-3 mb-14">
@@ -190,7 +193,7 @@ function HeroPhoto() {
             </svg>
           </div>
           <div>
-            <p className="text-sm font-bold leading-none mb-1" style={{ color: "var(--text-strong)" }}>4.8 / 5</p>
+            <p className="text-sm font-bold leading-none mb-1" style={{ color: "var(--klova-accent)" }}>4.8 / 5</p>
             <p className="text-[11px] leading-none" style={{ color: "var(--text-subtle)" }}>Keeper rating</p>
           </div>
         </div>
