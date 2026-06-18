@@ -267,10 +267,18 @@ Base URL (production): `https://klova-production.up.railway.app`
 - `issueRefund(bookingId, paystackReference)` → live Paystack `/refund` call. Guards: skips if no `paystack_reference`, skips if `refunded_at` already set (double-refund protection), sets `refunded_at` on success. **Not called automatically** — available as a safety net for manual use.
 
 ### `notificationService.ts`
-- `notifyCustomerConfirmed(bookingId)` — stub
-- `notifyCleanerAssigned(bookingId)` — stub (called by webhook on confirmation)
-- `notifyAdminConfirmed(bookingId)` — stub
-- Wire all three to Termii SMS/WhatsApp in Section 5.
+- `notifyCustomerConfirmed(bookingId)` — sends SMS to customer via Termii
+- `notifyCleanerAssigned(bookingId)` — sends SMS to cleaner via Termii
+- `notifyAdminConfirmed(bookingId)` — sends SMS to `ADMIN_PHONE` via Termii (skipped if unset)
+- All three are **graceful-failure**: Termii errors are caught and logged; a failed SMS never rolls back a confirmed booking.
+
+### `termiiClient.ts` (`api/src/lib/`)
+- `sendSms(to, message)` — sends via Termii `generic` channel
+- `sendWhatsApp(to, message)` — sends via Termii `whatsapp` channel (requires WhatsApp Business integration approval in Termii dashboard)
+- `normalizePhone(raw)` — accepts `0803…`, `+234803…`, `234803…` → `2348XXXXXXXXX`
+
+### `messageTemplates.ts` (`api/src/lib/`)
+- All three message templates in one place: `customerConfirmedMsg`, `cleanerAssignedMsg`, `adminConfirmedMsg`
 
 ### Error classes
 - `ValidationError` — status 400, from pricingService
@@ -380,6 +388,7 @@ Loaded in `app/layout.tsx` via `next/font/google`, exposed as CSS variables:
 | 3.6b Paystack webhook | ✅ Done | POST /webhooks/paystack — HMAC verify, matched→confirmed, notify stubs |
 | 3.7 Refund service | ✅ Done | issueRefund() — live Paystack call, double-refund guard, sets refunded_at |
 | 3.8 Flow rewire | ✅ Done | Assignment at booking time (not webhook); webhook just confirms + notifies |
+| 5.1 Termii notifications | ✅ Done | sendSms + sendWhatsApp, phone normalisation, graceful failure, message templates |
 
 **41 tests passing. Backend is feature-complete for the booking flow.**
 
@@ -411,6 +420,8 @@ FRONTEND_ORIGIN=             # CORS allowed origin
 ```
 
 **Railway env vars set:** `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `PAYSTACK_SECRET_KEY`, `PORT`, `COMMISSION_RATE`, `FRONTEND_ORIGIN`
+
+**To add for notifications (Railway + local .env):** `TERMII_API_KEY`, `TERMII_SENDER_ID`, `ADMIN_PHONE`
 
 ---
 
