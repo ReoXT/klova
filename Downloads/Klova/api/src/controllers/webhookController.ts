@@ -3,9 +3,8 @@ import { createHmac, timingSafeEqual } from 'crypto';
 import { config } from '../config';
 import { supabase } from '../lib/supabase';
 import {
-  notifyCustomerConfirmed,
-  notifyCleanerAssigned,
-  notifyAdminConfirmed,
+  notifyAdminPaidBooking,
+  notifyCleanerNewJob,
 } from '../services/notificationService';
 
 // ─── Signature verification ───────────────────────────────────────────────────
@@ -121,8 +120,8 @@ async function processChargeSuccess(reference: string): Promise<void> {
 
   const bookingId = claimed[0].id as string;
 
-  // Notify customer, cleaner, and admin (stubs until Section 5)
-  await notifyCustomerConfirmed(bookingId);
-  await notifyCleanerAssigned(bookingId);
-  await notifyAdminConfirmed(bookingId);
+  // Notify admin and cleaner on payment confirmation.
+  // Customer notification fires later from the admin panel when dispatch is confirmed.
+  await notifyAdminPaidBooking(bookingId);
+  await notifyCleanerNewJob(bookingId);
 }

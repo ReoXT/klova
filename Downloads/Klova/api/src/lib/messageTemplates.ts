@@ -9,41 +9,48 @@ export interface BookingNotifContext {
   cleanerLastName: string;
   cleanerPhone: string;
   serviceName: string;
+  zoneName: string;
   bookingDate: string;   // pre-formatted, e.g. "Tuesday, 1 July"
   address: string;
   totalAmountNgn: number;
 }
 
-// Sent to the customer after payment is confirmed.
-export function customerConfirmedMsg(ctx: BookingNotifContext): string {
-  return (
-    `Hi ${ctx.customerFirstName}, your Klova booking is confirmed! ` +
-    `${ctx.cleanerFirstName} ${ctx.cleanerLastName} will be with you on ${ctx.bookingDate} ` +
-    `for a ${ctx.serviceName}. ` +
-    `Address: ${ctx.address}. ` +
-    `Questions? WhatsApp us on +234 800 000 0000.`
-  );
-}
+// ─── Admin ────────────────────────────────────────────────────────────────────
+// Fires on payment confirmation. Roadmap wording verbatim, plus cleaner phone
+// so you can call to confirm dispatch without opening Supabase.
 
-// Sent to the cleaner when a booking is confirmed (payment received).
-export function cleanerAssignedMsg(ctx: BookingNotifContext): string {
+export function adminPaidBookingMsg(ctx: BookingNotifContext): string {
   return (
-    `Hi ${ctx.cleanerFirstName}, new Klova job! ` +
-    `${ctx.serviceName} for ${ctx.customerFirstName} on ${ctx.bookingDate}. ` +
-    `Address: ${ctx.address}. ` +
-    `Customer: ${ctx.customerPhone}. ` +
-    `Check the app for full details.`
-  );
-}
-
-// Sent to the admin phone for every confirmed paid booking.
-export function adminConfirmedMsg(ctx: BookingNotifContext): string {
-  return (
-    `[Klova] Booking confirmed. ` +
-    `ID: ${ctx.bookingId.slice(0, 8)}. ` +
+    `New paid booking: ${ctx.serviceName}, ${ctx.zoneName}, ${ctx.bookingDate}. ` +
     `Customer: ${ctx.customerFirstName} ${ctx.customerLastName} (${ctx.customerPhone}). ` +
-    `Cleaner: ${ctx.cleanerFirstName} ${ctx.cleanerLastName}. ` +
-    `Service: ${ctx.serviceName} on ${ctx.bookingDate}. ` +
-    `Amount: ₦${ctx.totalAmountNgn.toLocaleString('en-NG')}.`
+    `Auto-matched: ${ctx.cleanerFirstName} ${ctx.cleanerLastName} (${ctx.cleanerPhone}). ` +
+    `Confirm with cleaner.`
+  );
+}
+
+// ─── Cleaner ─────────────────────────────────────────────────────────────────
+// Fires on payment confirmation via both SMS and WhatsApp.
+
+export function cleanerNewJobMsg(ctx: BookingNotifContext): string {
+  return (
+    `Hi ${ctx.cleanerFirstName}! New Klova job.\n` +
+    `Service: ${ctx.serviceName}\n` +
+    `Date: ${ctx.bookingDate}\n` +
+    `Address: ${ctx.address}\n` +
+    `Customer: ${ctx.customerFirstName} (${ctx.customerPhone})\n` +
+    `Amount: ₦${ctx.totalAmountNgn.toLocaleString('en-NG')}\n` +
+    `Please confirm availability with admin.`
+  );
+}
+
+// ─── Customer ─────────────────────────────────────────────────────────────────
+// Reserved for when the admin panel can trigger dispatch confirmation.
+// Not sent automatically — admin contacts the customer manually for V1.
+
+export function customerDispatchConfirmedMsg(ctx: BookingNotifContext): string {
+  return (
+    `Hi ${ctx.customerFirstName}! Your Klova booking is confirmed. ` +
+    `${ctx.cleanerFirstName} will be with you on ${ctx.bookingDate} for your ${ctx.serviceName}. ` +
+    `Questions? WhatsApp us on +234 800 000 0000.`
   );
 }
