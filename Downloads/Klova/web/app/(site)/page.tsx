@@ -590,17 +590,9 @@ function Zones() {
               Surulere are next.
             </p>
 
-            {/* Honest early-stage note */}
-            <div className="mt-8 flex gap-3 p-4 bg-base-200 rounded-xl border border-base-300">
-              <svg className="w-5 h-5 text-base-content/30 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <p className="text-sm text-base-content/50 leading-relaxed">
-                <span className="font-semibold text-base-content/70">We just launched.</span>{" "}
-                We&apos;re running a limited number of bookings per week right now, so every clean
-                gets our full attention. Early customers get the best of what we&apos;ve built.
-              </p>
-            </div>
+            <p className="mt-6 text-sm text-base-content/40">
+              We&apos;re just getting started. More zones coming soon.
+            </p>
           </div>
 
           {/* ── Zone list ── */}
@@ -751,13 +743,6 @@ function FinalCTA() {
           </svg>
         </Link>
 
-        {/* Trust micro-line */}
-        <p
-          className="text-sm"
-          style={{ color: "oklch(0.97 0.01 152 / 0.30)" }}
-        >
-          Personally vetted Keepers · Secure payment via Paystack · No subscription required
-        </p>
       </div>
     </section>
   );
