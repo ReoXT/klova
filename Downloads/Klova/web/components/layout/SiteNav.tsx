@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import Link from "next/link";
 
 const ZONES = [
@@ -36,9 +37,10 @@ export function SiteNav() {
           {/* Logo */}
           <Link
             href="/"
-            className="wordmark text-2xl text-primary shrink-0 focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 rounded-sm"
+            className="shrink-0 focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-4 rounded-sm"
+            aria-label="Klova home"
           >
-            Klova
+            <Image src="/logo.svg" alt="Klova" width={40} height={35} priority />
           </Link>
 
           {/* Desktop centre — zones dropdown */}
@@ -110,7 +112,7 @@ export function SiteNav() {
       >
         {/* Drawer header */}
         <div className="flex items-center justify-between px-5 h-16 border-b border-base-300 shrink-0">
-          <span className="wordmark text-2xl text-primary">Klova</span>
+          <Image src="/logo.svg" alt="Klova" width={40} height={35} />
           <button
             onClick={() => setOpen(false)}
             className="btn btn-ghost btn-square btn-sm"

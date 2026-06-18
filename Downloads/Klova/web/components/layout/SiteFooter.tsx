@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 
 const LEGAL_LINKS = [
@@ -16,7 +17,7 @@ export function SiteFooter() {
 
           {/* Brand */}
           <div className="space-y-2.5">
-            <p className="wordmark text-2xl text-primary">Klova</p>
+            <Image src="/logo.svg" alt="Klova" width={48} height={42} />
             <p className="text-sm text-base-content/55 leading-relaxed max-w-xs">
               On-demand home cleaning for Lagos.<br />
               Personally trained, vetted, and rated.
