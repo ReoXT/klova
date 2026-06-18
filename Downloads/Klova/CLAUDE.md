@@ -7,9 +7,15 @@ The full step-by-step build guide is in `Klova Prompts.md`. The master schema, p
 
 ## What Klova Is
 
-On-demand home cleaning for Lagos, Nigeria. Customers book a clean, pay online, get auto-matched to a vetted cleaner, and see who's coming before arrival. V1 launches in Lekki / Ajah only.
+On-demand home cleaning for Lagos, Nigeria. Customers book a clean, get assigned a vetted cleaner instantly, see who's coming (name, photo, rating), then pay. V1 launches in Lekki / Ajah only.
 
-**Core differentiator:** NIN-verified, rated cleaners. The customer sees the cleaner's name, photo, star rating, and completed-job count before they arrive. Trust is the whole product.
+**Core differentiator:** NIN-verified, rated cleaners. The customer sees the cleaner's name, photo, star rating, and completed-job count before they pay. Trust is the whole product.
+
+**The confirmed booking flow:**
+1. Customer fills in booking details (service, date, address)
+2. Backend assigns the best available cleaner immediately
+3. Customer sees cleaner profile (name, photo, rating, job count) → proceeds to pay
+4. Paystack webhook confirms payment → booking flips to `confirmed` → cleaner gets notified
 
 **Pricing (live in DB — from MASTER-ROADMAP.md Section 9):**
 
@@ -39,14 +45,16 @@ On-demand home cleaning for Lagos, Nigeria. Customers book a clean, pay online, 
 | Package manager | pnpm | v11.7.0 |
 | Backend | Node.js + Express + TypeScript | live on Railway |
 | Database | Supabase (Postgres + auth) | schema applied, RLS on |
-| Payments | Paystack | — |
-| Notifications | Termii (SMS/WhatsApp) | — |
+| Payments | Paystack | test keys active |
+| Notifications | Termii (SMS/WhatsApp) | stubs only — Section 5 |
 | Frontend hosting | Vercel | Live: https://klova-nine.vercel.app |
 | Backend hosting | Railway | Live: https://klova-production.up.railway.app |
 | Test runner | Vitest | v2.1.9 (in api/ only) |
 | Repo | GitHub | https://github.com/ReoXT/klova.git |
 
 **Critical Tailwind v4 note:** There is NO `tailwind.config.js`. All config lives in `web/app/globals.css` via `@import "tailwindcss"` and `@plugin "daisyui"`. Custom theme tokens are in a `[data-theme="klova"]` CSS block using OKLCH colors.
+
+**Git repo root is `/Users/reoxt` (home dir), NOT `/Users/reoxt/Downloads/Klova`.** Railway root directory must be set to `Downloads/Klova/api` — this is already configured correctly.
 
 ---
 
@@ -76,7 +84,7 @@ Klova/
 │   │       ├── Skeleton.tsx    # exports Skeleton, SkeletonText, SkeletonCard, SkeletonAvatar, Spinner
 │   │       ├── EmptyState.tsx
 │   │       └── Alert.tsx
-│   ├── pnpm-workspace.yaml     # allowBuilds: sharp + unrs-resolver (required — do not remove)
+│   ├── pnpm-workspace.yaml     # packages: ['.'], allowBuilds: sharp + unrs-resolver
 │   └── package.json
 ├── api/                        # Express backend → Railway
 │   ├── src/
@@ -84,8 +92,9 @@ Klova/
 │   │   │   ├── pricingService.test.ts       # 5 tests
 │   │   │   ├── bookingService.test.ts       # 12 tests
 │   │   │   ├── matchingService.test.ts      # 9 tests
-│   │   │   ├── assignmentService.test.ts    # 7 tests
-│   │   │   └── availabilityService.test.ts  # 6 tests  (39 total)
+│   │   │   ├── assignmentService.test.ts    # 4 tests
+│   │   │   ├── availabilityService.test.ts  # 6 tests
+│   │   │   └── refundService.test.ts        # 5 tests  (41 total)
 │   │   ├── controllers/
 │   │   │   ├── healthController.ts
 │   │   │   ├── pricingController.ts
@@ -109,22 +118,22 @@ Klova/
 │   │   │   ├── pricingService.ts            # computePrice(), getPricingGrid()
 │   │   │   ├── bookingService.ts            # validateBookingInput(), createBooking()
 │   │   │   ├── matchingService.ts           # matchCleaner() → ranked string[]
-│   │   │   ├── assignmentService.ts         # assignCleaner() → calls RPC + refund stub
+│   │   │   ├── assignmentService.ts         # assignCleaner() → { outcome, cleanerId }
 │   │   │   ├── availabilityService.ts       # getAlternativeDates()
-│   │   │   ├── paymentService.ts            # initializePayment() → Paystack /transaction/initialize
-│   │   │   ├── notificationService.ts       # stubs: notifyCustomerAssigned/AdminAssigned/AdminNoMatch
-│   │   │   └── refundService.ts             # issueRefund() stub — wire to Paystack next
+│   │   │   ├── paymentService.ts            # initializePayment() → Paystack checkout URL
+│   │   │   ├── notificationService.ts       # stubs — wire to Termii in Section 5
+│   │   │   └── refundService.ts             # issueRefund() — live Paystack call, safety net only
 │   │   ├── app.ts
 │   │   ├── config.ts
 │   │   └── server.ts
-│   ├── pnpm-workspace.yaml     # allowBuilds: esbuild (needed for vitest)
+│   ├── pnpm-workspace.yaml     # packages: ['.'], allowBuilds: esbuild
 │   └── package.json
 ├── supabase/
 │   └── migrations/
-│       ├── 20260617000001_schema.sql    # all 10 tables
-│       ├── 20260617000002_seed.sql      # zones, services, pricing, addons
-│       ├── 20260617000003_rls.sql       # RLS enabled, no permissive policies
-│       └── 20260617000004_assign_cleaner_fn.sql  # assign_cleaner() Postgres fn — applied ✅
+│       ├── 20260617000001_schema.sql               # all 10 tables
+│       ├── 20260617000002_seed.sql                 # zones, services, pricing, addons
+│       ├── 20260617000003_rls.sql                  # RLS enabled, no permissive policies
+│       └── 20260617000004_assign_cleaner_fn.sql    # assign_cleaner() Postgres fn — applied ✅
 ├── CLAUDE.md                   # This file — update after every session
 ├── MASTER-ROADMAP.md           # Schema, matching algorithm, pricing (source of truth)
 ├── Klova Prompts.md            # Step-by-step build prompts (Sections 0–13)
@@ -146,14 +155,19 @@ All tables are in the `public` schema. RLS is **enabled on all 10 tables** with 
 | `services` | id (uuid), name, slug, description | 4 rows seeded |
 | `pricing` | id, service_id→services, bedrooms ('1'/'2'/'3'/'4+'), amount_kobo | 16 rows seeded |
 | `addons` | id, name, slug, amount_kobo | 3 rows seeded |
-| `cleaners` | id, first_name, last_name, phone (unique), photo_url, zone_id→zones, status ('active'/'inactive'/'suspended'), nin_verified, rating (1–5), total_jobs | — |
+| `cleaners` | id, first_name, last_name, phone (unique), photo_url, zone_id→zones, status ('active'/'inactive'/'suspended'), nin_verified, rating (1–5), total_jobs | no test data seeded yet |
 | `cleaner_availability` | id, cleaner_id→cleaners, available_date (date), is_booked | UNIQUE (cleaner_id, available_date) |
 | `customers` | id, first_name, last_name, phone (unique), email | upserted on phone at booking time |
-| `bookings` | id, customer_id, cleaner_id (null until matched), requested_cleaner_id, zone_id, service_id, bedrooms, booking_date, address, total_amount_kobo, commission_kobo, status, paystack_reference, refunded_at, created_at, updated_at | updated_at trigger; status enum via CHECK |
+| `bookings` | id, customer_id, cleaner_id (null until matched), requested_cleaner_id, zone_id, service_id, bedrooms, booking_date, address, total_amount_kobo, commission_kobo, status, paystack_reference, refunded_at, created_at, updated_at | updated_at trigger |
 | `booking_addons` | id, booking_id→bookings, addon_id→addons | UNIQUE (booking_id, addon_id) |
 | `ratings` | id, booking_id (unique)→bookings, customer_id, cleaner_id, score (1–5 CHECK), comment | — |
 
-**Booking statuses:** `pending_payment` → `paid` → `matched` → `confirmed` → `completed` / `cancelled` / `no_match`
+**Booking status flow:** `pending_payment` → `matched` → `confirmed` → `completed` / `cancelled` / `no_match`
+
+- `pending_payment` — booking row created, assignment in progress
+- `matched` — cleaner assigned (set by assign_cleaner Postgres RPC); customer can now pay
+- `confirmed` — payment received via webhook; cleaner notified
+- `no_match` — no cleaner available for that date (customer sees 409, never reaches payment)
 
 **Amounts:** all stored as integers in **kobo** (1 NGN = 100 kobo). API responses return NGN.
 
@@ -169,10 +183,10 @@ Base URL (production): `https://klova-production.up.railway.app`
 |---|---|---|
 | GET | `/health` | Returns `{ ok: true }` |
 | GET | `/pricing` | Full pricing grid + add-on list for the frontend calculator |
-| POST | `/bookings` | Creates a pending booking, returns `booking_id` + server-computed total |
-| GET | `/availability/alternatives` | `?zone_slug=lekki-ajah&date=2026-07-01` → next available dates in zone (next 14 days) |
-| POST | `/payments/initiate` | `{ booking_id }` → Paystack `authorization_url` + `reference`; stores reference on booking |
-| POST | `/webhooks/paystack` | Paystack webhook — verifies HMAC, on `charge.success` flips booking to `paid` and runs assignment |
+| POST | `/bookings` | Creates booking, immediately assigns cleaner, returns `booking_id` + cleaner profile |
+| GET | `/availability/alternatives` | `?zone_slug=lekki-ajah&date=2026-07-01` → available dates in next 14 days |
+| POST | `/payments/initiate` | `{ booking_id }` → Paystack `authorization_url` + `reference` (booking must be `matched`) |
+| POST | `/webhooks/paystack` | Paystack webhook — HMAC verify, `charge.success` → `confirmed`, notify cleaner |
 
 ### POST /bookings
 
@@ -195,15 +209,34 @@ Base URL (production): `https://klova-production.up.railway.app`
 
 **Success (201):**
 ```json
-{ "ok": true, "data": { "booking_id": "uuid", "total_amount": 13000, "commission_amount": 2860, "commission_rate": 0.22 } }
+{
+  "ok": true,
+  "data": {
+    "booking_id": "uuid",
+    "total_amount": 13000,
+    "commission_amount": 2860,
+    "commission_rate": 0.22,
+    "cleaner": {
+      "id": "uuid",
+      "first_name": "Chidi",
+      "last_name": "Okafor",
+      "photo_url": "https://...",
+      "rating": 4.8,
+      "total_jobs": 42
+    }
+  }
+}
+```
+
+**No cleaners available (409):**
+```json
+{ "error": { "message": "No cleaners available in lekki-ajah on 2026-07-01. Try a different date." } }
 ```
 
 **Validation error (400):**
 ```json
-{ "error": { "message": "Validation failed", "fields": { "phone": "phone is required.", "booking_date": "Booking date cannot be in the past." } } }
+{ "error": { "message": "Validation failed", "fields": { "phone": "phone is required." } } }
 ```
-
-**Validation rules:** all required fields present, zone slug must be active, date not in the past (YYYY-MM-DD), service/bedrooms/addons valid per DB. Price is always recomputed server-side — any price from the browser is ignored.
 
 ---
 
@@ -213,29 +246,37 @@ Base URL (production): `https://klova-production.up.railway.app`
 - `computePrice(serviceSlug, bedrooms, addonSlugs[])` → `PriceBreakdown` — server-side source of truth. Returns `service_id`, `addon_ids`, `base_amount`, `addons_amount`, `total_amount`, `commission_amount`, `commission_rate` (all NGN). Throws `ValidationError` (400) for unknown service, invalid bedrooms, unknown add-ons.
 - `getPricingGrid()` → `PricingGrid` — all services with price grids + all add-ons.
 
-### `matchingService.ts`
-- `matchCleaner(booking)` → `string[] | 'NO_MATCH'` — pure selection, no DB writes. Returns ALL candidates in priority order: [P1 requested?, ...P2 preferred sorted, ...P3 rest sorted]. The full list is passed to `assignCleaner()` so Postgres can try fallbacks. Exports `NO_MATCH` const, `MatchResult` type, `BookingForMatch` interface.
-
-### `assignmentService.ts`
-- `assignCleaner(bookingId, booking, paystackReference?)` → `'matched' | 'no_match'` — calls `matchCleaner()` then invokes the `assign_cleaner` Postgres RPC. Pass `paystackReference` when payment is already captured; on any no_match path, `issueRefund()` is called automatically.
-
-### `availabilityService.ts`
-- `getAlternativeDates(zoneSlug, requestedDate, days=14)` → `string[]` — finds dates in the next N days where at least one active cleaner in the zone has a free slot. Returns deduplicated, sorted YYYY-MM-DD strings. Returns `[]` gracefully if zone unknown or no cleaners exist.
-
-### `paymentService.ts`
-- `initializePayment(bookingId)` → `PaymentInitResult` — looks up booking (must be `pending_payment`), calls `POST https://api.paystack.co/transaction/initialize` with kobo amount + customer email, stores returned reference on the booking row. Throws `PaymentError` (404/400/502/503) for known failure modes.
-- Exports `PaymentError` class (has `.status`), `PaymentInitResult` interface.
-
-### `refundService.ts`
-- `issueRefund(paystackReference)` → stub, logs intent. Wire to `POST https://api.paystack.co/refund` in the payments prompt.
-
 ### `bookingService.ts`
 - `validateBookingInput(body)` → `BookingInput` — pure sync, no DB. Collects ALL field errors before throwing `FieldValidationError`.
-- `createBooking(input)` → `BookingResult` — validates zone active, calls `computePrice`, upserts customer on phone, inserts booking at `status: 'pending_payment'`, links `booking_addons`. No cleaner assigned yet, no payment yet.
+- `createBooking(input)` → `BookingResult` — validates zone, computes price, upserts customer, inserts booking, calls `assignCleaner()` immediately, fetches cleaner profile, returns everything. Throws `NoAvailabilityError` (409) if no_match.
+
+### `matchingService.ts`
+- `matchCleaner(booking)` → `string[] | 'NO_MATCH'` — pure selection, no DB writes. Priority: [P1 requested cleaner?, P2 customer's 5-star picks, P3 general pool by rating/load]. Returns ranked ID list for RPC fallback.
+
+### `assignmentService.ts`
+- `assignCleaner(bookingId, booking)` → `{ outcome: 'matched'; cleanerId: string } | { outcome: 'no_match' }` — calls `matchCleaner()` then the `assign_cleaner` Postgres RPC (SELECT FOR UPDATE concurrency). No longer takes `paystackReference` — assignment is pre-payment.
+
+### `availabilityService.ts`
+- `getAlternativeDates(zoneSlug, requestedDate, days=14)` → `string[]` — dates in next N days with at least one free cleaner slot in the zone.
+
+### `paymentService.ts`
+- `initializePayment(bookingId)` → `PaymentInitResult` — booking must be `matched`; calls Paystack `/transaction/initialize` with kobo amount + customer email; stores reference on booking row.
+- Exports `PaymentError` class (has `.status`).
+
+### `refundService.ts`
+- `issueRefund(bookingId, paystackReference)` → live Paystack `/refund` call. Guards: skips if no `paystack_reference`, skips if `refunded_at` already set (double-refund protection), sets `refunded_at` on success. **Not called automatically** — available as a safety net for manual use.
+
+### `notificationService.ts`
+- `notifyCustomerConfirmed(bookingId)` — stub
+- `notifyCleanerAssigned(bookingId)` — stub (called by webhook on confirmation)
+- `notifyAdminConfirmed(bookingId)` — stub
+- Wire all three to Termii SMS/WhatsApp in Section 5.
 
 ### Error classes
-- `ValidationError` — status 400, from pricingService (single message string)
-- `FieldValidationError` — status 400, from bookingService (has `.fields: Record<string, string>`)
+- `ValidationError` — status 400, from pricingService
+- `FieldValidationError` — status 400, from bookingService (has `.fields`)
+- `NoAvailabilityError` — status 409, from bookingService when no_match
+- `PaymentError` — status 400/404/502/503, from paymentService
 
 ---
 
@@ -328,17 +369,23 @@ Loaded in `app/layout.tsx` via `next/font/google`, exposed as CSS variables:
 | 1.4 UI primitives | ✅ Done | Button, FormField, SelectField, Card, Skeleton, EmptyState, Alert — all in styleguide |
 | 2.1 Express scaffold | ✅ Done | Health endpoint live at https://klova-production.up.railway.app/health |
 | 2.2 Supabase connection | ✅ Done | Service client in api/src/lib/supabase.ts, round-trip verified in production |
-| 2.3 Schema + seed | ✅ Done | 10 tables, 3 migration files, pricing/zones/services/addons seeded |
+| 2.3 Schema + seed | ✅ Done | 10 tables, 4 migration files, pricing/zones/services/addons seeded |
 | 2.4 Row-level security | ✅ Done | RLS on all tables, zero anon access, service role bypasses |
 | 3.1 Pricing service | ✅ Done | computePrice(), GET /pricing, 5 passing tests |
-| 3.2 Booking creation | ✅ Done | POST /bookings, field-level validation, 17 passing tests total |
-| 3.3 Matching algorithm | ✅ Done | matchCleaner() in matchingService.ts, returns ranked string[] for fallback |
-| 3.4 Concurrency-safe assignment | ✅ Done | assignCleaner() + assign_cleaner Postgres fn (SELECT FOR UPDATE), now accepts paystackReference |
-| 3.5 No-availability experience | ✅ Done | getAlternativeDates(), issueRefund() stub, GET /availability/alternatives, 39 tests |
-| 3.6a Paystack payment init | ✅ Done | POST /payments/initiate — calls Paystack, stores reference on booking; 39 tests still pass |
-| 3.6b Paystack webhook | ✅ Done | POST /webhooks/paystack — HMAC verify, idempotent claim, assignment, notification stubs |
+| 3.2 Booking creation | ✅ Done | POST /bookings — validates, assigns cleaner immediately, returns cleaner profile |
+| 3.3 Matching algorithm | ✅ Done | matchCleaner() — 3-tier priority, returns ranked candidate list |
+| 3.4 Concurrency-safe assignment | ✅ Done | assignCleaner() + assign_cleaner Postgres RPC (SELECT FOR UPDATE) |
+| 3.5 No-availability experience | ✅ Done | getAlternativeDates(), GET /availability/alternatives, 409 on no_match |
+| 3.6a Paystack payment init | ✅ Done | POST /payments/initiate — booking must be matched; stores reference |
+| 3.6b Paystack webhook | ✅ Done | POST /webhooks/paystack — HMAC verify, matched→confirmed, notify stubs |
+| 3.7 Refund service | ✅ Done | issueRefund() — live Paystack call, double-refund guard, sets refunded_at |
+| 3.8 Flow rewire | ✅ Done | Assignment at booking time (not webhook); webhook just confirms + notifies |
 
-**Next prompt to run: Prompt 4.1 — Booking flow frontend (multi-step form: service → date → customer details → pay)**
+**41 tests passing. Backend is feature-complete for the booking flow.**
+
+**Next: Prompt 4.1 — Booking flow frontend (multi-step form: service → date → customer details → cleaner reveal → pay)**
+
+**Blocker to test end-to-end:** No cleaners seeded in DB. Need to insert a cleaner + availability row before POST /bookings can return a matched result.
 
 ---
 
@@ -355,14 +402,15 @@ PORT=4000
 SUPABASE_URL=
 SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=   # NEVER send to frontend or commit
-PAYSTACK_SECRET_KEY=
+PAYSTACK_SECRET_KEY=         # used for both API calls and HMAC webhook verification
 PAYSTACK_PUBLIC_KEY=
-PAYSTACK_WEBHOOK_SECRET=
 TERMII_API_KEY=
 TERMII_SENDER_ID=
 COMMISSION_RATE=0.22
 FRONTEND_ORIGIN=             # CORS allowed origin
 ```
+
+**Railway env vars set:** `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `PAYSTACK_SECRET_KEY`, `PORT`, `COMMISSION_RATE`, `FRONTEND_ORIGIN`
 
 ---
 
@@ -381,13 +429,14 @@ cd api && pnpm test
 # Build frontend
 cd web && pnpm build
 
-# Install deps
-cd web && pnpm install   # or cd api && pnpm install
+# Push to deploy (Railway + Vercel auto-deploy on push to main)
+git push origin main
 ```
 
 **pnpm notes:**
-- `web/pnpm-workspace.yaml` has `allowBuilds: { sharp: true, unrs-resolver: true }` — do not remove
-- `api/pnpm-workspace.yaml` has `allowBuilds: { esbuild: true }` — needed for vitest, do not remove
+- `web/pnpm-workspace.yaml` — must have `packages: ['.']` and `allowBuilds: { sharp, unrs-resolver }`
+- `api/pnpm-workspace.yaml` — must have `packages: ['.']` and `allowBuilds: { esbuild }`
+- Both files need the `packages` field or pnpm v9 fails with "packages field missing or empty"
 
 ---
 
@@ -406,5 +455,7 @@ cd web && pnpm install   # or cd api && pnpm install
 
 - Branch: `main`
 - Remote: `https://github.com/ReoXT/klova.git`
+- **Repo root is `/Users/reoxt` (home directory)** — git commands work from anywhere but paths in commits are relative to home
 - Vercel auto-deploys on push to `main`
+- Railway auto-deploys on push to `main` (root dir: `Downloads/Klova/api`)
 - Commit style: `feat(web):`, `fix(web):`, `refactor(web):`, `feat(api):`, `feat(db):` etc.
