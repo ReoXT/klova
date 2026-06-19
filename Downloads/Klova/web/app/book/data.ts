@@ -1,4 +1,4 @@
-import type { ServiceSlug, BedroomCount, BookingData, PriceBreakdown } from "./types";
+import type { ServiceSlug, BedroomCount, BookingData, PriceBreakdown, LivePricingData } from "./types";
 
 export const SERVICES = [
   {
@@ -182,6 +182,80 @@ export function computePrice(data: BookingData): PriceBreakdown {
 
 export function formatNGN(amount: number): string {
   return `₦${amount.toLocaleString("en-NG")}`;
+}
+
+// ─── Backend slug maps ────────────────────────────────────────────────────────
+// The frontend uses short slugs; the DB was seeded with slightly different ones.
+export const SERVICE_SLUG_TO_API: Record<string, string> = {
+  "standard":         "standard",
+  "deep":             "deep",
+  "move-in-out":      "move-in-move-out",   // frontend slug ≠ DB slug
+  "post-construction":"post-construction",
+};
+
+// Only the add-ons that exist in the DB (3 seeded rows).
+// appliances/cabinets/windows/fans/walls/compound are UI-only until migrated.
+const ADDON_SLUG_TO_API: Partial<Record<keyof typeof DEFAULT_BOOKING.extras, string>> = {
+  laundry:  "laundry",
+  ironing:  "ironing",
+  wardrobe: "wardrobe-organising",  // frontend slug ≠ DB slug
+};
+
+// ─── Live-price compute (UX estimate only — backend is source of truth) ───────
+export function computePriceFromLive(data: BookingData, live: LivePricingData): PriceBreakdown {
+  const apiSlug = SERVICE_SLUG_TO_API[data.service ?? ""] ?? data.service;
+  const liveService = live.services.find((s) => s.slug === apiSlug);
+  const base = (liveService && data.bedrooms ? liveService.prices[data.bedrooms] : 0) ?? 0;
+
+  const keeperSurcharge = (data.keeperCount - 1) * base;
+
+  let extras = 0;
+  const e = data.extras;
+  const addonPrice = (slug: string) => live.addons.find((a) => a.slug === slug)?.amount ?? 0;
+  if (e.ironing)   extras += addonPrice("ironing");
+  if (e.laundry)   extras += addonPrice("laundry");
+  if (e.wardrobe)  extras += addonPrice("wardrobe-organising");
+  if (e.appliances) {
+    const boolCount = (["oven", "fridge", "freezer", "microwave", "coffee_machine", "toaster"] as const)
+      .filter((k) => e.appliance_units[k]).length;
+    const customCount = e.appliance_units.custom.trim() ? 1 : 0;
+    extras += (boolCount + customCount) * 1500;
+  }
+  if (e.cabinets) extras += 1500;
+  if (e.windows)  extras += 2000;
+  if (e.fans)     extras += 1600;
+  if (e.walls)    extras += 2300;
+  if (e.compound) extras += 3000;
+
+  const insurance = data.wantsInsurance ? INSURANCE_FEE : 0;
+  const promo = PROMO_CODES[data.promoCode.toUpperCase()] ?? 0;
+  const perVisit = base + keeperSurcharge + extras;
+  const discount = Math.round((perVisit * promo) / 100);
+  const total = perVisit - discount + insurance;
+  const monthlyTotal = (perVisit - discount + insurance) * data.payMonths;
+
+  return { base, extras, keeperSurcharge, insurance, discount, total, monthlyTotal };
+}
+
+// ─── Build POST /bookings payload ─────────────────────────────────────────────
+export function buildBookingPayload(data: BookingData) {
+  const addonSlugs = (Object.entries(ADDON_SLUG_TO_API) as [keyof typeof ADDON_SLUG_TO_API, string][])
+    .filter(([key]) => data.extras[key] as boolean)
+    .map(([, apiSlug]) => apiSlug);
+
+  return {
+    first_name:           data.firstName,
+    last_name:            data.lastName,
+    phone:                data.phone,
+    email:                data.email,
+    address:              data.address,
+    zone_slug:            "lekki-ajah",
+    service_slug:         SERVICE_SLUG_TO_API[data.service ?? ""] ?? data.service,
+    bedrooms:             data.bedrooms,
+    addon_slugs:          addonSlugs,
+    booking_date:         data.bookingDate,
+    requested_cleaner_id: null,
+  };
 }
 
 export const FAKE_KEEPER = {

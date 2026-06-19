@@ -60,6 +60,7 @@ export async function initializePayment(bookingId: string): Promise<PaymentInitR
     body: JSON.stringify({
       email: customerData.email,
       amount: booking.total_amount_kobo,
+      callback_url: `${config.frontendOrigin}/book/confirm`,
     }),
   });
 

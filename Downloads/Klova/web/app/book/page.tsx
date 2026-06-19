@@ -1,8 +1,13 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import type { BookingData } from "./types";
-import { DEFAULT_BOOKING, computePrice } from "./data";
+import { useState, useCallback, useEffect } from "react";
+import type { BookingData, ApiCleaner, LivePricingData } from "./types";
+import {
+  DEFAULT_BOOKING,
+  computePrice,
+  computePriceFromLive,
+  buildBookingPayload,
+} from "./data";
 import Step01Service from "./steps/Step01Service";
 import Step02Size from "./steps/Step02Size";
 import Step03Address from "./steps/Step03Address";
@@ -16,20 +21,7 @@ import Step10Checkout from "./steps/Step10Checkout";
 import Step11Matching from "./steps/Step11Matching";
 import Step12Confirmation from "./steps/Step12Confirmation";
 
-const STEP_LABELS = [
-  "Service",
-  "Apartment",
-  "Address",
-  "Date & Time",
-  "Add-ons",
-  "Customise",
-  "Preferences",
-  "Your Details",
-  "Review",
-  "Checkout",
-  "Matching",
-  "Confirmed",
-];
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
 function hasAppliancesSelected(data: BookingData) {
   return data.extras.appliances;
@@ -63,6 +55,26 @@ export default function BookPage() {
   const [animKey, setAnimKey] = useState(0);
   const [data, setData] = useState<BookingData>(DEFAULT_BOOKING);
 
+  // ─── Live pricing (UX estimate — backend recomputes before any charge) ───
+  const [livePricing, setLivePricing] = useState<LivePricingData | null>(null);
+  useEffect(() => {
+    fetch(`${API_URL}/pricing`)
+      .then((r) => r.json())
+      .then((json) => {
+        if (json.ok) setLivePricing(json.data as LivePricingData);
+      })
+      .catch(() => {/* silently fall back to hardcoded prices */});
+  }, []);
+
+  // ─── Booking submission state ────────────────────────────────────────────
+  const [bookingId, setBookingId] = useState<string | null>(null);
+  const [matchedCleaner, setMatchedCleaner] = useState<ApiCleaner | null>(null);
+  const [serverTotal, setServerTotal] = useState<number | null>(null);
+
+  type SubmitStatus = "idle" | "submitting" | "paying" | "redirecting";
+  const [submitStatus, setSubmitStatus] = useState<SubmitStatus>("idle");
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
   const patch = useCallback((partial: Partial<BookingData>) => {
     setData((prev) => ({ ...prev, ...partial }));
   }, []);
@@ -83,7 +95,111 @@ export default function BookPage() {
     });
   }, [data]);
 
-  const price = computePrice(data);
+  // ─── POST /bookings ──────────────────────────────────────────────────────
+  const handleSubmitBooking = useCallback(async () => {
+    setSubmitStatus("submitting");
+    setSubmitError(null);
+
+    try {
+      const res = await fetch(`${API_URL}/bookings`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(buildBookingPayload(data)),
+      });
+
+      const json = await res.json();
+
+      if (!res.ok) {
+        const msg = json?.error?.message;
+        if (res.status === 409) {
+          setSubmitError(
+            msg ?? "No keepers are available on this date. Please go back and choose a different date."
+          );
+        } else if (res.status === 400) {
+          setSubmitError(
+            msg ?? "Some booking details are invalid. Please review and try again."
+          );
+        } else {
+          setSubmitError("Something went wrong. Please try again in a moment.");
+        }
+        setSubmitStatus("idle");
+        return;
+      }
+
+      const { booking_id, total_amount, cleaner } = json.data;
+      setBookingId(booking_id);
+      setMatchedCleaner(cleaner);
+      setServerTotal(total_amount);
+      sessionStorage.setItem("klova_booking_id", booking_id);
+      setSubmitStatus("idle");
+
+      // Advance to the keeper reveal step
+      setStep((s) => {
+        const n = nextStep(s, data);
+        setAnimKey((k) => k + 1);
+        return n;
+      });
+    } catch {
+      setSubmitError("Network error — please check your connection and try again.");
+      setSubmitStatus("idle");
+    }
+  }, [data]);
+
+  // ─── POST /payments/initiate → redirect to Paystack ─────────────────────
+  const handleInitiatePayment = useCallback(async () => {
+    if (!bookingId) return;
+    setSubmitStatus("paying");
+    setSubmitError(null);
+
+    try {
+      const res = await fetch(`${API_URL}/payments/initiate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ booking_id: bookingId }),
+      });
+
+      const json = await res.json();
+
+      if (!res.ok) {
+        const msg = json?.error?.message;
+        setSubmitError(msg ?? "Failed to start payment. Please try again.");
+        setSubmitStatus("idle");
+        return;
+      }
+
+      const { authorization_url } = json.data;
+
+      // Persist summary so the /book/confirm page can read it after redirect
+      sessionStorage.setItem(
+        "klova_booking_summary",
+        JSON.stringify({
+          booking_id:  bookingId,
+          service:     data.service,
+          bedrooms:    data.bedrooms,
+          bookingDate: data.bookingDate,
+          timeSlot:    data.timeSlot,
+          address:     data.address,
+          firstName:   data.firstName,
+          phone:       data.phone,
+          email:       data.email,
+          serverTotal,
+          cleaner:     matchedCleaner,
+        })
+      );
+
+      setSubmitStatus("redirecting");
+      window.location.href = authorization_url;
+    } catch {
+      setSubmitError("Network error — please check your connection and try again.");
+      setSubmitStatus("idle");
+    }
+  }, [bookingId, data, serverTotal, matchedCleaner]);
+
+  // ─── Price (live from API when available, hardcoded fallback) ───────────
+  const price = livePricing
+    ? computePriceFromLive(data, livePricing)
+    : computePrice(data);
+
   const steps = getSteps(data);
   const stepIndex = getStepIndex(step, data);
   const totalSteps = steps.length;
@@ -95,10 +211,7 @@ export default function BookPage() {
       <div className="w-full h-1" style={{ background: "var(--border-default)" }}>
         <div
           className="h-full transition-all duration-500"
-          style={{
-            width: `${progressPct}%`,
-            background: "var(--klova-primary)",
-          }}
+          style={{ width: `${progressPct}%`, background: "var(--klova-primary)" }}
         />
       </div>
 
@@ -113,8 +226,26 @@ export default function BookPage() {
         {step === 7  && <Step07Preferences data={data} patch={patch} price={price} onNext={goNext} onBack={goBack} />}
         {step === 8  && <Step08Details data={data} patch={patch} price={price} onNext={goNext} onBack={goBack} />}
         {step === 9  && <Step09Summary data={data} price={price} onNext={goNext} onBack={goBack} />}
-        {step === 10 && <Step10Checkout data={data} patch={patch} price={price} onNext={goNext} onBack={goBack} />}
-        {step === 11 && <Step11Matching data={data} onNext={goNext} />}
+        {step === 10 && (
+          <Step10Checkout
+            data={data}
+            patch={patch}
+            price={price}
+            onSubmit={handleSubmitBooking}
+            submitStatus={submitStatus === "submitting" ? "submitting" : "idle"}
+            submitError={submitError}
+            onBack={goBack}
+          />
+        )}
+        {step === 11 && (
+          <Step11Matching
+            cleaner={matchedCleaner}
+            serverTotal={serverTotal}
+            payStatus={submitStatus === "paying" || submitStatus === "redirecting" ? submitStatus : "idle"}
+            payError={submitError}
+            onPay={handleInitiatePayment}
+          />
+        )}
         {step === 12 && <Step12Confirmation data={data} price={price} />}
       </div>
     </div>

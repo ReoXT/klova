@@ -74,3 +74,28 @@ export interface PriceBreakdown {
   total: number;
   monthlyTotal: number; // total × payMonths
 }
+
+export interface ApiCleaner {
+  id: string;
+  first_name: string;
+  last_name: string;
+  photo_url: string | null;
+  rating: number;
+  total_jobs: number;
+}
+
+export interface LivePricingData {
+  services: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    description: string | null;
+    prices: Record<string, number>; // bedrooms -> NGN
+  }>;
+  addons: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    amount: number; // NGN
+  }>;
+}

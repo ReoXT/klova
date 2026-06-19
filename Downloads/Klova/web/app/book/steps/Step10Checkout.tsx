@@ -4,16 +4,20 @@ import { useState } from "react";
 import type { BookingData, PriceBreakdown } from "../types";
 import { INSURANCE_FEE, PROMO_CODES, formatNGN } from "../data";
 import { Button } from "@/components/ui/Button";
+import { Alert } from "@/components/ui/Alert";
+import { Spinner } from "@/components/ui/Skeleton";
 
 interface Props {
   data: BookingData;
   patch: (p: Partial<BookingData>) => void;
   price: PriceBreakdown;
-  onNext: () => void;
+  onSubmit: () => void;
+  submitStatus: "idle" | "submitting";
+  submitError: string | null;
   onBack: () => void;
 }
 
-export default function Step10Checkout({ data, patch, price, onNext, onBack }: Props) {
+export default function Step10Checkout({ data, patch, price, onSubmit, submitStatus, submitError, onBack }: Props) {
   const [promoInput, setPromoInput] = useState(data.promoCode);
   const [promoStatus, setPromoStatus] = useState<"idle" | "ok" | "invalid">("idle");
   const [showOptOutModal, setShowOptOutModal] = useState(false);
@@ -225,10 +229,27 @@ export default function Step10Checkout({ data, patch, price, onNext, onBack }: P
             </span>
           </div>
 
+          {submitError && (
+            <Alert variant="error" className="mb-3">
+              <p className="text-sm">{submitError}</p>
+            </Alert>
+          )}
+
           <div className="flex gap-3">
-            <Button variant="ghost" onClick={onBack} className="flex-1">Back</Button>
-            <Button variant="primary" onClick={onNext} className="flex-1">
-              Find my keeper →
+            <Button variant="ghost" onClick={onBack} className="flex-1" disabled={submitStatus === "submitting"}>
+              Back
+            </Button>
+            <Button
+              variant="primary"
+              onClick={onSubmit}
+              disabled={submitStatus === "submitting"}
+              className="flex-1 flex items-center justify-center gap-2"
+            >
+              {submitStatus === "submitting" ? (
+                <><Spinner size="sm" /><span>Matching you…</span></>
+              ) : (
+                "Find my keeper →"
+              )}
             </Button>
           </div>
         </div>
