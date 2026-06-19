@@ -475,8 +475,8 @@ function BookingDetail({
   async function handleConfirmDispatch() {
     const label =
       b.status === "confirmed"
-        ? "Resend the dispatch SMS to the customer?"
-        : `Confirm dispatch — flip status to Confirmed and send "${b.customer.first_name}" the you're-all-set SMS?`;
+        ? "Resend the dispatch email to the customer?"
+        : `Confirm dispatch — flip status to Confirmed and notify "${b.customer.first_name}" via email?`;
 
     if (!window.confirm(label)) return;
 
@@ -577,7 +577,7 @@ function BookingDetail({
                     onClick={handleConfirmDispatch}
                   >
                     {b.status === "confirmed"
-                      ? "Resend dispatch SMS"
+                      ? "Resend dispatch email"
                       : "Confirm dispatch"}
                   </Button>
                   {confirmMsg && (
