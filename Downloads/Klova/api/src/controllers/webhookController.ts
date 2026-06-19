@@ -8,6 +8,7 @@ import {
 } from '../services/notificationService';
 import { handleTransferWebhook } from '../services/payoutService';
 import { adjustEarningForRefund } from '../services/earningsService';
+import { issueRefund } from '../services/refundService';
 
 // ─── Signature verification ───────────────────────────────────────────────────
 
@@ -182,8 +183,18 @@ async function processChargeSuccess(reference: string): Promise<void> {
       return;
     }
 
-    // Any other status (no_match, cancelled, pending_payment) — ignore
-    console.warn(`[webhook] Unexpected booking status "${existing.status}" for reference: ${reference}`);
+    // Slot expired: the 25-min cron cancelled the booking but payment still landed.
+    // Auto-refund so the customer is never charged for a booking that wasn't confirmed.
+    if (existing.status === 'cancelled') {
+      console.error(
+        `[webhook] Booking ${existing.id as string} was slot-expired (cancelled) but charged — auto-refunding ref: ${reference}`,
+      );
+      await issueRefund(existing.id as string, reference);
+      return;
+    }
+
+    // Any other status (no_match, pending_payment) — unexpected; log and ignore
+    console.warn(`[webhook] Unexpected booking status "${existing.status as string}" for reference: ${reference}`);
     return;
   }
 

@@ -51,18 +51,31 @@ export async function initializePayment(bookingId: string): Promise<PaymentInitR
   }
 
   // Call Paystack — amount is already in kobo, which is what Paystack expects for NGN
-  const paystackRes = await fetch('https://api.paystack.co/transaction/initialize', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${config.paystackSecretKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      email: customerData.email,
-      amount: booking.total_amount_kobo,
-      callback_url: `${config.frontendOrigin}/book/confirm`,
-    }),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15_000);
+  let paystackRes: globalThis.Response;
+  try {
+    paystackRes = await fetch('https://api.paystack.co/transaction/initialize', {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        Authorization: `Bearer ${config.paystackSecretKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email: customerData.email,
+        amount: booking.total_amount_kobo,
+        callback_url: `${config.frontendOrigin}/book/confirm`,
+      }),
+    });
+  } catch (err: unknown) {
+    if ((err as { name?: string }).name === 'AbortError') {
+      throw new PaymentError('Payment provider timed out. Please try again in a moment.', 504);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   if (!paystackRes.ok) {
     const body = await paystackRes.json().catch(() => ({})) as { message?: string };

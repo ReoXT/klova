@@ -133,6 +133,10 @@ export default function AdminBookingsPage() {
     if (zoneId) params.set("zone_id", zoneId);
     try {
       const r = await fetch(`/api/admin/bookings?${params}`);
+      if (r.status === 401) {
+        window.location.href = "/admin/login";
+        return;
+      }
       const d = await r.json();
       if (!r.ok) throw new Error(d.error ?? "Unknown error");
       setBookings(d.bookings ?? []);

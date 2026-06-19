@@ -100,6 +100,19 @@ export function validateBookingInput(body: Record<string, unknown>): BookingInpu
     }
   }
 
+  // Phone format — accepts 0XXXXXXXXXX, +234XXXXXXXXX, 234XXXXXXXXX (Nigerian mobile)
+  if (!errors.phone && typeof body.phone === 'string') {
+    const normalized = (body.phone as string).replace(/\s/g, '');
+    if (!/^(\+?234|0)[789]\d{9}$/.test(normalized)) {
+      errors.phone = 'Enter a valid Nigerian mobile number (e.g. 08012345678 or +2348012345678).';
+    }
+  }
+
+  // Address length cap
+  if (!errors.address && typeof body.address === 'string' && body.address.trim().length > 500) {
+    errors.address = 'Address must be 500 characters or fewer.';
+  }
+
   if (Object.keys(errors).length > 0) {
     throw new FieldValidationError(errors);
   }
@@ -133,6 +146,8 @@ export function validateBookingInput(body: Record<string, unknown>): BookingInpu
 // ─── Core booking logic ───────────────────────────────────────────────────────
 
 export async function createBooking(input: BookingInput): Promise<BookingResult> {
+  console.log(`[booking] Creating: ${input.service_slug} ${input.bedrooms}bd for ${input.phone} on ${input.booking_date}`);
+
   // 1. Validate zone is active
   const { data: zone } = await supabase
     .from('zones')
@@ -225,6 +240,8 @@ export async function createBooking(input: BookingInput): Promise<BookingResult>
     if (addonErr) throw addonErr;
   }
 
+  console.log(`[booking] ${booking.id}: row created — assigning cleaner`);
+
   // 6. Assign cleaner immediately — customer sees who's coming before paying
   const assignment = await assignCleaner(booking.id, {
     zone_id: zone.id,
@@ -234,8 +251,11 @@ export async function createBooking(input: BookingInput): Promise<BookingResult>
   });
 
   if (assignment.outcome === 'no_match') {
+    console.warn(`[booking] ${booking.id}: no match in ${input.zone_slug} on ${input.booking_date}`);
     throw new NoAvailabilityError(input.zone_slug, input.booking_date);
   }
+
+  console.log(`[booking] ${booking.id}: matched cleaner ${assignment.cleanerId}`);
 
   // 7. Fetch cleaner profile to return to the frontend
   const { data: cleaner, error: cleanerErr } = await supabase

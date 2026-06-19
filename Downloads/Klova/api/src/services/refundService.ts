@@ -39,14 +39,28 @@ export async function issueRefund(bookingId: string, paystackReference: string):
 
   console.log(`[refund] Initiating refund for booking ${bookingId} (ref: ${paystackReference})`);
 
-  const response = await fetch('https://api.paystack.co/refund', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${config.paystackSecretKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ transaction: paystackReference }),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15_000);
+  let response: globalThis.Response;
+  try {
+    response = await fetch('https://api.paystack.co/refund', {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        Authorization: `Bearer ${config.paystackSecretKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ transaction: paystackReference }),
+    });
+  } catch (err: unknown) {
+    if ((err as { name?: string }).name === 'AbortError') {
+      console.error(`[refund] Paystack timeout for booking ${bookingId} — retry manually in Paystack dashboard`);
+      throw new Error(`Refund timed out for booking ${bookingId}`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   const body = await response.json() as { status: boolean; message: string };
 
