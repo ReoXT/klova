@@ -35,6 +35,8 @@ export interface BookingInput {
   bedrooms: string;
   addon_slugs: string[];
   booking_date: string; // YYYY-MM-DD
+  keeper_count?: number;
+  wants_insurance?: boolean;
   requested_cleaner_id?: string;
 }
 
@@ -114,6 +116,11 @@ export function validateBookingInput(body: Record<string, unknown>): BookingInpu
       ? (body.addon_slugs as unknown[]).filter((s): s is string => typeof s === 'string')
       : [],
     booking_date: (body.booking_date as string).trim(),
+    keeper_count:
+      typeof body.keeper_count === 'number' && body.keeper_count >= 1
+        ? Math.round(body.keeper_count)
+        : undefined,
+    wants_insurance: body.wants_insurance === true,
     requested_cleaner_id:
       typeof body.requested_cleaner_id === 'string' && body.requested_cleaner_id.trim()
         ? body.requested_cleaner_id.trim()
@@ -143,7 +150,10 @@ export async function createBooking(input: BookingInput): Promise<BookingResult>
   // 2. Compute price server-side — also validates service, bedrooms, add-ons
   let breakdown;
   try {
-    breakdown = await computePrice(input.service_slug, input.bedrooms, input.addon_slugs);
+    breakdown = await computePrice(input.service_slug, input.bedrooms, input.addon_slugs, {
+      keeperCount: input.keeper_count,
+      wantsInsurance: input.wants_insurance,
+    });
   } catch (err) {
     if (err instanceof ValidationError) {
       const msg = err.message;

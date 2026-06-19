@@ -12,6 +12,8 @@ export class ValidationError extends Error {
 const VALID_BEDROOMS = ['1', '2', '3', '4+'] as const;
 type Bedrooms = (typeof VALID_BEDROOMS)[number];
 
+const INSURANCE_FEE_KOBO = 130_000; // ₦1,300
+
 export interface PriceBreakdown {
   service_id: string;        // DB id — for booking FK
   addon_ids: string[];       // DB ids — for booking_addons FK
@@ -46,7 +48,10 @@ export async function computePrice(
   serviceSlug: string,
   bedrooms: string,
   addonSlugs: string[],
+  opts: { keeperCount?: number; wantsInsurance?: boolean } = {},
 ): Promise<PriceBreakdown> {
+  const keeperCount = Math.max(1, Math.round(opts.keeperCount ?? 1));
+  const wantsInsurance = opts.wantsInsurance ?? false;
   if (!VALID_BEDROOMS.includes(bedrooms as Bedrooms)) {
     throw new ValidationError(
       `Invalid apartment size "${bedrooms}". Valid values: ${VALID_BEDROOMS.join(', ')}.`,
@@ -80,7 +85,7 @@ export async function computePrice(
     );
   }
 
-  const baseKobo: number = pricing.amount_kobo;
+  const baseKobo: number = pricing.amount_kobo * keeperCount;
 
   // Fetch and validate add-ons
   let addonsKobo = 0;
@@ -106,7 +111,8 @@ export async function computePrice(
     addonIds = (addons ?? []).map((a: { id: string }) => a.id);
   }
 
-  const totalKobo = baseKobo + addonsKobo;
+  const insuranceKobo = wantsInsurance ? INSURANCE_FEE_KOBO : 0;
+  const totalKobo = baseKobo + addonsKobo + insuranceKobo;
   const commissionKobo = Math.round(totalKobo * config.commissionRate);
 
   return {

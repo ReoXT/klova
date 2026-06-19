@@ -255,6 +255,8 @@ export function buildBookingPayload(data: BookingData) {
     bedrooms:             data.bedrooms,
     addon_slugs:          addonSlugs,
     booking_date:         data.bookingDate,
+    keeper_count:         data.keeperCount,
+    wants_insurance:      data.wantsInsurance,
     requested_cleaner_id: data.requestedCleanerId ?? null,
   };
 }
