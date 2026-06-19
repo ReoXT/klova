@@ -135,12 +135,12 @@ export default function AdminBookingsPage() {
     try {
       const r = await fetch(`/api/admin/bookings?${params}`);
       const d = await r.json();
-      if (!r.ok) throw new Error(d.error ?? "Unknown error");
+      if (!r.ok) throw new Error(`${r.status}: ${d.error ?? JSON.stringify(d)}`);
       setBookings(d.bookings ?? []);
       setTotal(d.total ?? 0);
       setPages(d.pages ?? 1);
-    } catch {
-      setFetchError("Failed to load bookings. Check your connection and try again.");
+    } catch (err) {
+      setFetchError(err instanceof Error ? err.message : "Unknown error");
     } finally {
       setLoading(false);
     }
