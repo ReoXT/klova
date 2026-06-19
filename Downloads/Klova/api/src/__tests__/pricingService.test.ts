@@ -73,6 +73,49 @@ describe('computePrice — no add-ons', () => {
   });
 });
 
+// ─── Insurance ───────────────────────────────────────────────────────────────
+describe('computePrice — with insurance', () => {
+  it('attributes 100% of insurance to commission, not 22%', async () => {
+    // 1-bed Standard Clean ₦5,000 + insurance ₦1,300
+    mockFrom()
+      .mockReturnValueOnce(chain({ data: { id: 'svc-uuid', name: 'Standard Clean' }, error: null }) as any)
+      .mockReturnValueOnce(chain({ data: { amount_kobo: 500_000 }, error: null }) as any);
+
+    const result = await computePrice('standard', '1', [], { wantsInsurance: true });
+
+    expect(result.base_amount).toBe(5_000);
+    expect(result.addons_amount).toBe(0);
+    expect(result.insurance_amount).toBe(1_300);
+    expect(result.total_amount).toBe(6_300);
+
+    // 22% of ₦5,000 cleaning fee = ₦1,100  +  100% of ₦1,300 insurance = ₦1,300
+    // Total commission = ₦2,400 (NOT ₦1,386 which would be wrong 22% of full total)
+    expect(result.commission_amount).toBe(2_400);
+    expect(result.commission_rate).toBe(0.22);
+  });
+
+  it('insurance with add-ons: commission is 22% of (base+addons) + 100% of insurance', async () => {
+    // 2-bed Standard ₦9,500 + Laundry ₦3,500 + insurance ₦1,300
+    mockFrom()
+      .mockReturnValueOnce(chain({ data: { id: 'svc-uuid', name: 'Standard Clean' }, error: null }) as any)
+      .mockReturnValueOnce(chain({ data: { amount_kobo: 950_000 }, error: null }) as any)
+      .mockReturnValueOnce(
+        chain({ data: [{ id: 'addon-uuid', slug: 'laundry', amount_kobo: 350_000 }], error: null }) as any,
+      );
+
+    const result = await computePrice('standard', '2', ['laundry'], { wantsInsurance: true });
+
+    expect(result.base_amount).toBe(9_500);
+    expect(result.addons_amount).toBe(3_500);
+    expect(result.insurance_amount).toBe(1_300);
+    expect(result.total_amount).toBe(14_300);
+
+    // 22% of ₦13,000 cleaning fee = ₦2,860  +  100% of ₦1,300 insurance = ₦1,300
+    // Total commission = ₦4,160
+    expect(result.commission_amount).toBe(4_160);
+  });
+});
+
 // ─── Validation errors ───────────────────────────────────────────────────────
 describe('computePrice — validation errors', () => {
   it('rejects an invalid bedroom size immediately', async () => {

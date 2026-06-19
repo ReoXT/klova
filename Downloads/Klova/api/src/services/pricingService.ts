@@ -17,10 +17,11 @@ const INSURANCE_FEE_KOBO = 130_000; // ₦1,300
 export interface PriceBreakdown {
   service_id: string;        // DB id — for booking FK
   addon_ids: string[];       // DB ids — for booking_addons FK
-  base_amount: number;       // NGN
-  addons_amount: number;     // NGN
-  total_amount: number;      // NGN
-  commission_amount: number; // NGN
+  base_amount: number;       // NGN — cleaning fee only
+  addons_amount: number;     // NGN — add-ons total
+  insurance_amount: number;  // NGN — 100% retained by Klova, cleaner never sees this
+  total_amount: number;      // NGN — what the customer pays
+  commission_amount: number; // NGN — 22% of cleaning fee + 100% of insurance
   commission_rate: number;
 }
 
@@ -112,14 +113,19 @@ export async function computePrice(
   }
 
   const insuranceKobo = wantsInsurance ? INSURANCE_FEE_KOBO : 0;
-  const totalKobo = baseKobo + addonsKobo + insuranceKobo;
-  const commissionKobo = Math.round(totalKobo * config.commissionRate);
+  const cleaningFeeKobo = baseKobo + addonsKobo;
+  const totalKobo = cleaningFeeKobo + insuranceKobo;
+
+  // Cleaner is paid from the cleaning fee only.
+  // Insurance is 100% Klova revenue — never shared with the cleaner.
+  const commissionKobo = Math.round(cleaningFeeKobo * config.commissionRate) + insuranceKobo;
 
   return {
     service_id: serviceId,
     addon_ids: addonIds,
     base_amount: baseKobo / 100,
     addons_amount: addonsKobo / 100,
+    insurance_amount: insuranceKobo / 100,
     total_amount: totalKobo / 100,
     commission_amount: commissionKobo / 100,
     commission_rate: config.commissionRate,
