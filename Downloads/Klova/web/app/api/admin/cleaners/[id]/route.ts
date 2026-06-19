@@ -1,0 +1,102 @@
+import { type NextRequest } from "next/server";
+import { verifyAdmin } from "@/app/api/admin/_auth";
+import { createAdminClient } from "@/lib/supabase/admin";
+
+const PHONE_RE = /^(\+?234|0)[7-9]\d{9}$/;
+const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp"];
+const MAX_BYTES = 5 * 1024 * 1024;
+
+function validatePhone(p: string) {
+  return PHONE_RE.test(p.replace(/\s/g, ""));
+}
+
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const unauth = await verifyAdmin();
+  if (unauth) return unauth;
+
+  const { id } = await params;
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("cleaners")
+    .select("*, zone:zones(id, name, slug)")
+    .eq("id", id)
+    .single();
+
+  if (error) return Response.json({ error: "Not found" }, { status: 404 });
+  return Response.json({ cleaner: data });
+}
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const unauth = await verifyAdmin();
+  if (unauth) return unauth;
+
+  const { id } = await params;
+  const fd = await request.formData();
+
+  const firstName   = (fd.get("first_name")  as string | null)?.trim();
+  const lastName    = (fd.get("last_name")   as string | null)?.trim();
+  const phone       = (fd.get("phone")       as string | null)?.trim();
+  const zoneId      = (fd.get("zone_id")     as string | null)?.trim();
+  const address     = (fd.get("address")     as string | null)?.trim();
+  const ninVerified = fd.has("nin_verified") ? fd.get("nin_verified") === "true" : undefined;
+  const status      = (fd.get("status")      as string | null) ?? undefined;
+  const photo       = fd.get("photo") as File | null;
+
+  const errs: Record<string, string> = {};
+  if (firstName !== undefined && !firstName)  errs.first_name = "Required";
+  if (lastName  !== undefined && !lastName)   errs.last_name  = "Required";
+  if (phone     !== undefined && !validatePhone(phone)) errs.phone = "Enter a valid Nigerian phone number";
+  if (status    !== undefined && !["active","inactive","suspended"].includes(status)) errs.status = "Invalid status";
+
+  if (photo && photo.size > 0) {
+    if (!ALLOWED_MIME.includes(photo.type)) errs.photo = "Only JPEG, PNG or WebP allowed";
+    else if (photo.size > MAX_BYTES)        errs.photo = "Photo must be under 5 MB";
+  }
+
+  if (Object.keys(errs).length) {
+    return Response.json({ errors: errs }, { status: 422 });
+  }
+
+  const admin = createAdminClient();
+
+  // Upload new photo if provided
+  let photoUrl: string | undefined;
+  if (photo && photo.size > 0) {
+    const ext  = photo.name.split(".").pop() ?? "jpg";
+    const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    const { error: uploadErr } = await admin.storage
+      .from("cleaner-photos")
+      .upload(path, Buffer.from(await photo.arrayBuffer()), { contentType: photo.type });
+
+    if (uploadErr) {
+      return Response.json({ error: "Photo upload failed" }, { status: 500 });
+    }
+    photoUrl = admin.storage.from("cleaner-photos").getPublicUrl(path).data.publicUrl;
+  }
+
+  const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (firstName   !== undefined) patch.first_name   = firstName;
+  if (lastName    !== undefined) patch.last_name    = lastName;
+  if (phone       !== undefined) patch.phone        = phone;
+  if (zoneId      !== undefined) patch.zone_id      = zoneId;
+  if (address     !== undefined) patch.address      = address || null;
+  if (ninVerified !== undefined) patch.nin_verified = ninVerified;
+  if (status      !== undefined) patch.status       = status;
+  if (photoUrl    !== undefined) patch.photo_url    = photoUrl;
+
+  const { data, error } = await admin
+    .from("cleaners")
+    .update(patch)
+    .eq("id", id)
+    .select("*, zone:zones(id, name, slug)")
+    .single();
+
+  if (error) return Response.json({ error: "Update failed" }, { status: 500 });
+  return Response.json({ cleaner: data });
+}
