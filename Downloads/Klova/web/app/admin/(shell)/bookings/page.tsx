@@ -451,11 +451,16 @@ function BookingDetail({
   const [reassignMsg, setReassignMsg] = useState<string | null>(null);
   const [reassignIsError, setReassignIsError] = useState(false);
 
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelMsg, setCancelMsg]   = useState<string | null>(null);
+  const [cancelIsError, setCancelIsError] = useState(false);
+
   const canConfirmDispatch =
     b.cleaner !== null &&
     ["matched", "paid", "confirmed"].includes(b.status);
 
   const canReassign = !["completed", "cancelled"].includes(b.status);
+  const canCancel   = !["completed", "cancelled"].includes(b.status);
 
   // Fetch available cleaners whenever this booking is shown and reassign is relevant
   useEffect(() => {
@@ -494,6 +499,34 @@ function BookingDetail({
       setConfirmMsg(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
       setConfirming(false);
+    }
+  }
+
+  async function handleCancel() {
+    const isPaid = ["paid", "confirmed"].includes(b.status);
+    const msg = isPaid
+      ? `Cancel this booking?\n\nPayment was already made (${b.paystack_reference ?? "ref unknown"}). You will need to issue a manual refund via Paystack — this does not do it automatically.\n\nThe cleaner's slot will be freed.`
+      : `Cancel this booking?\n\nThe cleaner's slot will be freed and the booking marked as cancelled.`;
+    if (!window.confirm(msg)) return;
+
+    setCancelling(true);
+    setCancelMsg(null);
+    try {
+      const r = await fetch(`/api/admin/bookings/${b.id}/cancel`, { method: "POST" });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error ?? "Failed");
+      setCancelIsError(false);
+      setCancelMsg(
+        d.refundRequired
+          ? "Cancelled. Remember to issue the refund manually in Paystack."
+          : "Booking cancelled and slot freed.",
+      );
+      await onUpdated(b.id);
+    } catch (err) {
+      setCancelIsError(true);
+      setCancelMsg(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setCancelling(false);
     }
   }
 
@@ -561,7 +594,7 @@ function BookingDetail({
 
       <div className="divide-y divide-base-200">
         {/* ── Actions ───────────────────────────────────────── */}
-        {(canConfirmDispatch || canReassign) && (
+        {(canConfirmDispatch || canReassign || canCancel) && (
           <Section label="Actions">
             <div className="space-y-4">
               {/* Confirm dispatch */}
@@ -647,6 +680,26 @@ function BookingDetail({
                       className={`text-xs ${reassignIsError ? "text-error" : "text-success"}`}
                     >
                       {reassignMsg}
+                    </p>
+                  )}
+                </div>
+              )}
+              {/* Cancel booking */}
+              {canCancel && (
+                <div className="space-y-2 pt-2 border-t border-base-200">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    wide
+                    loading={cancelling}
+                    onClick={handleCancel}
+                    className="text-error hover:bg-error/10 border border-error/30"
+                  >
+                    Cancel booking
+                  </Button>
+                  {cancelMsg && (
+                    <p className={`text-xs ${cancelIsError ? "text-error" : "text-success"}`}>
+                      {cancelMsg}
                     </p>
                   )}
                 </div>
