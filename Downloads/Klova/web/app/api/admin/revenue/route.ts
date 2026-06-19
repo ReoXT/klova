@@ -18,6 +18,7 @@ export async function GET(request: NextRequest) {
     .from("bookings")
     .select(`
       total_amount_kobo, commission_kobo,
+      base_amount_kobo, addons_amount_kobo, insurance_amount_kobo,
       service:services(name),
       zone:zones(name)
     `)
@@ -29,34 +30,61 @@ export async function GET(request: NextRequest) {
 
   const rows = data ?? [];
 
-  // Totals
-  const summary = rows.reduce(
-    (acc, r) => ({
-      total_bookings:  acc.total_bookings + 1,
-      gross_kobo:      acc.gross_kobo + (r.total_amount_kobo as number),
-      commission_kobo: acc.commission_kobo + (r.commission_kobo as number),
-    }),
-    { total_bookings: 0, gross_kobo: 0, commission_kobo: 0 },
+  type Acc = {
+    total_bookings: number;
+    gross_kobo: number;
+    cleaning_fee_kobo: number;
+    base_kobo: number;
+    addons_kobo: number;
+    insurance_kobo: number;
+    commission_kobo: number;
+  };
+
+  const summary = rows.reduce<Acc>(
+    (acc, r) => {
+      const base      = (r.base_amount_kobo      as number) ?? 0;
+      const addons    = (r.addons_amount_kobo     as number) ?? 0;
+      const insurance = (r.insurance_amount_kobo  as number) ?? 0;
+      return {
+        total_bookings:    acc.total_bookings + 1,
+        gross_kobo:        acc.gross_kobo        + (r.total_amount_kobo as number),
+        cleaning_fee_kobo: acc.cleaning_fee_kobo + base + addons,
+        base_kobo:         acc.base_kobo         + base,
+        addons_kobo:       acc.addons_kobo        + addons,
+        insurance_kobo:    acc.insurance_kobo     + insurance,
+        commission_kobo:   acc.commission_kobo    + (r.commission_kobo  as number),
+      };
+    },
+    { total_bookings: 0, gross_kobo: 0, cleaning_fee_kobo: 0, base_kobo: 0, addons_kobo: 0, insurance_kobo: 0, commission_kobo: 0 },
   );
 
-  // By service
-  const svcMap: Record<string, { bookings: number; gross_kobo: number; commission_kobo: number }> = {};
-  for (const r of rows) {
-    const name = (r.service as { name: string } | null)?.name ?? "Unknown";
-    if (!svcMap[name]) svcMap[name] = { bookings: 0, gross_kobo: 0, commission_kobo: 0 };
-    svcMap[name].bookings++;
-    svcMap[name].gross_kobo      += r.total_amount_kobo as number;
-    svcMap[name].commission_kobo += r.commission_kobo  as number;
-  }
+  type RowAcc = { bookings: number; gross_kobo: number; cleaning_fee_kobo: number; addons_kobo: number; insurance_kobo: number; commission_kobo: number };
 
-  // By zone
-  const zoneMap: Record<string, { bookings: number; gross_kobo: number; commission_kobo: number }> = {};
+  const svcMap: Record<string, RowAcc> = {};
+  const zoneMap: Record<string, RowAcc> = {};
+
   for (const r of rows) {
-    const name = (r.zone as { name: string } | null)?.name ?? "Unknown";
-    if (!zoneMap[name]) zoneMap[name] = { bookings: 0, gross_kobo: 0, commission_kobo: 0 };
-    zoneMap[name].bookings++;
-    zoneMap[name].gross_kobo      += r.total_amount_kobo as number;
-    zoneMap[name].commission_kobo += r.commission_kobo  as number;
+    const base      = (r.base_amount_kobo      as number) ?? 0;
+    const addons    = (r.addons_amount_kobo     as number) ?? 0;
+    const insurance = (r.insurance_amount_kobo  as number) ?? 0;
+    const cleaning  = base + addons;
+
+    const svc  = (r.service as unknown as { name: string } | null)?.name ?? "Unknown";
+    const zone = (r.zone    as unknown as { name: string } | null)?.name ?? "Unknown";
+
+    const blank: RowAcc = { bookings: 0, gross_kobo: 0, cleaning_fee_kobo: 0, addons_kobo: 0, insurance_kobo: 0, commission_kobo: 0 };
+
+    if (!svcMap[svc])   svcMap[svc]   = { ...blank };
+    if (!zoneMap[zone]) zoneMap[zone] = { ...blank };
+
+    for (const map of [svcMap[svc], zoneMap[zone]]) {
+      map.bookings++;
+      map.gross_kobo        += r.total_amount_kobo as number;
+      map.cleaning_fee_kobo += cleaning;
+      map.addons_kobo       += addons;
+      map.insurance_kobo    += insurance;
+      map.commission_kobo   += r.commission_kobo as number;
+    }
   }
 
   const by_service = Object.entries(svcMap)

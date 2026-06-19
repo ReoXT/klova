@@ -184,22 +184,28 @@ export async function createBooking(input: BookingInput): Promise<BookingResult>
   }
 
   // 4. Insert booking row at pending_payment — assignment runs next
-  const totalKobo = Math.round(breakdown.total_amount * 100);
-  const commissionKobo = Math.round(breakdown.commission_amount * 100);
+  const baseKobo         = Math.round(breakdown.base_amount * 100);
+  const addonsKobo       = Math.round(breakdown.addons_amount * 100);
+  const insuranceKobo    = Math.round(breakdown.insurance_amount * 100);
+  const totalKobo        = Math.round(breakdown.total_amount * 100);
+  const commissionKobo   = Math.round(breakdown.commission_amount * 100);
 
   const { data: booking, error: bookingErr } = await supabase
     .from('bookings')
     .insert({
-      customer_id: customer.id,
-      zone_id: zone.id,
-      service_id: breakdown.service_id,
-      bedrooms: input.bedrooms,
-      booking_date: input.booking_date,
-      address: input.address,
-      total_amount_kobo: totalKobo,
-      commission_kobo: commissionKobo,
+      customer_id:          customer.id,
+      zone_id:              zone.id,
+      service_id:           breakdown.service_id,
+      bedrooms:             input.bedrooms,
+      booking_date:         input.booking_date,
+      address:              input.address,
+      base_amount_kobo:     baseKobo,
+      addons_amount_kobo:   addonsKobo,
+      insurance_amount_kobo: insuranceKobo,
+      total_amount_kobo:    totalKobo,
+      commission_kobo:      commissionKobo,
       requested_cleaner_id: input.requested_cleaner_id ?? null,
-      status: 'pending_payment',
+      status:               'pending_payment',
     })
     .select('id')
     .single();

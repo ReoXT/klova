@@ -29,7 +29,7 @@ export async function GET() {
       score: r.score as number,
       comment: r.comment as string | null,
       created_at: r.created_at as string,
-      customer_first_name: (r.customer as { first_name: string } | null)?.first_name ?? null,
+      customer_first_name: (r.customer as unknown as { first_name: string } | null)?.first_name ?? null,
     });
   }
 
