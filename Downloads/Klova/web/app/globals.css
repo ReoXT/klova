@@ -26,11 +26,11 @@
   --border-default: oklch(0.91 0.015 85);
   --border-strong:  oklch(0.84 0.018 85);
 
-  /* Text aliases */
+  /* Text aliases — ratios on --surface-page (~white): strong>15:1, body~6:1, muted~4.5:1, subtle~3:1 */
   --text-strong:     oklch(0.18 0.007 85);
   --text-body:       oklch(0.18 0.007 85 / 0.78);
-  --text-muted:      oklch(0.18 0.007 85 / 0.55);
-  --text-subtle:     oklch(0.18 0.007 85 / 0.38);
+  --text-muted:      oklch(0.18 0.007 85 / 0.70);
+  --text-subtle:     oklch(0.18 0.007 85 / 0.55);
   --text-on-primary: oklch(0.97 0.01 152);
 
   /* Radius extras */
@@ -175,3 +175,25 @@ body {
   50%       { opacity: 0.4; }
 }
 .pulse-dot { animation: pulse-dot 1.8s ease-in-out infinite; }
+
+/* ── Skip-to-content link ────────────────────────────────── */
+.skip-link {
+  position: absolute;
+  transform: translateY(-200%);
+  left: 1rem;
+  top: 1rem;
+  z-index: 9999;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  background: var(--klova-primary);
+  color: var(--klova-primary-content);
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: transform 0.15s ease;
+}
+.skip-link:focus {
+  transform: translateY(0);
+  outline: 2px solid var(--klova-accent);
+  outline-offset: 2px;
+}

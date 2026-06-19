@@ -293,14 +293,34 @@ export default function BookPage() {
   const totalSteps = steps.length;
   const progressPct = ((stepIndex + 1) / totalSteps) * 100;
 
+  // Scroll to top on step change so mobile users start at the top of each step
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [step, noMatchDates]);
+
   return (
     <div className="flex flex-col min-h-[calc(100vh-3.5rem)]">
       {/* Progress bar */}
-      <div className="w-full h-1" style={{ background: "var(--border-default)" }}>
+      <div
+        role="progressbar"
+        aria-valuenow={stepIndex + 1}
+        aria-valuemin={1}
+        aria-valuemax={totalSteps}
+        aria-label={`Booking step ${stepIndex + 1} of ${totalSteps}`}
+        className="w-full h-1"
+        style={{ background: "var(--border-default)" }}
+      >
         <div
           className="h-full transition-all duration-500"
           style={{ width: `${progressPct}%`, background: "var(--klova-primary)" }}
         />
+      </div>
+
+      {/* Screen-reader step announcement */}
+      <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
+        {noMatchDates !== null
+          ? "No availability — please choose another date"
+          : `Step ${stepIndex + 1} of ${totalSteps}`}
       </div>
 
       {/* Step content */}

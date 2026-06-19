@@ -28,6 +28,7 @@ export default function Step01Service({ data, patch, price, onNext }: Props) {
             <button
               key={svc.slug}
               type="button"
+              aria-pressed={selected}
               onClick={() => patch({ service: svc.slug as ServiceSlug })}
               className="w-full text-left rounded-xl p-4 border-2 transition-all duration-150"
               style={{

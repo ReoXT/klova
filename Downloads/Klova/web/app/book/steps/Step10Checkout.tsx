@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import type { BookingData, PriceBreakdown } from "../types";
 import { INSURANCE_FEE, PROMO_CODES, formatNGN } from "../data";
 import { Button } from "@/components/ui/Button";
@@ -22,6 +22,30 @@ export default function Step10Checkout({ data, patch, price, onSubmit, submitSta
   const [promoStatus, setPromoStatus] = useState<"idle" | "ok" | "invalid">("idle");
   const [showOptOutModal, setShowOptOutModal] = useState(false);
   const [showInsuranceDetails, setShowInsuranceDetails] = useState(false);
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  // Focus trap + escape key for insurance opt-out modal
+  useEffect(() => {
+    if (!showOptOutModal) return;
+    const modal = modalRef.current;
+    if (!modal) return;
+    const firstFocusable = modal.querySelector<HTMLElement>("button, [href], input");
+    firstFocusable?.focus();
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") { setShowOptOutModal(false); return; }
+      if (e.key !== "Tab") return;
+      const focusable = Array.from(modal!.querySelectorAll<HTMLElement>("button, [href], input, [tabindex]:not([tabindex='-1'])"));
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey) {
+        if (document.activeElement === first) { e.preventDefault(); last?.focus(); }
+      } else {
+        if (document.activeElement === last) { e.preventDefault(); first?.focus(); }
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [showOptOutModal]);
 
   function applyPromo() {
     const code = promoInput.trim().toUpperCase();
@@ -72,6 +96,7 @@ export default function Step10Checkout({ data, patch, price, onSubmit, submitSta
               <button
                 key={months}
                 type="button"
+                aria-pressed={sel}
                 onClick={() => patch({ payMonths: months })}
                 className="w-full text-left rounded-xl border-2 px-4 py-3 flex items-start gap-3 transition-all duration-150"
                 style={{
@@ -106,6 +131,9 @@ export default function Step10Checkout({ data, patch, price, onSubmit, submitSta
         </p>
         <button
           type="button"
+          role="checkbox"
+          aria-checked={data.wantsInsurance}
+          aria-label="Add booking insurance"
           onClick={handleInsuranceClick}
           className="w-full text-left rounded-xl border-2 px-4 py-4 flex items-start gap-3 transition-all duration-150"
           style={{
@@ -142,11 +170,12 @@ export default function Step10Checkout({ data, patch, price, onSubmit, submitSta
 
       {/* Promo code */}
       <div className="mb-4">
-        <p className="text-sm font-medium mb-2" style={{ color: "var(--text-body)" }}>
+        <label htmlFor="promo-code" className="text-sm font-medium mb-2 block" style={{ color: "var(--text-body)" }}>
           Promotional code
-        </p>
+        </label>
         <div className="flex gap-2">
           <input
+            id="promo-code"
             type="text"
             placeholder="Enter code"
             value={promoInput}
@@ -263,6 +292,10 @@ export default function Step10Checkout({ data, patch, price, onSubmit, submitSta
           onClick={(e) => { if (e.target === e.currentTarget) setShowOptOutModal(false); }}
         >
           <div
+            ref={modalRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="insurance-modal-title"
             className="rounded-2xl w-full max-w-sm p-6"
             style={{ background: "var(--surface-card)", boxShadow: "var(--shadow-float)" }}
           >
@@ -277,7 +310,7 @@ export default function Step10Checkout({ data, patch, price, onSubmit, submitSta
               </svg>
             </div>
 
-            <h2 className="text-lg font-semibold text-center mb-3" style={{ color: "var(--text-strong)" }}>
+            <h2 id="insurance-modal-title" className="text-lg font-semibold text-center mb-3" style={{ color: "var(--text-strong)" }}>
               Are you sure?
             </h2>
 
@@ -299,7 +332,8 @@ export default function Step10Checkout({ data, patch, price, onSubmit, submitSta
             <button
               type="button"
               onClick={() => setShowInsuranceDetails((v) => !v)}
-              className="text-xs font-medium mb-3 flex items-center gap-1"
+              aria-expanded={showInsuranceDetails}
+              className="text-xs font-medium mb-3 py-2 flex items-center gap-1"
               style={{ color: "var(--klova-accent)" }}
             >
               {showInsuranceDetails ? "Hide details ↑" : "What does insurance cover? ↓"}
@@ -338,7 +372,7 @@ export default function Step10Checkout({ data, patch, price, onSubmit, submitSta
               <button
                 type="button"
                 onClick={() => { patch({ wantsInsurance: false }); setShowOptOutModal(false); }}
-                className="text-xs py-2"
+                className="text-xs py-3.5 w-full"
                 style={{ color: "var(--text-muted)" }}
               >
                 I understand — continue without insurance

@@ -49,6 +49,7 @@ export default function Step02Size({ data, patch, price, onNext, onBack }: Props
             <button
               key={value}
               type="button"
+              aria-pressed={sel}
               onClick={() => patch({ bedrooms: value })}
               className="rounded-xl p-3.5 border-2 text-center font-semibold text-base transition-all duration-150"
               style={{
@@ -74,6 +75,7 @@ export default function Step02Size({ data, patch, price, onNext, onBack }: Props
             <button
               key={freq}
               type="button"
+              aria-pressed={sel}
               onClick={() => patch({ frequency: freq, recurringPattern: freq === "one-off" ? null : data.recurringPattern })}
               className="w-full text-left rounded-xl p-4 border-2 transition-all duration-150"
               style={{
@@ -107,6 +109,7 @@ export default function Step02Size({ data, patch, price, onNext, onBack }: Props
                 <button
                   key={value}
                   type="button"
+                  aria-pressed={sel}
                   onClick={() => patch({ recurringPattern: value })}
                   className="w-full text-left rounded-xl px-4 py-3 border-2 flex items-center gap-3 transition-all duration-150"
                   style={{

@@ -195,6 +195,7 @@ export default function Step08Details({ data, patch, price, onNext, onBack }: Pr
                 <button
                   key={cleaner.id}
                   type="button"
+                  aria-pressed={selected}
                   onClick={() =>
                     patch({ requestedCleanerId: selected ? null : cleaner.id })
                   }
@@ -266,7 +267,7 @@ export default function Step08Details({ data, patch, price, onNext, onBack }: Pr
             <button
               type="button"
               onClick={() => patch({ requestedCleanerId: null })}
-              className="text-xs mt-2"
+              className="text-xs mt-2 py-3 px-1 min-w-[44px]"
               style={{ color: "var(--text-subtle)" }}
             >
               No preference — any great keeper is fine

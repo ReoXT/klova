@@ -4,6 +4,7 @@ import Link from "next/link";
 export default function BookLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "var(--surface-page)" }}>
+      <a href="#book-main" className="skip-link">Skip to booking form</a>
       <header
         className="sticky top-0 z-40 h-14 flex items-center px-4 border-b"
         style={{ background: "var(--surface-page)", borderColor: "var(--border-default)" }}
@@ -15,7 +16,7 @@ export default function BookLayout({ children }: { children: React.ReactNode }) 
           </span>
         </Link>
       </header>
-      <main className="flex-1">{children}</main>
+      <main id="book-main" className="flex-1">{children}</main>
     </div>
   );
 }
