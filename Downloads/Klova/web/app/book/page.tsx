@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import type { BookingData, ApiCleaner, LivePricingData } from "./types";
 import {
   DEFAULT_BOOKING,
@@ -78,26 +78,47 @@ export default function BookPage() {
 
   // null = not in no-match mode; [] = no-match but no alternatives; [...] = alternatives ready
   const [noMatchDates, setNoMatchDates] = useState<string[] | null>(null);
+  // Tracks whether we pushed a no-match history entry so the success path
+  // can replaceState instead of pushState (avoids orphaned history entries).
+  const noMatchActiveRef = useRef(false);
 
   const patch = useCallback((partial: Partial<BookingData>) => {
     setData((prev) => ({ ...prev, ...partial }));
   }, []);
 
+  // ─── Browser history: seed on mount + listen for back/forward ────────────
+  useEffect(() => {
+    // Seed the first entry so pressing back from step 1 exits /book cleanly.
+    history.replaceState({ step: 1 }, "");
+
+    function onPopState(e: PopStateEvent) {
+      const state = e.state as { step?: number } | null;
+      // Clear any in-flight no-match state — if we're navigating back we want
+      // the target step, not the overlay.
+      noMatchActiveRef.current = false;
+      setNoMatchDates(null);
+      setSubmitError(null);
+      setStep(state?.step ?? 1);
+      setAnimKey((k) => k + 1);
+    }
+
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []); // setters are stable — empty deps is correct
+
   const goNext = useCallback(() => {
     setStep((s) => {
       const n = nextStep(s, data);
+      history.pushState({ step: n }, "");
       setAnimKey((k) => k + 1);
       return n;
     });
   }, [data]);
 
+  // Delegate to the browser so the History stack and UI state stay in sync.
   const goBack = useCallback(() => {
-    setStep((s) => {
-      const n = prevStep(s, data);
-      setAnimKey((k) => k + 1);
-      return n;
-    });
-  }, [data]);
+    history.back();
+  }, []);
 
   // ─── POST /bookings ──────────────────────────────────────────────────────
   // dateOverride: when retrying from the no-match screen, pass the new date
@@ -136,8 +157,18 @@ export default function BookPage() {
             const alternatives: string[] = altJson.ok
               ? altJson.data.alternative_dates
               : [];
+            // Push a history entry so the browser back button dismisses the
+            // no-match screen and returns to checkout rather than leaving /book.
+            if (!noMatchActiveRef.current) {
+              history.pushState({ step: 10 }, "");
+              noMatchActiveRef.current = true;
+            }
             setNoMatchDates(alternatives);
           } catch {
+            if (!noMatchActiveRef.current) {
+              history.pushState({ step: 10 }, "");
+              noMatchActiveRef.current = true;
+            }
             setNoMatchDates([]);
           }
           setAnimKey((k) => k + 1);
@@ -167,6 +198,14 @@ export default function BookPage() {
 
       setStep((s) => {
         const n = nextStep(s, data);
+        // If we came through the no-match overlay, replace its history entry
+        // so pressing back from step 11 returns to checkout, not the overlay.
+        if (noMatchActiveRef.current) {
+          history.replaceState({ step: n }, "");
+          noMatchActiveRef.current = false;
+        } else {
+          history.pushState({ step: n }, "");
+        }
         setAnimKey((k) => k + 1);
         return n;
       });
@@ -182,8 +221,12 @@ export default function BookPage() {
     [handleSubmitBooking],
   );
 
-  // Return the user to the date picker so they can choose manually
+  // Return the user to the date picker so they can choose manually.
+  // Replace the current no-match history entry with step 4 so pressing back
+  // from the date picker returns to checkout, not the no-match overlay.
   const handleChangeDateManually = useCallback(() => {
+    noMatchActiveRef.current = false;
+    history.replaceState({ step: 4 }, "");
     setNoMatchDates(null);
     setSubmitError(null);
     setStep(4);
