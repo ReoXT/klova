@@ -1,10 +1,8 @@
 "use client";
 
-import type { BookingData } from "../types";
-import type { PriceBreakdown } from "../types";
-import { SERVICES, EXTRAS, APPLIANCES, formatNGN } from "../data";
+import type { BookingData, PriceBreakdown } from "../types";
+import { APPLIANCES, EXTRAS, SERVICES, formatNGN } from "../data";
 import { Button } from "@/components/ui/Button";
-import { Alert } from "@/components/ui/Alert";
 
 interface Props {
   data: BookingData;
@@ -13,18 +11,24 @@ interface Props {
   onBack: () => void;
 }
 
-const EQUIPMENT = [
-  "Broom and dustpan",
-  "Mop and bucket",
-  "Bin liners",
-  "Toilet brush",
-  "All-purpose spray cleaner",
-  "Sponges and scrubbing pads",
-  "Rubber gloves",
-];
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p
+      className="text-xs font-semibold uppercase tracking-widest mb-2"
+      style={{ color: "var(--text-subtle)" }}
+    >
+      {children}
+    </p>
+  );
+}
+
+function Divider() {
+  return <div style={{ height: "1px", background: "var(--border-default)" }} />;
+}
 
 export default function Step09Summary({ data, price, onNext, onBack }: Props) {
   const service = SERVICES.find((s) => s.slug === data.service);
+
   const selectedExtras = EXTRAS.filter(
     (e) => data.extras[e.slug as keyof typeof data.extras] as boolean
   );
@@ -38,105 +42,165 @@ export default function Step09Summary({ data, price, onNext, onBack }: Props) {
       })
     : "—";
 
+  const extrasLabel = selectedExtras
+    .map((e) => {
+      if (e.slug === "appliances") {
+        const boolKeys = ["oven", "fridge", "freezer", "microwave", "coffee_machine", "toaster"] as const;
+        const named = boolKeys
+          .filter((k) => data.extras.appliance_units[k])
+          .map((k) => APPLIANCES.find((a) => a.slug === k)?.name ?? k);
+        const custom = data.extras.appliance_units.custom.trim();
+        const all = [...named, custom].filter(Boolean);
+        return all.length > 0 ? `${e.name} (${all.join(", ")})` : e.name;
+      }
+      return e.name;
+    })
+    .join(" · ");
+
+  const perVisitNet = price.base + price.keeperSurcharge + price.extras - price.discount;
+
   return (
-    <div className="max-w-lg mx-auto px-4 pt-6 pb-4">
+    <div className="max-w-lg mx-auto px-4 pt-6 pb-72">
       <h1 className="text-2xl font-semibold mb-1" style={{ color: "var(--text-strong)" }}>
         Booking summary
       </h1>
-      <p className="text-sm mb-5" style={{ color: "var(--text-muted)" }}>
+      <p className="text-sm mb-6" style={{ color: "var(--text-muted)" }}>
         Review everything before you pay.
       </p>
 
-      {/* Equipment alert */}
-      <Alert variant="warning" className="mb-5">
-        <p className="font-semibold">Your keeper brings no equipment</p>
-        <p className="mt-1">Please make sure these items are available at home:</p>
-        <ul className="mt-1.5 space-y-0.5 list-disc list-inside">
-          {EQUIPMENT.map((item) => (
-            <li key={item} className="text-xs">{item}</li>
-          ))}
-        </ul>
-      </Alert>
-
-      {/* Summary card */}
+      {/* Equipment notice */}
       <div
-        className="rounded-2xl border divide-y text-sm"
-        style={{ borderColor: "var(--border-default)" }}
+        className="rounded-xl px-4 py-3.5 mb-6 text-sm"
+        style={{ background: "oklch(0.68 0.14 67 / 0.10)", color: "oklch(0.38 0.08 67)" }}
       >
-        {/* Service */}
-        <Row label="Service">{service?.name ?? "—"}</Row>
-        <Row label="Apartment">{data.bedrooms ? `${data.bedrooms} bedroom${data.bedrooms === "1" ? "" : "s"}` : "—"}</Row>
-        <Row label="Frequency">
-          {data.frequency === "recurring"
-            ? `Recurring · ${data.recurringPattern ?? ""}`
-            : "One-off"}
-        </Row>
-        <Row label="Date">{bookingDate}</Row>
-        <Row label="Time">{data.timeSlot ?? "—"}</Row>
-        <Row label="Address">{data.address || "—"}</Row>
-        <Row label="Keepers">{data.keeperCount}</Row>
+        <p className="font-semibold mb-1">Your keeper brings no equipment</p>
+        <p style={{ color: "oklch(0.45 0.07 67)" }}>
+          Please have a broom, mop &amp; bucket, toilet brush, bin liners, all-purpose spray, and sponges ready at home.
+        </p>
+      </div>
+
+      <div className="space-y-5">
+        {/* Booking */}
+        <div>
+          <SectionLabel>Booking</SectionLabel>
+          <p className="font-semibold text-base" style={{ color: "var(--text-strong)" }}>
+            {service?.name ?? "—"}{data.bedrooms ? ` · ${data.bedrooms} bedroom${data.bedrooms === "1" ? "" : "s"}` : ""}
+          </p>
+          <p className="text-sm mt-0.5" style={{ color: "var(--text-body)" }}>
+            {data.frequency === "recurring"
+              ? `${data.recurringPattern ? data.recurringPattern.charAt(0).toUpperCase() + data.recurringPattern.slice(1) : ""} recurring`
+              : "One-off"}
+            {data.keeperCount === 2 ? " · 2 keepers" : ""}
+          </p>
+          <p className="text-sm" style={{ color: "var(--text-body)" }}>
+            {bookingDate}
+          </p>
+          {data.timeSlot && (
+            <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+              {data.timeSlot} arrival
+            </p>
+          )}
+        </div>
+
+        <Divider />
+
+        {/* Address */}
+        <div>
+          <SectionLabel>Address</SectionLabel>
+          <p className="text-sm" style={{ color: "var(--text-body)" }}>
+            {data.address || "—"}
+          </p>
+        </div>
 
         {selectedExtras.length > 0 && (
-          <Row label="Add-ons">
-            <span className="text-right">
-              {selectedExtras.map((e) => {
-                if (e.slug === "appliances") {
-                  const units = APPLIANCES.filter(
-                    (a) => data.extras.appliance_units[a.slug as keyof typeof data.extras.appliance_units]
-                  );
-                  return units.length > 0
-                    ? `${e.name} (${units.map((u) => u.name).join(", ")})`
-                    : e.name;
-                }
-                return e.name;
-              }).join(" · ")}
-            </span>
-          </Row>
+          <>
+            <Divider />
+            <div>
+              <SectionLabel>Add-ons</SectionLabel>
+              <p className="text-sm" style={{ color: "var(--text-body)" }}>
+                {extrasLabel}
+              </p>
+            </div>
+          </>
         )}
 
-        {/* Divider before price */}
-        <div style={{ borderTop: `1px solid var(--border-default)` }} />
+        <Divider />
 
-        <Row label="Base price">{formatNGN(price.base)}</Row>
-        {price.keeperSurcharge > 0 && <Row label={`+${data.keeperCount - 1} extra keeper${data.keeperCount > 2 ? "s" : ""}`}>{formatNGN(price.keeperSurcharge)}</Row>}
-        {price.extras > 0 && <Row label="Add-ons">{formatNGN(price.extras)}</Row>}
-
-        {/* Total */}
-        <div className="px-4 py-3 flex items-center justify-between">
-          <p className="font-semibold" style={{ color: "var(--text-strong)" }}>Total</p>
-          <p className="font-bold text-base" style={{ color: "var(--klova-accent)" }}>
-            {formatNGN(price.total)}
+        {/* Contact */}
+        <div>
+          <SectionLabel>Contact</SectionLabel>
+          <p className="font-semibold text-sm" style={{ color: "var(--text-strong)" }}>
+            {data.firstName} {data.lastName}
+          </p>
+          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+            {data.phone}
+          </p>
+          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+            {data.email}
           </p>
         </div>
       </div>
 
-      {/* Customer */}
+      {/* Sticky footer */}
       <div
-        className="mt-4 rounded-xl border px-4 py-3 text-sm"
-        style={{ borderColor: "var(--border-default)" }}
+        className="fixed bottom-0 left-0 right-0 z-30"
+        style={{
+          background: "var(--surface-card)",
+          borderTop: "1px solid var(--border-default)",
+          boxShadow: "0 -4px 24px oklch(0.18 0.007 85 / 0.08)",
+        }}
       >
-        <p className="font-medium mb-1" style={{ color: "var(--text-body)" }}>
-          {data.firstName} {data.lastName}
-        </p>
-        <p style={{ color: "var(--text-muted)" }}>{data.phone}</p>
-        <p style={{ color: "var(--text-muted)" }}>{data.email}</p>
-      </div>
+        <div className="max-w-lg mx-auto px-4 pt-4 pb-6">
+          {/* Price rows */}
+          <div className="space-y-1.5 text-sm mb-3">
+            <div className="flex justify-between">
+              <span style={{ color: "var(--text-muted)" }}>
+                {price.keeperSurcharge > 0 ? "Base price (2 keepers)" : "Base price"}
+              </span>
+              <span style={{ color: "var(--text-body)" }}>
+                {formatNGN(price.base + price.keeperSurcharge)}
+              </span>
+            </div>
+            {price.extras > 0 && (
+              <div className="flex justify-between">
+                <span style={{ color: "var(--text-muted)" }}>Add-ons</span>
+                <span style={{ color: "var(--text-body)" }}>{formatNGN(price.extras)}</span>
+              </div>
+            )}
+            {price.insurance > 0 && (
+              <div className="flex justify-between">
+                <span style={{ color: "var(--text-muted)" }}>Insurance</span>
+                <span style={{ color: "var(--text-body)" }}>{formatNGN(price.insurance)}</span>
+              </div>
+            )}
+            {price.discount > 0 && (
+              <div className="flex justify-between">
+                <span style={{ color: "var(--klova-success)" }}>Discount</span>
+                <span style={{ color: "var(--klova-success)" }}>−{formatNGN(price.discount)}</span>
+              </div>
+            )}
+          </div>
 
-      <div className="flex gap-3 mt-6">
-        <Button variant="ghost" onClick={onBack} className="flex-1">Back</Button>
-        <Button variant="primary" onClick={onNext} className="flex-1">Proceed to checkout</Button>
-      </div>
-    </div>
-  );
-}
+          <div
+            className="flex items-baseline justify-between py-3 mb-4"
+            style={{ borderTop: "1px solid var(--border-default)" }}
+          >
+            <span className="font-semibold text-sm" style={{ color: "var(--text-strong)" }}>
+              Total per visit
+            </span>
+            <span className="text-xl font-bold" style={{ color: "var(--klova-accent)" }}>
+              {formatNGN(perVisitNet + price.insurance)}
+            </span>
+          </div>
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="px-4 py-3 flex items-start justify-between gap-3">
-      <p style={{ color: "var(--text-muted)", flexShrink: 0 }}>{label}</p>
-      <p className="font-medium text-right" style={{ color: "var(--text-body)" }}>
-        {children}
-      </p>
+          <div className="flex gap-3">
+            <Button variant="ghost" onClick={onBack} className="flex-1">Back</Button>
+            <Button variant="primary" onClick={onNext} className="flex-1">
+              Proceed to checkout
+            </Button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

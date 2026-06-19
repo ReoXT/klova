@@ -3,7 +3,6 @@
 import type { BookingData, ApplianceSelection } from "../types";
 import { APPLIANCES } from "../data";
 import { Button } from "@/components/ui/Button";
-import { Alert } from "@/components/ui/Alert";
 
 interface Props {
   data: BookingData;
@@ -38,10 +37,6 @@ export default function Step06ExtrasConfig({ data, patch, onBack, onNext }: Prop
   }
 
   const boolKeys = ["oven", "fridge", "freezer", "microwave", "coffee_machine", "toaster"] as const;
-  const boolCount = boolKeys.filter((k) => data.extras.appliance_units[k]).length;
-  const customCount = data.extras.appliance_units.custom.trim() ? 1 : 0;
-  const applianceCount = boolCount + customCount;
-  const canContinue = !data.extras.appliances || applianceCount > 0;
 
   return (
     <div className="max-w-lg mx-auto px-4 pt-6 pb-4">
@@ -107,9 +102,6 @@ export default function Step06ExtrasConfig({ data, patch, onBack, onNext }: Prop
             >
               Got one that&apos;s not listed?
             </label>
-            <p className="text-xs mb-2.5" style={{ color: "var(--text-muted)" }}>
-              Type the name and we&apos;ll add it to your booking.
-            </p>
             <input
               id="custom-appliance"
               type="text"
@@ -120,17 +112,12 @@ export default function Step06ExtrasConfig({ data, patch, onBack, onNext }: Prop
             />
           </div>
 
-          {applianceCount === 0 && (
-            <Alert variant="warning" className="mt-3">
-              Select at least one appliance, or go back and uncheck Appliance cleaning.
-            </Alert>
-          )}
         </div>
       )}
 
       <div className="flex gap-3 mt-6">
         <Button variant="ghost" onClick={onBack} className="flex-1">Back</Button>
-        <Button variant="primary" onClick={onNext} disabled={!canContinue} className="flex-1">Continue</Button>
+        <Button variant="primary" onClick={onNext} className="flex-1">Continue</Button>
       </div>
     </div>
   );

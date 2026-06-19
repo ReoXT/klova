@@ -39,32 +39,30 @@ export default function Step10Checkout({ data, patch, price, onNext, onBack }: P
   }
 
   const monthOptions = [
-    { months: 1, label: "1 month (this booking only)", description: null },
-    { months: 2, label: "2 months", description: `Pay upfront for 2 visits — ${formatNGN(price.total * 2)}` },
-    { months: 3, label: "3 months", description: `Pay upfront for 3 visits — ${formatNGN(price.total * 3)}` },
+    { months: 1, label: "1 month (this booking only)" },
+    { months: 2, label: "2 months upfront" },
+    { months: 3, label: "3 months upfront" },
   ];
 
+  const perVisitGross = price.base + price.keeperSurcharge + price.extras;
   const grandTotal = price.monthlyTotal;
 
   return (
-    <div className="max-w-lg mx-auto px-4 pt-6 pb-4">
+    <div className="max-w-lg mx-auto px-4 pt-6 pb-80">
       <h1 className="text-2xl font-semibold mb-1" style={{ color: "var(--text-strong)" }}>
         Checkout
       </h1>
       <p className="text-sm mb-6" style={{ color: "var(--text-muted)" }}>
-        Review and customise your payment.
+        Finalise your booking options.
       </p>
 
       {/* Multi-month */}
-      <div className="mb-6">
-        <p className="text-sm font-medium mb-1" style={{ color: "var(--text-body)" }}>
-          Pay for multiple months upfront
-        </p>
-        <p className="text-xs mb-3" style={{ color: "var(--text-muted)" }}>
-          Lock in your keeper for upcoming months. Max 3 months.
+      <div className="mb-7">
+        <p className="text-sm font-medium mb-3" style={{ color: "var(--text-body)" }}>
+          How many months would you like to pay for?
         </p>
         <div className="flex flex-col gap-2.5">
-          {monthOptions.map(({ months, label, description }) => {
+          {monthOptions.map(({ months, label }) => {
             const sel = data.payMonths === months;
             return (
               <button
@@ -83,14 +81,9 @@ export default function Step10Checkout({ data, patch, price, onNext, onBack }: P
                 >
                   {sel && <div className="w-2 h-2 rounded-full" style={{ background: "var(--klova-accent)" }} />}
                 </div>
-                <div>
-                  <p className="font-semibold text-sm" style={{ color: sel ? "var(--klova-primary)" : "var(--text-strong)" }}>
-                    {label}
-                  </p>
-                  {description && (
-                    <p className="text-xs" style={{ color: "var(--text-muted)" }}>{description}</p>
-                  )}
-                </div>
+                <p className="font-semibold text-base" style={{ color: sel ? "var(--klova-primary)" : "var(--text-strong)" }}>
+                  {label}
+                </p>
               </button>
             );
           })}
@@ -98,7 +91,10 @@ export default function Step10Checkout({ data, patch, price, onNext, onBack }: P
       </div>
 
       {/* Booking insurance */}
-      <div className="mb-6">
+      <div className="mb-7">
+        <p className="text-sm font-medium mb-3" style={{ color: "var(--text-body)" }}>
+          Booking insurance
+        </p>
         <button
           type="button"
           onClick={handleInsuranceClick}
@@ -126,17 +122,17 @@ export default function Step10Checkout({ data, patch, price, onNext, onBack }: P
               className="font-semibold text-sm"
               style={{ color: data.wantsInsurance ? "var(--klova-primary)" : "var(--text-strong)" }}
             >
-              Booking insurance — {formatNGN(INSURANCE_FEE)}
+              Add insurance — {formatNGN(INSURANCE_FEE)} per visit
             </p>
             <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
-              Protection against stolen or damaged items during your clean. Covers up to ₦200,000.
+              Protection against stolen or damaged items. Covers up to ₦200,000.
             </p>
           </div>
         </button>
       </div>
 
       {/* Promo code */}
-      <div className="mb-6">
+      <div className="mb-4">
         <p className="text-sm font-medium mb-2" style={{ color: "var(--text-body)" }}>
           Promotional code
         </p>
@@ -168,44 +164,69 @@ export default function Step10Checkout({ data, patch, price, onNext, onBack }: P
         )}
       </div>
 
-      {/* Price summary */}
+      {/* Sticky footer */}
       <div
-        className="rounded-2xl border divide-y text-sm mb-6"
-        style={{ borderColor: "var(--border-default)" }}
+        className="fixed bottom-0 left-0 right-0 z-30"
+        style={{
+          background: "var(--surface-card)",
+          borderTop: "1px solid var(--border-default)",
+          boxShadow: "0 -4px 24px oklch(0.18 0.007 85 / 0.08)",
+        }}
       >
-        <div className="px-4 py-3 flex justify-between">
-          <span style={{ color: "var(--text-muted)" }}>
-            {data.payMonths > 1
-              ? `${data.payMonths} visits × ${formatNGN(price.base + price.keeperSurcharge + price.extras)}`
-              : "Subtotal"}
-          </span>
-          <span style={{ color: "var(--text-body)" }}>
-            {formatNGN((price.base + price.keeperSurcharge + price.extras) * data.payMonths)}
-          </span>
-        </div>
-        {price.discount > 0 && (
-          <div className="px-4 py-3 flex justify-between">
-            <span style={{ color: "var(--klova-success)" }}>Discount ({PROMO_CODES[data.promoCode]}%)</span>
-            <span style={{ color: "var(--klova-success)" }}>−{formatNGN(price.discount * data.payMonths)}</span>
+        <div className="max-w-lg mx-auto px-4 pt-4 pb-6">
+          {/* Price breakdown */}
+          <div className="space-y-1.5 text-sm mb-3">
+            <div className="flex justify-between">
+              <span style={{ color: "var(--text-muted)" }}>
+                {data.payMonths > 1
+                  ? `${data.payMonths} visits × ${formatNGN(perVisitGross)}`
+                  : "Service"}
+              </span>
+              <span style={{ color: "var(--text-body)" }}>
+                {formatNGN(perVisitGross * data.payMonths)}
+              </span>
+            </div>
+            {price.insurance > 0 && (
+              <div className="flex justify-between">
+                <span style={{ color: "var(--text-muted)" }}>
+                  {data.payMonths > 1 ? `Insurance × ${data.payMonths}` : "Insurance"}
+                </span>
+                <span style={{ color: "var(--text-body)" }}>
+                  {formatNGN(price.insurance * data.payMonths)}
+                </span>
+              </div>
+            )}
+            {price.discount > 0 && (
+              <div className="flex justify-between">
+                <span style={{ color: "var(--klova-success)" }}>
+                  Discount ({PROMO_CODES[data.promoCode]}%)
+                </span>
+                <span style={{ color: "var(--klova-success)" }}>
+                  −{formatNGN(price.discount * data.payMonths)}
+                </span>
+              </div>
+            )}
           </div>
-        )}
-        {price.insurance > 0 && (
-          <div className="px-4 py-3 flex justify-between">
-            <span style={{ color: "var(--text-muted)" }}>Insurance (one-time)</span>
-            <span style={{ color: "var(--text-body)" }}>{formatNGN(price.insurance)}</span>
-          </div>
-        )}
-        <div className="px-4 py-3 flex justify-between font-semibold">
-          <span style={{ color: "var(--text-strong)" }}>You pay</span>
-          <span className="text-base" style={{ color: "var(--klova-accent)" }}>{formatNGN(grandTotal)}</span>
-        </div>
-      </div>
 
-      <div className="flex gap-3">
-        <Button variant="ghost" onClick={onBack} className="flex-1">Back</Button>
-        <Button variant="primary" onClick={onNext} className="flex-1">
-          Find my keeper →
-        </Button>
+          <div
+            className="flex items-baseline justify-between py-3 mb-4"
+            style={{ borderTop: "1px solid var(--border-default)" }}
+          >
+            <span className="font-semibold text-sm" style={{ color: "var(--text-strong)" }}>
+              Total payable
+            </span>
+            <span className="text-xl font-bold" style={{ color: "var(--klova-accent)" }}>
+              {formatNGN(grandTotal)}
+            </span>
+          </div>
+
+          <div className="flex gap-3">
+            <Button variant="ghost" onClick={onBack} className="flex-1">Back</Button>
+            <Button variant="primary" onClick={onNext} className="flex-1">
+              Find my keeper →
+            </Button>
+          </div>
+        </div>
       </div>
 
       {/* Insurance opt-out modal */}
@@ -217,12 +238,8 @@ export default function Step10Checkout({ data, patch, price, onNext, onBack }: P
         >
           <div
             className="rounded-2xl w-full max-w-sm p-6"
-            style={{
-              background: "var(--surface-card)",
-              boxShadow: "var(--shadow-float)",
-            }}
+            style={{ background: "var(--surface-card)", boxShadow: "var(--shadow-float)" }}
           >
-            {/* Shield icon */}
             <div
               className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4"
               style={{ background: "oklch(0.68 0.14 67 / 0.15)" }}
@@ -240,24 +257,23 @@ export default function Step10Checkout({ data, patch, price, onNext, onBack }: P
 
             <p className="text-sm mb-3" style={{ color: "var(--text-body)" }}>
               Klova Keepers are NIN-verified and thoroughly vetted — but life is unpredictable. For just{" "}
-              <strong>{formatNGN(INSURANCE_FEE)}</strong>, booking insurance protects you for stolen or
-              damaged items up to <strong>₦200,000</strong>.
+              <strong>{formatNGN(INSURANCE_FEE)}</strong> per visit, booking insurance protects you for
+              stolen or damaged items up to <strong>₦200,000</strong>.
             </p>
 
             <p className="text-sm mb-3" style={{ color: "var(--text-body)" }}>
-              Without insurance, Klova cannot be held liable for any loss or damage that occurs during your
-              clean. We strongly recommend securing your valuables regardless.
+              Without insurance, Klova cannot be held liable for any loss or damage during your clean.
+              We strongly recommend securing your valuables regardless.
             </p>
 
             <p className="text-xs mb-4" style={{ color: "var(--text-muted)" }}>
-              Even with insurance, all claims are subject to verification and may take up to 7 working days to process.
+              Even with insurance, all claims are subject to verification and may take up to 7 working days.
             </p>
 
-            {/* Read more toggle */}
             <button
               type="button"
               onClick={() => setShowInsuranceDetails((v) => !v)}
-              className="text-xs font-medium mb-3 flex items-center gap-1 transition-colors"
+              className="text-xs font-medium mb-3 flex items-center gap-1"
               style={{ color: "var(--klova-accent)" }}
             >
               {showInsuranceDetails ? "Hide details ↑" : "What does insurance cover? ↓"}
@@ -268,7 +284,7 @@ export default function Step10Checkout({ data, patch, price, onNext, onBack }: P
                 className="rounded-xl p-4 mb-4 text-xs"
                 style={{ background: "var(--surface-section)", color: "var(--text-body)" }}
               >
-                <p className="font-semibold mb-2" style={{ color: "var(--text-strong)" }}>Coverage</p>
+                <p className="font-semibold mb-2" style={{ color: "var(--text-strong)" }}>Covered</p>
                 <ul className="list-disc list-inside space-y-1 mb-3">
                   <li>Accidental breakage of household items by your keeper</li>
                   <li>Theft by a Klova Keeper (verified via NIN + investigation)</li>
@@ -283,24 +299,20 @@ export default function Step10Checkout({ data, patch, price, onNext, onBack }: P
                 </ul>
                 <p className="font-semibold mb-1" style={{ color: "var(--text-strong)" }}>How to claim</p>
                 <p>
-                  Contact us on WhatsApp within 24 hours with photos and a description. Klova will respond
-                  within 7 working days. Claims are subject to internal verification.
+                  Contact us on WhatsApp within 24 hours with photos and a description.
+                  Klova will respond within 7 working days. Claims are subject to verification.
                 </p>
               </div>
             )}
 
             <div className="flex flex-col gap-2.5">
-              <Button
-                variant="primary"
-                className="w-full"
-                onClick={() => setShowOptOutModal(false)}
-              >
+              <Button variant="primary" className="w-full" onClick={() => setShowOptOutModal(false)}>
                 Keep my protection
               </Button>
               <button
                 type="button"
                 onClick={() => { patch({ wantsInsurance: false }); setShowOptOutModal(false); }}
-                className="text-xs py-2 transition-colors"
+                className="text-xs py-2"
                 style={{ color: "var(--text-muted)" }}
               >
                 I understand — continue without insurance

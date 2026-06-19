@@ -174,8 +174,8 @@ export function computePrice(data: BookingData): PriceBreakdown {
   // discount applied per-visit on the repeatable portion
   const perVisit = base + keeperSurcharge + extras;
   const discount = Math.round((perVisit * promo) / 100);
-  const total = perVisit - discount + insurance; // insurance is one-time
-  const monthlyTotal = (perVisit - discount) * data.payMonths + insurance;
+  const total = perVisit - discount + insurance;
+  const monthlyTotal = (perVisit - discount + insurance) * data.payMonths;
 
   return { base, extras, keeperSurcharge, insurance, discount, total, monthlyTotal };
 }

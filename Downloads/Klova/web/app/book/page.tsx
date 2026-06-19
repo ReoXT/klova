@@ -89,7 +89,7 @@ export default function BookPage() {
   const totalSteps = steps.length;
   const progressPct = ((stepIndex + 1) / totalSteps) * 100;
 
-  const showPriceBar = step >= 1 && step <= 10 && price.base > 0;
+  const showPriceBar = step >= 1 && step <= 8 && price.base > 0;
 
   return (
     <div className="flex flex-col min-h-[calc(100vh-3.5rem)]">
@@ -102,13 +102,6 @@ export default function BookPage() {
             background: "var(--klova-primary)",
           }}
         />
-      </div>
-
-      {/* Step label */}
-      <div className="px-4 pt-4 pb-0">
-        <p className="text-xs font-medium" style={{ color: "var(--text-subtle)" }}>
-          Step {stepIndex + 1} of {totalSteps} — {STEP_LABELS[step - 1]}
-        </p>
       </div>
 
       {/* Step content */}

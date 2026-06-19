@@ -87,7 +87,7 @@ export default function Step05Extras({ data, patch, onNext, onBack }: Props) {
       {selectedCount > 0 && (
         <p className="text-xs mt-3 text-center" style={{ color: "var(--text-subtle)" }}>
           {selectedCount} add-on{selectedCount > 1 ? "s" : ""} selected
-          {data.extras.appliances && " — you&apos;ll customise appliances on the next screen"}
+          {data.extras.appliances && " — you'll customise appliances on the next screen"}
         </p>
       )}
 

@@ -99,7 +99,6 @@ export default function Step08Details({ data, patch, onNext, onBack }: Props) {
           required
           autoComplete="tel"
           placeholder="08012345678"
-          hint="Nigerian number — we'll send your booking confirmation here."
           {...field("phone")}
         />
 
@@ -110,7 +109,6 @@ export default function Step08Details({ data, patch, onNext, onBack }: Props) {
           required
           autoComplete="email"
           placeholder="amara@example.com"
-          hint="For your booking receipt and updates."
           {...field("email")}
         />
       </div>

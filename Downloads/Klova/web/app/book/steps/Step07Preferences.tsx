@@ -86,9 +86,6 @@ export default function Step07Preferences({ data, patch, onNext, onBack }: Props
         <p className="text-sm font-medium mb-1" style={{ color: "var(--text-body)" }}>
           Do you need an extra keeper?
         </p>
-        <p className="text-xs mb-3" style={{ color: "var(--text-muted)" }}>
-          A second keeper covers more ground in less time. The base price is doubled (add-ons unaffected).
-        </p>
         <div className="flex gap-3">
           {([true, false] as const).map((want) => {
             const sel = want ? data.keeperCount === 2 : data.keeperCount === 1;
