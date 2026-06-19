@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { LegalShell, Section, ReviewNote, Ul } from "../_legal";
+import { SUPPORT_EMAIL } from "@/lib/contact";
 
 export const metadata: Metadata = {
   title: "Cancellation & Refunds — Klova",
@@ -7,13 +8,16 @@ export const metadata: Metadata = {
 };
 
 export default function CancellationPage() {
+  const emailDisplay = SUPPORT_EMAIL || "[email not set — update lib/contact.ts]";
+  const emailHref = SUPPORT_EMAIL ? `mailto:${SUPPORT_EMAIL}` : "#";
+
   return (
     <LegalShell title="Cancellation & Refunds" lastUpdated="June 2026">
 
       <Section heading="1. Cancellation windows">
         <p>
           You can cancel any confirmed booking directly through the platform or by contacting us
-          on WhatsApp. The refund you receive depends on how much notice you give.
+          by email. The refund you receive depends on how much notice you give.
         </p>
 
         {/* Timeline cards */}
@@ -62,7 +66,7 @@ export default function CancellationPage() {
               <p className="font-medium mb-0.5" style={{ color: "var(--text-strong)" }}>After the cleaner has been dispatched</p>
               <p>
                 Once your cleaner is on their way to your property, we are unable to issue a refund.
-                The cleaner's time, travel, and effort are committed at this point.
+                The cleaner&apos;s time, travel, and effort are committed at this point.
               </p>
             </div>
           </div>
@@ -80,8 +84,8 @@ export default function CancellationPage() {
         ]} />
         <p>
           We initiate every refund on our end within 24 hours of the cancellation being confirmed.
-          If you have not received your refund after 5 business days, contact us on WhatsApp with
-          your booking reference and we will follow up with Paystack directly.
+          If you have not received your refund after 5 business days, email us with your booking
+          reference and we will follow up with Paystack directly.
         </p>
         <ReviewNote>
           Confirm the exact Paystack refund processing timeline before launch, as it may vary
@@ -122,7 +126,7 @@ export default function CancellationPage() {
           We want every Klova clean to be excellent. If yours falls short, here is what to do:
         </p>
         <Ul items={[
-          "Contact us on WhatsApp within 24 hours of the service completing",
+          "Email us within 24 hours of the service completing",
           "Tell us clearly what the problem is, and send photos where possible",
           "We will review the case and aim to respond within 1 business day",
         ]} />
@@ -148,29 +152,23 @@ export default function CancellationPage() {
         ]} />
         <p>
           If we cancel your booking for any of these reasons, you will receive a full refund
-          regardless of the timing. We will contact you immediately by SMS or WhatsApp to explain
+          regardless of the timing. We will contact you immediately by email to explain
           and, where possible, suggest alternative dates.
         </p>
       </Section>
 
       <Section heading="7. Get in touch">
         <p>
-          For cancellation requests or refund questions, the fastest way to reach us is WhatsApp
-          at{" "}
+          For cancellation requests or refund questions, email us at{" "}
           <a
-            href="https://wa.me/2348000000000"
+            href={emailHref}
             className="underline underline-offset-2"
             style={{ color: "var(--color-primary)" }}
-            target="_blank"
-            rel="noopener noreferrer"
           >
-            +234 800 000 0000
+            {emailDisplay}
           </a>
-          . Please have your booking reference ready when you contact us.
+          . Please include your booking reference in your message.
         </p>
-        <ReviewNote>
-          Update the WhatsApp number before launch.
-        </ReviewNote>
       </Section>
 
     </LegalShell>

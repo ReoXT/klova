@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { LegalShell, Section, ReviewNote, Ul } from "../_legal";
+import { SUPPORT_EMAIL } from "@/lib/contact";
 
 export const metadata: Metadata = {
   title: "Terms of Service — Klova",
@@ -7,6 +8,9 @@ export const metadata: Metadata = {
 };
 
 export default function TermsPage() {
+  const emailDisplay = SUPPORT_EMAIL || "[email not set — update lib/contact.ts]";
+  const emailHref = SUPPORT_EMAIL ? `mailto:${SUPPORT_EMAIL}` : "#";
+
   return (
     <LegalShell title="Terms of Service" lastUpdated="June 2026">
 
@@ -23,7 +27,7 @@ export default function TermsPage() {
         <p>
           When you book through Klova, you are entering into an agreement directly with your assigned
           cleaner for the cleaning work itself. Klova acts as the platform and payment facilitator, not
-          as the cleaner's employer. That said, we take responsibility for the quality of the vetting
+          as the cleaner&apos;s employer. That said, we take responsibility for the quality of the vetting
           and matching process, and we stand behind every booking.
         </p>
       </Section>
@@ -35,7 +39,7 @@ export default function TermsPage() {
           "NIN-verified, rated cleaners matched to your booking",
           "Secure payment processing through Paystack",
           "Optional order protection (see section 6)",
-          "Customer support via WhatsApp",
+          "Customer support by email",
         ]} />
         <p>
           Klova does not supply cleaning equipment or products. Unless you have separately agreed
@@ -72,7 +76,7 @@ export default function TermsPage() {
         <p>
           All prices are set by Klova and displayed clearly during the booking process. The price
           includes a platform fee that covers cleaner vetting, matching, insurance management, and
-          customer support. The specific split between the cleaner's earnings and Klova's fee is not
+          customer support. The specific split between the cleaner&apos;s earnings and Klova&apos;s fee is not
           disclosed to customers, but no amount beyond the price shown at checkout will ever be charged.
         </p>
       </Section>
@@ -90,9 +94,9 @@ export default function TermsPage() {
           protection it actually provides and what the claims process looks like.
         </ReviewNote>
         <p>
-          To make a claim, contact us on WhatsApp within 24 hours of the service completing, with
-          photographic evidence. We will investigate and, where a claim is upheld, arrange compensation
-          up to the stated limit.
+          To make a claim, email us within 24 hours of the service completing with photographic
+          evidence. We will investigate and, where a claim is upheld, arrange compensation up to the
+          stated limit.
         </p>
         <p>Order protection does not cover:</p>
         <Ul items={[
@@ -117,8 +121,8 @@ export default function TermsPage() {
 
       <Section heading="8. Service quality">
         <p>
-          If you are not satisfied with a clean, contact us on WhatsApp within 24 hours of the service
-          completing. We will review the situation and, where the issue is validated, either:
+          If you are not satisfied with a clean, email us within 24 hours of the service completing.
+          We will review the situation and, where the issue is validated, either:
         </p>
         <Ul items={[
           "Arrange a complimentary re-clean of the affected areas at no cost, or",
@@ -163,7 +167,7 @@ export default function TermsPage() {
         <p>
           All cleaners on the Klova platform are independent contractors, not employees of Klova. Klova
           vets and rates them, but we are not their employer. If a cleaner behaves inappropriately,
-          report it to us on WhatsApp immediately. We investigate every report and take conduct
+          report it to us by email immediately. We investigate every report and take conduct
           seriously, including removing cleaners from the platform where warranted.
         </p>
       </Section>
@@ -193,8 +197,8 @@ export default function TermsPage() {
       <Section heading="14. Changes to these terms">
         <p>
           We may update these terms from time to time. If we make material changes, we will let you
-          know by SMS or WhatsApp before the changes take effect. Continued use of Klova after the
-          effective date of any update means you accept the revised terms.
+          know by email before the changes take effect. Continued use of Klova after the effective date
+          of any update means you accept the revised terms.
         </p>
       </Section>
 
@@ -213,18 +217,11 @@ export default function TermsPage() {
 
       <Section heading="16. Contact us">
         <p>
-          For questions about these terms, reach us on WhatsApp at{" "}
-          <a href="https://wa.me/2348000000000" className="underline underline-offset-2" style={{ color: "var(--color-primary)" }} target="_blank" rel="noopener noreferrer">
-            +234 800 000 0000
-          </a>
-          {" "}or email us at{" "}
-          <a href="mailto:hello@klova.ng" className="underline underline-offset-2" style={{ color: "var(--color-primary)" }}>
-            hello@klova.ng
+          For questions about these terms, email us at{" "}
+          <a href={emailHref} className="underline underline-offset-2" style={{ color: "var(--color-primary)" }}>
+            {emailDisplay}
           </a>.
         </p>
-        <ReviewNote>
-          Update the email address and WhatsApp number before launch.
-        </ReviewNote>
       </Section>
 
     </LegalShell>

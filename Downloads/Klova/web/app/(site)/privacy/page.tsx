@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { LegalShell, Section, ReviewNote, Ul } from "../_legal";
+import { SUPPORT_EMAIL } from "@/lib/contact";
 
 export const metadata: Metadata = {
   title: "Privacy Policy — Klova",
@@ -7,6 +8,9 @@ export const metadata: Metadata = {
 };
 
 export default function PrivacyPage() {
+  const emailDisplay = SUPPORT_EMAIL || "[email not set — update lib/contact.ts]";
+  const emailHref = SUPPORT_EMAIL ? `mailto:${SUPPORT_EMAIL}` : "#";
+
   return (
     <LegalShell title="Privacy Policy" lastUpdated="June 2026">
 
@@ -50,7 +54,7 @@ export default function PrivacyPage() {
         <Ul items={[
           "Create and manage your booking",
           "Match you with the most suitable available cleaner",
-          "Send you booking confirmations, reminders, and updates by SMS or WhatsApp",
+          "Send you booking confirmations, reminders, and updates",
           "Enable your cleaner to find and access your property",
           "Process refunds and handle complaints",
           "Respond to your support requests",
@@ -72,7 +76,7 @@ export default function PrivacyPage() {
         <p className="font-medium pt-1" style={{ color: "var(--text-strong)" }}>Service providers we use:</p>
         <Ul items={[
           "Paystack: processes your payment. Your card data is governed by Paystack's privacy policy.",
-          "Termii: delivers SMS booking confirmations and updates to your phone number.",
+          "Termii: delivers booking confirmations and status updates to your phone number.",
           "Supabase: hosts our database. Your data is stored on their secure cloud infrastructure.",
           "Vercel: hosts our website. General web traffic passes through their platform.",
         ]} />
@@ -141,8 +145,8 @@ export default function PrivacyPage() {
           "Lodge a complaint with the Nigeria Data Protection Commission (NDPC) at ndpc.gov.ng",
         ]} />
         <p>
-          To exercise any of these rights, contact us on WhatsApp or by email. We will respond
-          within 30 days of receiving your request.
+          To exercise any of these rights, email us. We will respond within 30 days of receiving
+          your request.
         </p>
       </Section>
 
@@ -161,7 +165,7 @@ export default function PrivacyPage() {
 
       <Section heading="9. Third-party links">
         <p>
-          Our website may contain links to third-party sites (for example, Paystack's payment pages).
+          Our website may contain links to third-party sites (for example, Paystack&apos;s payment pages).
           Once you leave the Klova platform, this privacy policy no longer applies. We recommend
           reading the privacy policies of any third-party sites you visit.
         </p>
@@ -191,27 +195,16 @@ export default function PrivacyPage() {
       <Section heading="12. Changes to this policy">
         <p>
           We may update this policy from time to time. The date at the top of this page shows
-          when it was last revised. For significant changes, we will let you know by SMS or
-          WhatsApp before they take effect.
+          when it was last revised. For significant changes, we will let you know by email before
+          they take effect.
         </p>
       </Section>
 
       <Section heading="13. Contact us">
         <p>
-          For questions, access requests, or complaints about how we handle your data, reach us on
-          WhatsApp at{" "}
-          <a
-            href="https://wa.me/2348000000000"
-            className="underline underline-offset-2"
-            style={{ color: "var(--color-primary)" }}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            +234 800 000 0000
-          </a>
-          {" "}or by email at{" "}
-          <a href="mailto:hello@klova.ng" className="underline underline-offset-2" style={{ color: "var(--color-primary)" }}>
-            hello@klova.ng
+          For questions, access requests, or complaints about how we handle your data, email us at{" "}
+          <a href={emailHref} className="underline underline-offset-2" style={{ color: "var(--color-primary)" }}>
+            {emailDisplay}
           </a>.
         </p>
         <p>
@@ -222,8 +215,8 @@ export default function PrivacyPage() {
           </a>.
         </p>
         <ReviewNote>
-          Update the email address and WhatsApp number before launch. Confirm whether a named DPO
-          contact is required and add their details here if so.
+          Update the support email address before launch. Confirm whether a named DPO contact is
+          required and add their details here if so.
         </ReviewNote>
       </Section>
 
