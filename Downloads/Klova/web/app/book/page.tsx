@@ -20,6 +20,7 @@ import Step09Summary from "./steps/Step09Summary";
 import Step10Checkout from "./steps/Step10Checkout";
 import Step11Matching from "./steps/Step11Matching";
 import Step12Confirmation from "./steps/Step12Confirmation";
+import StepNoMatch from "./steps/StepNoMatch";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
@@ -75,6 +76,9 @@ export default function BookPage() {
   const [submitStatus, setSubmitStatus] = useState<SubmitStatus>("idle");
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  // null = not in no-match mode; [] = no-match but no alternatives; [...] = alternatives ready
+  const [noMatchDates, setNoMatchDates] = useState<string[] | null>(null);
+
   const patch = useCallback((partial: Partial<BookingData>) => {
     setData((prev) => ({ ...prev, ...partial }));
   }, []);
@@ -96,44 +100,71 @@ export default function BookPage() {
   }, [data]);
 
   // ─── POST /bookings ──────────────────────────────────────────────────────
-  const handleSubmitBooking = useCallback(async () => {
+  // dateOverride: when retrying from the no-match screen, pass the new date
+  // directly so we don't rely on data.bookingDate being updated yet in state.
+  const handleSubmitBooking = useCallback(async (dateOverride?: string) => {
     setSubmitStatus("submitting");
     setSubmitError(null);
+
+    const effectiveDate = dateOverride ?? data.bookingDate;
+    const payload = buildBookingPayload(
+      dateOverride ? { ...data, bookingDate: dateOverride } : data,
+    );
 
     try {
       const res = await fetch(`${API_URL}/bookings`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(buildBookingPayload(data)),
+        body: JSON.stringify(payload),
       });
 
       const json = await res.json();
 
       if (!res.ok) {
         const msg = json?.error?.message;
+
         if (res.status === 409) {
-          setSubmitError(
-            msg ?? "No keepers are available on this date. Please go back and choose a different date."
-          );
-        } else if (res.status === 400) {
-          setSubmitError(
-            msg ?? "Some booking details are invalid. Please review and try again."
-          );
-        } else {
-          setSubmitError("Something went wrong. Please try again in a moment.");
+          // Persist the tried date into state so the no-match screen displays it
+          if (dateOverride) patch({ bookingDate: dateOverride });
+
+          // Fetch nearby alternatives and surface them as one-tap options
+          try {
+            const altRes = await fetch(
+              `${API_URL}/availability/alternatives?zone_slug=lekki-ajah&date=${effectiveDate}`,
+            );
+            const altJson = await altRes.json();
+            const alternatives: string[] = altJson.ok
+              ? altJson.data.alternative_dates
+              : [];
+            setNoMatchDates(alternatives);
+          } catch {
+            setNoMatchDates([]);
+          }
+          setAnimKey((k) => k + 1);
+          setSubmitStatus("idle");
+          return;
         }
+
+        setSubmitError(
+          msg ??
+            (res.status === 400
+              ? "Some booking details are invalid. Please review and try again."
+              : "Something went wrong. Please try again in a moment."),
+        );
         setSubmitStatus("idle");
         return;
       }
 
+      // Success — exit no-match mode and advance to keeper reveal
+      if (dateOverride) patch({ bookingDate: dateOverride });
       const { booking_id, total_amount, cleaner } = json.data;
       setBookingId(booking_id);
       setMatchedCleaner(cleaner);
       setServerTotal(total_amount);
       sessionStorage.setItem("klova_booking_id", booking_id);
+      setNoMatchDates(null);
       setSubmitStatus("idle");
 
-      // Advance to the keeper reveal step
       setStep((s) => {
         const n = nextStep(s, data);
         setAnimKey((k) => k + 1);
@@ -143,7 +174,21 @@ export default function BookPage() {
       setSubmitError("Network error — please check your connection and try again.");
       setSubmitStatus("idle");
     }
-  }, [data]);
+  }, [data, patch]);
+
+  // Retry from the no-match screen with a specific date
+  const handleRetryWithDate = useCallback(
+    (date: string) => { handleSubmitBooking(date); },
+    [handleSubmitBooking],
+  );
+
+  // Return the user to the date picker so they can choose manually
+  const handleChangeDateManually = useCallback(() => {
+    setNoMatchDates(null);
+    setSubmitError(null);
+    setStep(4);
+    setAnimKey((k) => k + 1);
+  }, []);
 
   // ─── POST /payments/initiate → redirect to Paystack ─────────────────────
   const handleInitiatePayment = useCallback(async () => {
@@ -217,36 +262,49 @@ export default function BookPage() {
 
       {/* Step content */}
       <div key={animKey} className="fade-up flex-1 pb-40">
-        {step === 1  && <Step01Service data={data} patch={patch} price={price} onNext={goNext} />}
-        {step === 2  && <Step02Size    data={data} patch={patch} price={price} onNext={goNext} onBack={goBack} />}
-        {step === 3  && <Step03Address data={data} patch={patch} price={price} onNext={goNext} onBack={goBack} />}
-        {step === 4  && <Step04DateTime data={data} patch={patch} price={price} onNext={goNext} onBack={goBack} />}
-        {step === 5  && <Step05Extras  data={data} patch={patch} price={price} onNext={goNext} onBack={goBack} />}
-        {step === 6  && <Step06ExtrasConfig data={data} patch={patch} price={price} onNext={goNext} onBack={goBack} />}
-        {step === 7  && <Step07Preferences data={data} patch={patch} price={price} onNext={goNext} onBack={goBack} />}
-        {step === 8  && <Step08Details data={data} patch={patch} price={price} onNext={goNext} onBack={goBack} />}
-        {step === 9  && <Step09Summary data={data} price={price} onNext={goNext} onBack={goBack} />}
-        {step === 10 && (
-          <Step10Checkout
+        {noMatchDates !== null ? (
+          <StepNoMatch
             data={data}
-            patch={patch}
-            price={price}
-            onSubmit={handleSubmitBooking}
-            submitStatus={submitStatus === "submitting" ? "submitting" : "idle"}
+            alternatives={noMatchDates}
+            submitting={submitStatus === "submitting"}
             submitError={submitError}
-            onBack={goBack}
+            onRetryWithDate={handleRetryWithDate}
+            onChangeDateManually={handleChangeDateManually}
           />
+        ) : (
+          <>
+            {step === 1  && <Step01Service data={data} patch={patch} price={price} onNext={goNext} />}
+            {step === 2  && <Step02Size    data={data} patch={patch} price={price} onNext={goNext} onBack={goBack} />}
+            {step === 3  && <Step03Address data={data} patch={patch} price={price} onNext={goNext} onBack={goBack} />}
+            {step === 4  && <Step04DateTime data={data} patch={patch} price={price} onNext={goNext} onBack={goBack} />}
+            {step === 5  && <Step05Extras  data={data} patch={patch} price={price} onNext={goNext} onBack={goBack} />}
+            {step === 6  && <Step06ExtrasConfig data={data} patch={patch} price={price} onNext={goNext} onBack={goBack} />}
+            {step === 7  && <Step07Preferences data={data} patch={patch} price={price} onNext={goNext} onBack={goBack} />}
+            {step === 8  && <Step08Details data={data} patch={patch} price={price} onNext={goNext} onBack={goBack} />}
+            {step === 9  && <Step09Summary data={data} price={price} onNext={goNext} onBack={goBack} />}
+            {step === 10 && (
+              <Step10Checkout
+                data={data}
+                patch={patch}
+                price={price}
+                onSubmit={() => handleSubmitBooking()}
+                submitStatus={submitStatus === "submitting" ? "submitting" : "idle"}
+                submitError={submitError}
+                onBack={goBack}
+              />
+            )}
+            {step === 11 && (
+              <Step11Matching
+                cleaner={matchedCleaner}
+                serverTotal={serverTotal}
+                payStatus={submitStatus === "paying" || submitStatus === "redirecting" ? submitStatus : "idle"}
+                payError={submitError}
+                onPay={handleInitiatePayment}
+              />
+            )}
+            {step === 12 && <Step12Confirmation data={data} price={price} />}
+          </>
         )}
-        {step === 11 && (
-          <Step11Matching
-            cleaner={matchedCleaner}
-            serverTotal={serverTotal}
-            payStatus={submitStatus === "paying" || submitStatus === "redirecting" ? submitStatus : "idle"}
-            payError={submitError}
-            onPay={handleInitiatePayment}
-          />
-        )}
-        {step === 12 && <Step12Confirmation data={data} price={price} />}
       </div>
     </div>
   );
