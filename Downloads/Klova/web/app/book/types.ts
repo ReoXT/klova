@@ -11,6 +11,7 @@ export interface ApplianceSelection {
   microwave: boolean;
   coffee_machine: boolean;
   toaster: boolean;
+  custom: string; // name of an unlisted appliance, empty = not used
 }
 
 export interface ExtraSelections {

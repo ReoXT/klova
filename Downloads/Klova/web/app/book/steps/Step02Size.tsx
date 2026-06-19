@@ -48,10 +48,10 @@ export default function Step02Size({ data, patch, onNext, onBack }: Props) {
               key={value}
               type="button"
               onClick={() => patch({ bedrooms: value })}
-              className="rounded-xl p-3.5 border-2 text-center font-medium text-sm transition-all duration-150"
+              className="rounded-xl p-3.5 border-2 text-center font-semibold text-base transition-all duration-150"
               style={{
-                borderColor: sel ? "var(--klova-primary)" : "var(--border-default)",
-                background: sel ? "var(--klova-primary-soft)" : "var(--surface-card)",
+                borderColor: sel ? "var(--klova-accent)" : "var(--border-default)",
+                background: sel ? "var(--klova-accent-soft)" : "var(--surface-card)",
                 color: sel ? "var(--klova-primary)" : "var(--text-body)",
               }}
             >
@@ -75,17 +75,17 @@ export default function Step02Size({ data, patch, onNext, onBack }: Props) {
               onClick={() => patch({ frequency: freq, recurringPattern: freq === "one-off" ? null : data.recurringPattern })}
               className="w-full text-left rounded-xl p-4 border-2 transition-all duration-150"
               style={{
-                borderColor: sel ? "var(--klova-primary)" : "var(--border-default)",
-                background: sel ? "var(--klova-primary-soft)" : "var(--surface-card)",
+                borderColor: sel ? "var(--klova-accent)" : "var(--border-default)",
+                background: sel ? "var(--klova-accent-soft)" : "var(--surface-card)",
               }}
             >
-              <p className="font-semibold text-sm" style={{ color: sel ? "var(--klova-primary)" : "var(--text-strong)" }}>
+              <p className="font-semibold text-base" style={{ color: sel ? "var(--klova-primary)" : "var(--text-strong)" }}>
                 {freq === "one-off" ? "One-off" : "Recurring"}
               </p>
               <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
                 {freq === "one-off"
                   ? "A single clean whenever you need it"
-                  : "Regular cleans — we keep the same keeper for you"}
+                  : "Regular cleans, we keep the same keeper for you"}
               </p>
             </button>
           );
@@ -108,20 +108,20 @@ export default function Step02Size({ data, patch, onNext, onBack }: Props) {
                   onClick={() => patch({ recurringPattern: value })}
                   className="w-full text-left rounded-xl px-4 py-3 border-2 flex items-center gap-3 transition-all duration-150"
                   style={{
-                    borderColor: sel ? "var(--klova-primary)" : "var(--border-default)",
-                    background: sel ? "var(--klova-primary-soft)" : "var(--surface-card)",
+                    borderColor: sel ? "var(--klova-accent)" : "var(--border-default)",
+                    background: sel ? "var(--klova-accent-soft)" : "var(--surface-card)",
                   }}
                 >
                   <div
                     className="w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0"
-                    style={{ borderColor: sel ? "var(--klova-primary)" : "var(--border-strong)" }}
+                    style={{ borderColor: sel ? "var(--klova-accent)" : "var(--border-strong)" }}
                   >
                     {sel && (
-                      <div className="w-2 h-2 rounded-full" style={{ background: "var(--klova-primary)" }} />
+                      <div className="w-2 h-2 rounded-full" style={{ background: "var(--klova-accent)" }} />
                     )}
                   </div>
                   <div>
-                    <p className="font-medium text-sm" style={{ color: sel ? "var(--klova-primary)" : "var(--text-strong)" }}>
+                    <p className="font-semibold text-base" style={{ color: sel ? "var(--klova-primary)" : "var(--text-strong)" }}>
                       {label}
                     </p>
                     <p className="text-xs" style={{ color: "var(--text-muted)" }}>{desc}</p>

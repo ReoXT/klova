@@ -1,7 +1,7 @@
 "use client";
 
 import type { BookingData, ExtraSelections } from "../types";
-import { EXTRAS, formatNGN } from "../data";
+import { EXTRAS } from "../data";
 import { Button } from "@/components/ui/Button";
 
 interface Props {
@@ -19,12 +19,12 @@ export default function Step05Extras({ data, patch, onNext, onBack }: Props) {
       extras: {
         ...data.extras,
         [key]: !current,
-        // if un-toggling appliances, reset units
         ...(slug === "appliances" && current
           ? {
               appliance_units: {
                 oven: false, fridge: false, freezer: false,
                 microwave: false, coffee_machine: false, toaster: false,
+                custom: "",
               },
             }
           : {}),
@@ -47,7 +47,7 @@ export default function Step05Extras({ data, patch, onNext, onBack }: Props) {
       </p>
 
       <div className="flex flex-col gap-2.5">
-        {EXTRAS.map(({ slug, name, price, description, perUnit }) => {
+        {EXTRAS.map(({ slug, name }) => {
           const key = slug as keyof ExtraSelections;
           const selected = data.extras[key] as boolean;
           return (
@@ -55,18 +55,18 @@ export default function Step05Extras({ data, patch, onNext, onBack }: Props) {
               key={slug}
               type="button"
               onClick={() => toggle(slug)}
-              className="w-full text-left rounded-xl p-4 border-2 flex items-start gap-3 transition-all duration-150"
+              className="w-full text-left rounded-xl px-4 py-3.5 border-2 flex items-center gap-3 transition-all duration-150"
               style={{
-                borderColor: selected ? "var(--klova-primary)" : "var(--border-default)",
-                background: selected ? "var(--klova-primary-soft)" : "var(--surface-card)",
+                borderColor: selected ? "var(--klova-accent)" : "var(--border-default)",
+                background: selected ? "var(--klova-accent-soft)" : "var(--surface-card)",
               }}
             >
               {/* Checkbox */}
               <div
-                className="w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 mt-0.5 transition-all"
+                className="w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-all"
                 style={{
-                  borderColor: selected ? "var(--klova-primary)" : "var(--border-strong)",
-                  background: selected ? "var(--klova-primary)" : "transparent",
+                  borderColor: selected ? "var(--klova-accent)" : "var(--border-strong)",
+                  background: selected ? "var(--klova-accent)" : "transparent",
                 }}
               >
                 {selected && (
@@ -76,22 +76,9 @@ export default function Step05Extras({ data, patch, onNext, onBack }: Props) {
                 )}
               </div>
 
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="font-semibold text-sm" style={{ color: selected ? "var(--klova-primary)" : "var(--text-strong)" }}>
-                    {name}
-                  </p>
-                  <span
-                    className="text-xs font-semibold shrink-0"
-                    style={{ color: selected ? "var(--klova-accent)" : "var(--text-muted)" }}
-                  >
-                    {perUnit ? `${formatNGN(price)}/item` : formatNGN(price)}
-                  </span>
-                </div>
-                <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
-                  {description}
-                </p>
-              </div>
+              <p className="font-semibold text-base" style={{ color: selected ? "var(--klova-primary)" : "var(--text-strong)" }}>
+                {name}
+              </p>
             </button>
           );
         })}
@@ -100,7 +87,7 @@ export default function Step05Extras({ data, patch, onNext, onBack }: Props) {
       {selectedCount > 0 && (
         <p className="text-xs mt-3 text-center" style={{ color: "var(--text-subtle)" }}>
           {selectedCount} add-on{selectedCount > 1 ? "s" : ""} selected
-          {data.extras.appliances && " — you'll customise appliances on the next screen"}
+          {data.extras.appliances && " — you&apos;ll customise appliances on the next screen"}
         </p>
       )}
 

@@ -19,13 +19,6 @@ today.setHours(0, 0, 0, 0);
 const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
 const threeMonthsOut = new Date(today.getFullYear(), today.getMonth() + 3, 0);
 
-const TIME_META: Record<string, string> = {
-  "7am–9am":   "Morning — great for early risers",
-  "9am–12pm":  "Mid-morning — our most popular slot",
-  "12pm–2pm":  "Afternoon — after lunch",
-  "2pm–4pm":   "Late afternoon — wrap up by 4pm",
-};
-
 export default function Step04DateTime({ data, patch, onNext, onBack }: Props) {
   const [error, setError] = useState<string | null>(null);
 
@@ -55,7 +48,7 @@ export default function Step04DateTime({ data, patch, onNext, onBack }: Props) {
         When should we come?
       </h1>
       <p className="text-sm mb-5" style={{ color: "var(--text-muted)" }}>
-        Pick a date — earliest available is tomorrow.
+        Pick a date, earliest available is tomorrow.
       </p>
 
       {/* Calendar */}
@@ -69,8 +62,8 @@ export default function Step04DateTime({ data, patch, onNext, onBack }: Props) {
       >
         <style>{`
           .klova-cal .rdp-root {
-            --rdp-accent-color: oklch(0.29 0.09 152);
-            --rdp-accent-background-color: oklch(0.29 0.09 152 / 0.10);
+            --rdp-accent-color: oklch(0.68 0.14 67);
+            --rdp-accent-background-color: oklch(0.68 0.14 67 / 0.10);
             --rdp-today-color: oklch(0.68 0.14 67);
             --rdp-day-height: 40px;
             --rdp-day-width: 40px;
@@ -97,9 +90,9 @@ export default function Step04DateTime({ data, patch, onNext, onBack }: Props) {
             background: var(--surface-section);
           }
           .klova-cal .rdp-selected .rdp-day_button {
-            background: oklch(0.29 0.09 152);
-            color: oklch(0.97 0.01 152);
-            font-weight: 600;
+            background: oklch(0.68 0.14 67);
+            color: oklch(0.15 0.02 67);
+            font-weight: 700;
           }
           .klova-cal .rdp-disabled {
             opacity: 0.3;
@@ -151,25 +144,19 @@ export default function Step04DateTime({ data, patch, onNext, onBack }: Props) {
                   onClick={() => { patch({ timeSlot: slot as TimeSlot }); setError(null); }}
                   className="w-full text-left rounded-xl border-2 px-4 py-3 flex items-center gap-3 transition-all duration-150"
                   style={{
-                    borderColor: sel ? "var(--klova-primary)" : "var(--border-default)",
-                    background: sel ? "var(--klova-primary-soft)" : "var(--surface-card)",
+                    borderColor: sel ? "var(--klova-accent)" : "var(--border-default)",
+                    background: sel ? "var(--klova-accent-soft)" : "var(--surface-card)",
                   }}
                 >
-                  {/* Radio dot */}
                   <div
                     className="w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0"
-                    style={{ borderColor: sel ? "var(--klova-primary)" : "var(--border-strong)" }}
+                    style={{ borderColor: sel ? "var(--klova-accent)" : "var(--border-strong)" }}
                   >
-                    {sel && <div className="w-2 h-2 rounded-full" style={{ background: "var(--klova-primary)" }} />}
+                    {sel && <div className="w-2 h-2 rounded-full" style={{ background: "var(--klova-accent)" }} />}
                   </div>
-                  <div>
-                    <p className="font-semibold text-sm" style={{ color: sel ? "var(--klova-primary)" : "var(--text-strong)" }}>
-                      {slot}
-                    </p>
-                    <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-                      {TIME_META[slot]}
-                    </p>
-                  </div>
+                  <p className="font-semibold text-base" style={{ color: sel ? "var(--klova-primary)" : "var(--text-strong)" }}>
+                    {slot}
+                  </p>
                 </button>
               );
             })}

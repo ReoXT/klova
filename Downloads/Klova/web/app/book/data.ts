@@ -4,7 +4,7 @@ export const SERVICES = [
   {
     slug: "standard" as ServiceSlug,
     name: "Standard Clean",
-    description: "Regular upkeep — vacuuming, mopping, surface wipes, bathrooms and kitchen cleaned.",
+    description: "Regular upkeep: vacuuming, mopping, surface wipes, bathrooms and kitchen cleaned.",
     pricing: { "1": 5000, "2": 9500, "3": 14000, "4+": 18000 } as Record<BedroomCount, number>,
   },
   {
@@ -16,7 +16,7 @@ export const SERVICES = [
   {
     slug: "move-in-out" as ServiceSlug,
     name: "Move-in / Move-out",
-    description: "End-to-end clean for empty apartments — inside appliances and all cupboards.",
+    description: "End-to-end clean for empty apartments, inside appliances and all cupboards.",
     pricing: { "1": 40000, "2": 56000, "3": 74000, "4+": 90000 } as Record<BedroomCount, number>,
   },
   {
@@ -95,7 +95,7 @@ export function validateAddress(raw: string): AddressResult {
   return { ok: false, comingSoon: false };
 }
 
-export const INSURANCE_FEE = 2500;
+export const INSURANCE_FEE = 1300;
 
 export const PROMO_CODES: Record<string, number> = {
   KLOVA10: 10,
@@ -124,6 +124,7 @@ export const DEFAULT_BOOKING: BookingData = {
       microwave: false,
       coffee_machine: false,
       toaster: false,
+      custom: "",
     },
     cabinets: false,
     windows: false,
@@ -140,7 +141,7 @@ export const DEFAULT_BOOKING: BookingData = {
   phone: "",
   email: "",
   payMonths: 1,
-  wantsInsurance: false,
+  wantsInsurance: true,
   promoCode: "",
 };
 
@@ -156,8 +157,10 @@ export function computePrice(data: BookingData): PriceBreakdown {
   if (e.laundry)   extras += 3500;
   if (e.wardrobe)  extras += 4000;
   if (e.appliances) {
-    const count = Object.values(e.appliance_units).filter(Boolean).length;
-    extras += count * 1500;
+    const boolCount = (["oven", "fridge", "freezer", "microwave", "coffee_machine", "toaster"] as const)
+      .filter((k) => e.appliance_units[k]).length;
+    const customCount = e.appliance_units.custom.trim() ? 1 : 0;
+    extras += (boolCount + customCount) * 1500;
   }
   if (e.cabinets)  extras += 1500;
   if (e.windows)   extras += 2000;

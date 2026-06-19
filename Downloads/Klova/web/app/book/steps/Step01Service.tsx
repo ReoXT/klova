@@ -30,8 +30,8 @@ export default function Step01Service({ data, patch, onNext }: Props) {
               onClick={() => patch({ service: svc.slug as ServiceSlug })}
               className="w-full text-left rounded-xl p-4 border-2 transition-all duration-150"
               style={{
-                borderColor: selected ? "var(--klova-primary)" : "var(--border-default)",
-                background: selected ? "var(--klova-primary-soft)" : "var(--surface-card)",
+                borderColor: selected ? "var(--klova-accent)" : "var(--border-default)",
+                background: selected ? "var(--klova-accent-soft)" : "var(--surface-card)",
                 boxShadow: selected ? "var(--shadow-sm)" : "none",
               }}
             >

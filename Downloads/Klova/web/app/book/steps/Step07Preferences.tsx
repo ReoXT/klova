@@ -45,10 +45,10 @@ export default function Step07Preferences({ data, patch, onNext, onBack }: Props
                 key={String(val)}
                 type="button"
                 onClick={() => { patch({ hasPets: val }); setError(null); }}
-                className="flex-1 rounded-xl border-2 py-3 text-sm font-medium transition-all duration-150"
+                className="flex-1 rounded-xl border-2 py-3 text-base font-semibold transition-all duration-150"
                 style={{
-                  borderColor: sel ? "var(--klova-primary)" : "var(--border-default)",
-                  background: sel ? "var(--klova-primary-soft)" : "var(--surface-card)",
+                  borderColor: sel ? "var(--klova-accent)" : "var(--border-default)",
+                  background: sel ? "var(--klova-accent-soft)" : "var(--surface-card)",
                   color: sel ? "var(--klova-primary)" : "var(--text-body)",
                 }}
               >
@@ -81,41 +81,37 @@ export default function Step07Preferences({ data, patch, onNext, onBack }: Props
         )}
       </div>
 
-      {/* Number of keepers */}
+      {/* Extra keeper — Yes/No */}
       <div className="mb-6">
         <p className="text-sm font-medium mb-1" style={{ color: "var(--text-body)" }}>
-          How many keepers do you need?
+          Do you need an extra keeper?
         </p>
         <p className="text-xs mb-3" style={{ color: "var(--text-muted)" }}>
-          Extra keepers double the base price (add-ons excluded).
+          A second keeper covers more ground in less time. The base price is doubled (add-ons unaffected).
         </p>
-        <div className="grid grid-cols-3 gap-2.5">
-          {[1, 2, 3].map((n) => {
-            const sel = data.keeperCount === n;
+        <div className="flex gap-3">
+          {([true, false] as const).map((want) => {
+            const sel = want ? data.keeperCount === 2 : data.keeperCount === 1;
             return (
               <button
-                key={n}
+                key={String(want)}
                 type="button"
-                onClick={() => patch({ keeperCount: n })}
-                className="rounded-xl border-2 py-3 text-center text-sm transition-all duration-150"
+                onClick={() => patch({ keeperCount: want ? 2 : 1 })}
+                className="flex-1 rounded-xl border-2 py-3 text-base font-semibold transition-all duration-150"
                 style={{
-                  borderColor: sel ? "var(--klova-primary)" : "var(--border-default)",
-                  background: sel ? "var(--klova-primary-soft)" : "var(--surface-card)",
+                  borderColor: sel ? "var(--klova-accent)" : "var(--border-default)",
+                  background: sel ? "var(--klova-accent-soft)" : "var(--surface-card)",
+                  color: sel ? "var(--klova-primary)" : "var(--text-body)",
                 }}
               >
-                <p className="font-semibold" style={{ color: sel ? "var(--klova-primary)" : "var(--text-strong)" }}>
-                  {n}
-                </p>
-                <p className="text-xs mt-0.5" style={{ color: sel ? "var(--klova-primary)" : "var(--text-muted)" }}>
-                  {n === 1 ? "Keeper" : "Keepers"}
-                </p>
+                {want ? "Yes" : "No"}
               </button>
             );
           })}
         </div>
-        {data.keeperCount > 1 && (
+        {data.keeperCount === 2 && (
           <Alert variant="info" className="mt-3">
-            {data.keeperCount} keepers requested — the base clean price will be ×{data.keeperCount}.
+            2 keepers requested — your base clean price will be doubled.
           </Alert>
         )}
       </div>
@@ -127,7 +123,8 @@ export default function Step07Preferences({ data, patch, onNext, onBack }: Props
           className="block text-sm font-medium mb-1.5"
           style={{ color: "var(--text-body)" }}
         >
-          Anything else your keeper should know? <span style={{ color: "var(--text-subtle)" }}>(optional)</span>
+          Anything else your keeper should know?{" "}
+          <span style={{ color: "var(--text-subtle)" }}>(optional)</span>
         </label>
         <textarea
           id="notes"
