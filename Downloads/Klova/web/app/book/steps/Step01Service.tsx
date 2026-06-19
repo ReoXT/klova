@@ -69,7 +69,7 @@ export default function Step01Service({ data, patch, price, onNext }: Props) {
                   {data.bedrooms ? ` · ${data.bedrooms} bed${data.bedrooms === "1" ? "" : "s"}` : ""}
                 </p>
               </div>
-              <span className="text-xl font-bold" style={{ color: "var(--klova-accent)" }}>{formatNGN(price.total)}</span>
+              <span className="text-xl font-bold" style={{ color: "var(--klova-accent)" }}>{formatNGN(price.total - price.insurance)}</span>
             </div>
           )}
           <Button variant="primary" className="w-full" disabled={!data.service} onClick={onNext}>

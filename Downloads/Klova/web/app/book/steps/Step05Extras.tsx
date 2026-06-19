@@ -110,7 +110,7 @@ export default function Step05Extras({ data, patch, price, onNext, onBack }: Pro
                   {data.bedrooms ? ` · ${data.bedrooms} bed${data.bedrooms === "1" ? "" : "s"}` : ""}
                 </p>
               </div>
-              <span className="text-xl font-bold" style={{ color: "var(--klova-accent)" }}>{formatNGN(price.total)}</span>
+              <span className="text-xl font-bold" style={{ color: "var(--klova-accent)" }}>{formatNGN(price.total - price.insurance)}</span>
             </div>
           )}
           <div className="flex gap-3">

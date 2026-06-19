@@ -164,7 +164,7 @@ export default function Step11Matching({ cleaner, serverTotal, payStatus, payErr
         {paying ? (
           <><Spinner size="sm" /><span>{payStatus === "redirecting" ? "Redirecting to Paystack…" : "Starting payment…"}</span></>
         ) : (
-          "Pay now — secure my booking"
+          "Make Payment Now"
         )}
       </Button>
 

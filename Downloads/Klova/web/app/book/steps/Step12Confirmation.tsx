@@ -109,7 +109,7 @@ export default function Step12Confirmation({ data, price }: Props) {
 
       {/* Reminder */}
       <Alert variant="warning" className="mb-6">
-        <strong>Reminder:</strong> Please have your cleaning supplies ready before your keeper arrives — broom, mop, bin liners, cleaning sprays and gloves.
+        <strong>Reminder:</strong> Please have your cleaning supplies ready before your keeper arrives, broom, mop, bin liners, cleaning sprays and gloves.
       </Alert>
 
       <div className="flex flex-col gap-3">
