@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useTransition } from "react";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -252,6 +252,8 @@ function CleanerPanel({
   );
   const [bankForm, setBankForm]         = useState<BankFormState>(BLANK_BANK);
   const [bankLoaded, setBankLoaded]     = useState(false);
+  const [resolving, startResolve]       = useTransition();
+  const [resolveError, setResolveError] = useState<string | null>(null);
   const [photoFile, setPhotoFile]       = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [saving, setSaving]             = useState(false);
@@ -287,10 +289,36 @@ function CleanerPanel({
     setBankErrors((e) => { const n = { ...e }; delete n[k]; return n; });
   }
 
+  function tryResolve(accountNumber: string, bankCode: string) {
+    if (!/^\d{10}$/.test(accountNumber) || !bankCode) return;
+    setResolveError(null);
+    setBankForm((f) => ({ ...f, account_name: "" }));
+    startResolve(async () => {
+      const r = await fetch(`/api/admin/cleaners/resolve-bank?account_number=${accountNumber}&bank_code=${bankCode}`);
+      const d = await r.json() as { account_name?: string; error?: string };
+      if (!r.ok || !d.account_name) {
+        setResolveError(d.error ?? "Could not verify account");
+      } else {
+        setBankForm((f) => ({ ...f, account_name: d.account_name! }));
+        setResolveError(null);
+      }
+    });
+  }
+
+  function onAccountNumberChange(val: string) {
+    const digits = val.replace(/\D/g, "").slice(0, 10);
+    setBankForm((f) => ({ ...f, account_number: digits, account_name: "" }));
+    setBankErrors((e) => { const n = { ...e }; delete n.account_number; return n; });
+    setResolveError(null);
+    tryResolve(digits, bankForm.bank_code);
+  }
+
   function onBankSelect(code: string) {
     const bank = NIGERIAN_BANKS.find((b) => b.code === code);
-    setBankForm((f) => ({ ...f, bank_code: code, bank_name: bank?.name ?? "" }));
+    setBankForm((f) => ({ ...f, bank_code: code, bank_name: bank?.name ?? "", account_name: "" }));
     setBankErrors((e) => { const n = { ...e }; delete n.bank_code; return n; });
+    setResolveError(null);
+    tryResolve(bankForm.account_number, code);
   }
 
   function setField<K extends keyof FormState>(k: K, v: FormState[K]) {
@@ -471,15 +499,6 @@ function CleanerPanel({
                 Bank account (for payouts)
               </p>
 
-              <PanelField label="Account name" error={bankErrors.account_name}>
-                <input
-                  className={`input input-bordered w-full text-sm${bankErrors.account_name ? " input-error" : ""}`}
-                  value={bankForm.account_name}
-                  onChange={(e) => setBankField("account_name", e.target.value)}
-                  placeholder="As it appears on the account"
-                />
-              </PanelField>
-
               <PanelField label="Bank" error={bankErrors.bank_code}>
                 <select
                   className={`select select-bordered w-full text-sm${bankErrors.bank_code ? " select-error" : ""}`}
@@ -497,16 +516,34 @@ function CleanerPanel({
                 <input
                   className={`input input-bordered w-full text-sm font-mono${bankErrors.account_number ? " input-error" : ""}`}
                   value={bankForm.account_number}
-                  onChange={(e) => setBankField("account_number", e.target.value.replace(/\D/g, "").slice(0, 10))}
+                  onChange={(e) => onAccountNumberChange(e.target.value)}
                   placeholder="0123456789"
                   maxLength={10}
                 />
               </PanelField>
 
-              {bankForm.bank_code && bankForm.account_number.length === 10 && bankForm.account_name && (
-                <div className="rounded-xl px-3 py-2.5 text-xs" style={{ background: "oklch(0.97 0.01 145)", border: "1px solid oklch(0.85 0.06 145)" }}>
-                  <p style={{ color: "oklch(0.4 0.1 145)" }}>
-                    ✓ {bankForm.account_name} · {NIGERIAN_BANKS.find((b) => b.code === bankForm.bank_code)?.name ?? bankForm.bank_code} · ****{bankForm.account_number.slice(-4)}
+              {/* Account name — auto-resolved from Paystack */}
+              {resolving && (
+                <div className="flex items-center gap-2 text-xs" style={{ color: "var(--text-muted)" }}>
+                  <span className="loading loading-spinner loading-xs" />
+                  Verifying account…
+                </div>
+              )}
+
+              {!resolving && resolveError && (
+                <p className="text-xs text-error">{resolveError}</p>
+              )}
+
+              {!resolving && !resolveError && bankForm.account_name && (
+                <div className="rounded-xl px-3 py-2.5" style={{ background: "oklch(0.97 0.01 145)", border: "1px solid oklch(0.85 0.06 145)" }}>
+                  <p className="text-xs font-semibold" style={{ color: "oklch(0.4 0.1 145)" }}>
+                    ✓ Account verified
+                  </p>
+                  <p className="text-sm font-medium mt-0.5" style={{ color: "var(--text-strong)" }}>
+                    {bankForm.account_name}
+                  </p>
+                  <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
+                    {NIGERIAN_BANKS.find((b) => b.code === bankForm.bank_code)?.name ?? bankForm.bank_code} · ****{bankForm.account_number.slice(-4)}
                   </p>
                 </div>
               )}
