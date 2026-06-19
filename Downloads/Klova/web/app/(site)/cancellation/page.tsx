@@ -1,38 +1,178 @@
 import type { Metadata } from "next";
+import { LegalShell, Section, ReviewNote, Ul } from "../_legal";
 
 export const metadata: Metadata = {
   title: "Cancellation & Refunds — Klova",
+  description: "Klova's cancellation windows, refund timelines, and what to do if you have a problem with your clean.",
 };
 
 export default function CancellationPage() {
   return (
-    <div className="max-w-2xl mx-auto px-6 py-20">
-      <p className="text-xs font-semibold text-base-content/40 uppercase tracking-widest mb-4">Legal</p>
-      <h1 className="text-4xl mb-6">Cancellation &amp; Refunds</h1>
-      <div className="space-y-6 text-sm text-base-content/70 leading-relaxed">
-        <p>Our cancellation policy is designed to be fair to both customers and cleaners.</p>
-        <div className="space-y-3">
-          <div className="flex gap-4">
-            <span className="badge badge-success badge-soft shrink-0 mt-0.5">Free</span>
-            <p>Cancel more than 24 hours before your scheduled clean — full refund, no questions asked.</p>
+    <LegalShell title="Cancellation & Refunds" lastUpdated="June 2026">
+
+      <Section heading="1. Cancellation windows">
+        <p>
+          You can cancel any confirmed booking directly through the platform or by contacting us
+          on WhatsApp. The refund you receive depends on how much notice you give.
+        </p>
+
+        {/* Timeline cards */}
+        <div className="space-y-3 pt-1">
+          <div
+            className="flex gap-4 rounded-2xl px-5 py-4"
+            style={{ background: "var(--surface-card)", border: "1px solid var(--color-base-200)" }}
+          >
+            <div className="pt-0.5 shrink-0">
+              <span className="badge badge-success badge-soft text-xs font-semibold px-3">Full refund</span>
+            </div>
+            <div className="text-sm leading-relaxed" style={{ color: "var(--text-body)" }}>
+              <p className="font-medium mb-0.5" style={{ color: "var(--text-strong)" }}>More than 24 hours before the scheduled clean</p>
+              <p>
+                Cancel at any point more than 24 hours before your booking time and you will receive
+                a complete refund with no deductions. No questions asked.
+              </p>
+            </div>
           </div>
-          <div className="flex gap-4">
-            <span className="badge badge-warning badge-soft shrink-0 mt-0.5">50%</span>
-            <p>Cancel within 24 hours of the scheduled clean — 50% refund. The rest compensates the cleaner for the reserved time.</p>
+
+          <div
+            className="flex gap-4 rounded-2xl px-5 py-4"
+            style={{ background: "var(--surface-card)", border: "1px solid var(--color-base-200)" }}
+          >
+            <div className="pt-0.5 shrink-0">
+              <span className="badge badge-warning badge-soft text-xs font-semibold px-3">50% refund</span>
+            </div>
+            <div className="text-sm leading-relaxed" style={{ color: "var(--text-body)" }}>
+              <p className="font-medium mb-0.5" style={{ color: "var(--text-strong)" }}>Within 24 hours of the scheduled clean</p>
+              <p>
+                If you cancel within 24 hours of your booking time, you will receive a 50% refund.
+                The remaining 50% compensates your assigned cleaner for the time they have reserved
+                and cannot rebook.
+              </p>
+            </div>
           </div>
-          <div className="flex gap-4">
-            <span className="badge badge-error badge-soft shrink-0 mt-0.5">No refund</span>
-            <p>Cancel after the cleaner has been dispatched — no refund can be issued.</p>
+
+          <div
+            className="flex gap-4 rounded-2xl px-5 py-4"
+            style={{ background: "var(--surface-card)", border: "1px solid var(--color-base-200)" }}
+          >
+            <div className="pt-0.5 shrink-0">
+              <span className="badge badge-error badge-soft text-xs font-semibold whitespace-nowrap px-3">No refund</span>
+            </div>
+            <div className="text-sm leading-relaxed" style={{ color: "var(--text-body)" }}>
+              <p className="font-medium mb-0.5" style={{ color: "var(--text-strong)" }}>After the cleaner has been dispatched</p>
+              <p>
+                Once your cleaner is on their way to your property, we are unable to issue a refund.
+                The cleaner's time, travel, and effort are committed at this point.
+              </p>
+            </div>
           </div>
         </div>
+      </Section>
+
+      <Section heading="2. How refunds are processed">
         <p>
-          Refunds are returned to your original payment method within 3–5 business days.
-          For help, reach us on{" "}
-          <a href="https://wa.me/2348000000000" className="text-primary underline underline-offset-2" target="_blank" rel="noopener noreferrer">
-            WhatsApp
-          </a>.
+          Refunds are returned to the original payment method used at checkout (your debit or credit
+          card via Paystack). Processing times depend on your bank:
         </p>
-      </div>
-    </div>
+        <Ul items={[
+          "Most Nigerian banks: 1 to 3 business days",
+          "Some cards may take up to 5 business days",
+        ]} />
+        <p>
+          We initiate every refund on our end within 24 hours of the cancellation being confirmed.
+          If you have not received your refund after 5 business days, contact us on WhatsApp with
+          your booking reference and we will follow up with Paystack directly.
+        </p>
+        <ReviewNote>
+          Confirm the exact Paystack refund processing timeline before launch, as it may vary
+          depending on the card network (Verve, Mastercard, Visa) and the issuing bank.
+        </ReviewNote>
+      </Section>
+
+      <Section heading="3. Order protection refunds">
+        <p>
+          The ₦1,300 order protection fee is non-refundable once a booking is confirmed, regardless
+          of when the cancellation is made. If you cancel and receive a refund on the cleaning fee,
+          the order protection fee will not be included in the refund.
+        </p>
+      </Section>
+
+      <Section heading="4. No-shows and access problems">
+        <p>
+          If your cleaner cannot access the property at the agreed time because:
+        </p>
+        <Ul items={[
+          "No one is home and no access instructions were provided",
+          "The address provided was incorrect",
+          "Access was denied after the cleaner arrived",
+        ]} />
+        <p>
+          This is treated the same as a cancellation after dispatch. No refund will be issued.
+          Please make sure your address is accurate and that access is arranged before your
+          booking time.
+        </p>
+        <p>
+          If the cleaner cannot reach you after arriving, they will wait up to 15 minutes and
+          then contact us. If no resolution is possible, the booking will be marked as a no-show.
+        </p>
+      </Section>
+
+      <Section heading="5. If the clean does not meet your expectations">
+        <p>
+          We want every Klova clean to be excellent. If yours falls short, here is what to do:
+        </p>
+        <Ul items={[
+          "Contact us on WhatsApp within 24 hours of the service completing",
+          "Tell us clearly what the problem is, and send photos where possible",
+          "We will review the case and aim to respond within 1 business day",
+        ]} />
+        <p>Where a valid complaint is confirmed, we will either:</p>
+        <Ul items={[
+          "Arrange a complimentary re-clean of the affected areas at no cost to you, or",
+          "Issue a partial refund, at our discretion based on the nature of the issue",
+        ]} />
+        <p>
+          Complaints raised more than 24 hours after the service cannot be considered, as it is
+          not possible to verify the state of the property at that point.
+        </p>
+      </Section>
+
+      <Section heading="6. Cancellations initiated by Klova">
+        <p>
+          In rare cases, Klova may need to cancel a booking. This can happen if:
+        </p>
+        <Ul items={[
+          "No cleaner is available for your area or date at the time of booking",
+          "Your assigned cleaner reports an emergency and no replacement can be found",
+          "We detect fraudulent activity on the booking",
+        ]} />
+        <p>
+          If we cancel your booking for any of these reasons, you will receive a full refund
+          regardless of the timing. We will contact you immediately by SMS or WhatsApp to explain
+          and, where possible, suggest alternative dates.
+        </p>
+      </Section>
+
+      <Section heading="7. Get in touch">
+        <p>
+          For cancellation requests or refund questions, the fastest way to reach us is WhatsApp
+          at{" "}
+          <a
+            href="https://wa.me/2348000000000"
+            className="underline underline-offset-2"
+            style={{ color: "var(--color-primary)" }}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            +234 800 000 0000
+          </a>
+          . Please have your booking reference ready when you contact us.
+        </p>
+        <ReviewNote>
+          Update the WhatsApp number before launch.
+        </ReviewNote>
+      </Section>
+
+    </LegalShell>
   );
 }

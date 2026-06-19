@@ -1,23 +1,232 @@
 import type { Metadata } from "next";
+import { LegalShell, Section, ReviewNote, Ul } from "../_legal";
 
 export const metadata: Metadata = {
   title: "Terms of Service — Klova",
+  description: "The terms that govern your use of Klova, the on-demand home cleaning platform for Lagos.",
 };
 
 export default function TermsPage() {
   return (
-    <div className="max-w-2xl mx-auto px-6 py-20">
-      <p className="text-xs font-semibold text-base-content/40 uppercase tracking-widest mb-4">Legal</p>
-      <h1 className="text-4xl mb-6">Terms of Service</h1>
-      <div className="prose prose-sm text-base-content/70 space-y-4">
-        <p>Full terms of service will be published before launch.</p>
+    <LegalShell title="Terms of Service" lastUpdated="June 2026">
+
+      <Section heading="1. About Klova">
         <p>
-          For questions, reach us on{" "}
-          <a href="https://wa.me/2348000000000" className="text-primary underline underline-offset-2" target="_blank" rel="noopener noreferrer">
-            WhatsApp
+          Klova is an online platform that connects customers in Lagos with independent professional
+          cleaners. We are registered in Nigeria.
+        </p>
+        <ReviewNote>
+          Insert the full registered company name and RC number here before launch. A lawyer should
+          confirm that this structure (platform connecting independent contractors) does not create an
+          employment relationship under Nigerian labour law.
+        </ReviewNote>
+        <p>
+          When you book through Klova, you are entering into an agreement directly with your assigned
+          cleaner for the cleaning work itself. Klova acts as the platform and payment facilitator, not
+          as the cleaner's employer. That said, we take responsibility for the quality of the vetting
+          and matching process, and we stand behind every booking.
+        </p>
+      </Section>
+
+      <Section heading="2. What Klova provides">
+        <p>We provide:</p>
+        <Ul items={[
+          "A platform to browse, book, and pay for cleaning services",
+          "NIN-verified, rated cleaners matched to your booking",
+          "Secure payment processing through Paystack",
+          "Optional order protection (see section 6)",
+          "Customer support via WhatsApp",
+        ]} />
+        <p>
+          Klova does not supply cleaning equipment or products. Unless you have separately agreed
+          otherwise with your cleaner, you are responsible for ensuring the basic supplies needed are
+          available at the property.
+        </p>
+      </Section>
+
+      <Section heading="3. Eligibility">
+        <p>
+          You must be at least 18 years old to use Klova. By placing a booking you confirm that you
+          are the legal owner or occupant of the property, or that you have clear authority from the
+          owner or occupant to allow a cleaner to enter and work there.
+        </p>
+      </Section>
+
+      <Section heading="4. Booking and payment">
+        <p>
+          When you complete a booking on Klova:
+        </p>
+        <Ul items={[
+          "A cleaner is matched and assigned before you pay",
+          "You see the cleaner's name, photo, rating, and verification status before checkout",
+          "Full payment is collected at the time of booking through Paystack",
+          "Your booking is confirmed only once payment clears successfully",
+        ]} />
+        <p>
+          Prices shown during checkout are final and inclusive of all fees. We do not add charges after
+          a booking is placed.
+        </p>
+      </Section>
+
+      <Section heading="5. Pricing">
+        <p>
+          All prices are set by Klova and displayed clearly during the booking process. The price
+          includes a platform fee that covers cleaner vetting, matching, insurance management, and
+          customer support. The specific split between the cleaner's earnings and Klova's fee is not
+          disclosed to customers, but no amount beyond the price shown at checkout will ever be charged.
+        </p>
+      </Section>
+
+      <Section heading="6. Order protection">
+        <p>
+          Order protection is an optional add-on available at checkout. When selected, it covers you
+          against accidental damage to your property and missing items that are directly caused by your
+          assigned cleaner during the booking.
+        </p>
+        <ReviewNote>
+          Before launch, have a Nigerian lawyer confirm whether this product is legally classified as
+          insurance under the Insurance Act 2003, and if so, what registration and disclosure obligations
+          apply. If it is not classified as insurance, the copy should still be accurate about what
+          protection it actually provides and what the claims process looks like.
+        </ReviewNote>
+        <p>
+          To make a claim, contact us on WhatsApp within 24 hours of the service completing, with
+          photographic evidence. We will investigate and, where a claim is upheld, arrange compensation
+          up to the stated limit.
+        </p>
+        <p>Order protection does not cover:</p>
+        <Ul items={[
+          "Pre-existing damage or wear and tear",
+          "Cash, jewellery, artwork, or items of extraordinary value unless separately disclosed in writing before the booking",
+          "Damage caused by the customer, other occupants, or third parties",
+          "Losses arising after the cleaner has left the property",
+        ]} />
+      </Section>
+
+      <Section heading="7. Cancellations and refunds">
+        <p>
+          Please read our <a href="/cancellation" className="underline underline-offset-2" style={{ color: "var(--color-primary)" }}>Cancellation and Refunds</a> page
+          for the full policy. In summary:
+        </p>
+        <Ul items={[
+          "More than 24 hours before the scheduled clean: full refund",
+          "Within 24 hours of the scheduled clean: 50% refund",
+          "After the cleaner has been dispatched: no refund",
+        ]} />
+      </Section>
+
+      <Section heading="8. Service quality">
+        <p>
+          If you are not satisfied with a clean, contact us on WhatsApp within 24 hours of the service
+          completing. We will review the situation and, where the issue is validated, either:
+        </p>
+        <Ul items={[
+          "Arrange a complimentary re-clean of the affected areas at no cost, or",
+          "Issue a partial refund at our discretion",
+        ]} />
+        <p>
+          Complaints raised more than 24 hours after the service cannot be considered, as it is not
+          possible to verify the condition of the property at that point.
+        </p>
+      </Section>
+
+      <Section heading="9. Your responsibilities">
+        <p>As a customer you agree to:</p>
+        <Ul items={[
+          "Provide an accurate address and clear access instructions",
+          "Be present, or arrange access for the cleaner, at the agreed time",
+          "Ensure the property is reasonably safe for a person to work in",
+          "Treat cleaners with respect. Harassment, threats, or unsafe working conditions are grounds for immediate cancellation without refund and removal from the platform",
+          "Not request services, or ask the cleaner to perform tasks, beyond what was booked and paid for",
+        ]} />
+      </Section>
+
+      <Section heading="10. Our liability to you">
+        <p>
+          Klova is responsible for direct losses caused by our platform failing to perform as described
+          in these terms. We are not responsible for:
+        </p>
+        <Ul items={[
+          "The cleaner's performance beyond what is covered by order protection",
+          "Indirect or consequential losses (such as loss of income or loss of enjoyment)",
+          "Events outside our reasonable control (including power cuts, flooding, or road closures)",
+          "Losses arising from information you provided that turned out to be inaccurate",
+        ]} />
+        <ReviewNote>
+          This limitation of liability clause needs to be reviewed against the Federal Competition and
+          Consumer Protection Act (FCCPA) 2018 and the Consumer Protection Council Act to ensure it is
+          enforceable under Nigerian consumer protection law.
+        </ReviewNote>
+      </Section>
+
+      <Section heading="11. Cleaners are independent contractors">
+        <p>
+          All cleaners on the Klova platform are independent contractors, not employees of Klova. Klova
+          vets and rates them, but we are not their employer. If a cleaner behaves inappropriately,
+          report it to us on WhatsApp immediately. We investigate every report and take conduct
+          seriously, including removing cleaners from the platform where warranted.
+        </p>
+      </Section>
+
+      <Section heading="12. Platform rules">
+        <p>
+          You may not use the Klova platform to:
+        </p>
+        <Ul items={[
+          "Contact or directly hire a cleaner you met through Klova, bypassing the platform",
+          "Submit false reviews or complaints",
+          "Attempt to access systems or data you are not authorised to access",
+          "Use the platform for any unlawful purpose",
+        ]} />
+        <p>
+          Breach of these rules may result in your account being suspended or permanently removed.
+        </p>
+      </Section>
+
+      <Section heading="13. Intellectual property">
+        <p>
+          All content on the Klova website, including the brand name, logo, copy, and design, belongs
+          to Klova. You may not copy, reproduce, or use any of it without written permission from us.
+        </p>
+      </Section>
+
+      <Section heading="14. Changes to these terms">
+        <p>
+          We may update these terms from time to time. If we make material changes, we will let you
+          know by SMS or WhatsApp before the changes take effect. Continued use of Klova after the
+          effective date of any update means you accept the revised terms.
+        </p>
+      </Section>
+
+      <Section heading="15. Governing law">
+        <p>
+          These terms are governed by the laws of the Federal Republic of Nigeria. Any disputes that
+          cannot be resolved informally will be subject to the exclusive jurisdiction of the courts
+          of Lagos State.
+        </p>
+        <ReviewNote>
+          Consider whether to include an arbitration or mediation clause as an alternative to
+          litigation. This is common in Nigerian commercial contracts and can be faster and cheaper
+          for both parties.
+        </ReviewNote>
+      </Section>
+
+      <Section heading="16. Contact us">
+        <p>
+          For questions about these terms, reach us on WhatsApp at{" "}
+          <a href="https://wa.me/2348000000000" className="underline underline-offset-2" style={{ color: "var(--color-primary)" }} target="_blank" rel="noopener noreferrer">
+            +234 800 000 0000
+          </a>
+          {" "}or email us at{" "}
+          <a href="mailto:hello@klova.ng" className="underline underline-offset-2" style={{ color: "var(--color-primary)" }}>
+            hello@klova.ng
           </a>.
         </p>
-      </div>
-    </div>
+        <ReviewNote>
+          Update the email address and WhatsApp number before launch.
+        </ReviewNote>
+      </Section>
+
+    </LegalShell>
   );
 }
