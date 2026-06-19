@@ -116,8 +116,14 @@ export default function CancellationPage() {
           booking time.
         </p>
         <p>
-          If the cleaner cannot reach you after arriving, they will wait up to 15 minutes and
-          then contact us. If no resolution is possible, the booking will be marked as a no-show.
+          When the cleaner arrives at your property, they notify Klova directly. We then send
+          you a message to let you know your cleaner has arrived. The cleaner will wait up to 15
+          minutes from that notification. If we cannot reach you or access cannot be arranged
+          within that window, the booking will be marked as a no-show.
+        </p>
+        <p>
+          To protect both parties, Klova does not share customer phone numbers with cleaners.
+          All communication goes through us.
         </p>
       </Section>
 

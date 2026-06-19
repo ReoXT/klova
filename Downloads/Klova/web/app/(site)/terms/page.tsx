@@ -177,13 +177,23 @@ export default function TermsPage() {
           You may not use the Klova platform to:
         </p>
         <Ul items={[
-          "Contact or directly hire a cleaner you met through Klova, bypassing the platform",
+          "Arrange or pay for cleaning services directly with a cleaner you were matched with through Klova, bypassing the platform and its payment system",
+          "Solicit a cleaner for work outside the platform, whether during, before, or after a booking",
           "Submit false reviews or complaints",
           "Attempt to access systems or data you are not authorised to access",
           "Use the platform for any unlawful purpose",
         ]} />
         <p>
-          Breach of these rules may result in your account being suspended or permanently removed.
+          The non-circumvention rule exists to protect the integrity of the platform and the
+          livelihoods of cleaners who depend on it. Customers who are found to have arranged
+          off-platform work with a Klova cleaner will be permanently removed and may be liable
+          for the platform fees that would have applied to those bookings.
+        </p>
+        <p>
+          Cleaners are bound by an equivalent obligation in their Cleaner Agreement. Both parties
+          benefit from using the platform: customers retain accountability, insurance coverage, and
+          dispute resolution; cleaners retain ratings, verified income records, and payment
+          protection.
         </p>
       </Section>
 
