@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
 
   if (error) {
     console.error("[admin/bookings]", error);
-    return Response.json({ error: "Database error" }, { status: 500 });
+    return Response.json({ error: `Database error: ${error.message} (code: ${error.code})` }, { status: 500 });
   }
 
   const total = count ?? 0;
