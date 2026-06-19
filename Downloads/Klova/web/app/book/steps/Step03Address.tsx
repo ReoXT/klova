@@ -1,12 +1,10 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { setOptions, importLibrary } from "@googlemaps/js-api-loader";
 import type { BookingData } from "../types";
 import { validateAddress } from "../data";
 import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
-import { Spinner } from "@/components/ui/Skeleton";
 
 interface Props {
   data: BookingData;
@@ -15,79 +13,69 @@ interface Props {
   onBack: () => void;
 }
 
-interface Prediction {
-  description: string;
-  placeId: string;
+interface Suggestion {
+  displayName: string;
+  placeId: string; // OSM unique id
 }
 
-// Singleton — load once across re-mounts
-let autocompleteService: google.maps.places.AutocompleteService | null = null;
-let loaderPromise: Promise<void> | null = null;
-
-function loadPlaces(apiKey: string): Promise<void> {
-  if (loaderPromise) return loaderPromise;
-  setOptions({ key: apiKey, v: "weekly" });
-  loaderPromise = importLibrary("places").then(() => {
-    autocompleteService = new google.maps.places.AutocompleteService();
+// Nominatim OpenStreetMap — free, no API key, no credit card
+async function fetchSuggestions(query: string): Promise<Suggestion[]> {
+  const params = new URLSearchParams({
+    q: query,
+    format: "json",
+    addressdetails: "0",
+    limit: "6",
+    countrycodes: "ng",
+    "accept-language": "en",
   });
-  return loaderPromise;
+
+  const res = await fetch(
+    `https://nominatim.openstreetmap.org/search?${params}`,
+    { headers: { "User-Agent": "Klova/1.0 (klova-nine.vercel.app)" } }
+  );
+
+  if (!res.ok) return [];
+
+  const data = await res.json();
+  return (data as { display_name: string; place_id: number }[]).map((r) => ({
+    displayName: r.display_name,
+    placeId: String(r.place_id),
+  }));
 }
 
 export default function Step03Address({ data, patch, onNext, onBack }: Props) {
   const [query, setQuery] = useState(data.address);
-  const [predictions, setPredictions] = useState<Prediction[]>([]);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [touched, setTouched] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [comingSoon, setComingSoon] = useState<string | null>(null);
-  const [mapsReady, setMapsReady] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY ?? "";
 
-  // Load Maps SDK once
+  // Close on outside click
   useEffect(() => {
-    if (!apiKey) return;
-    loadPlaces(apiKey).then(() => setMapsReady(true));
-  }, [apiKey]);
-
-  // Close dropdown on outside click
-  useEffect(() => {
-    function handle(e: MouseEvent) {
+    function onPointerDown(e: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setOpen(false);
       }
     }
-    document.addEventListener("mousedown", handle);
-    return () => document.removeEventListener("mousedown", handle);
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
   }, []);
 
-  const fetchPredictions = useCallback(
-    (input: string) => {
-      if (!mapsReady || !autocompleteService || input.length < 3) {
-        setPredictions([]);
-        return;
-      }
-      autocompleteService.getPlacePredictions(
-        {
-          input,
-          componentRestrictions: { country: "ng" },
-          types: ["geocode", "establishment"],
-        },
-        (results, status) => {
-          if (status === google.maps.places.PlacesServiceStatus.OK && results) {
-            setPredictions(
-              results.map((r) => ({ description: r.description, placeId: r.place_id }))
-            );
-            setOpen(true);
-          } else {
-            setPredictions([]);
-          }
-        }
-      );
-    },
-    [mapsReady]
-  );
+  const search = useCallback(async (q: string) => {
+    if (q.trim().length < 4) { setSuggestions([]); return; }
+    setLoading(true);
+    try {
+      const results = await fetchSuggestions(q);
+      setSuggestions(results);
+      setOpen(results.length > 0);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   function handleInput(val: string) {
     setQuery(val);
@@ -95,16 +83,17 @@ export default function Step03Address({ data, patch, onNext, onBack }: Props) {
     setError(null);
     setComingSoon(null);
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => fetchPredictions(val), 320);
+    // Nominatim ask to not send more than 1 req/s — 600ms debounce is safe
+    debounceRef.current = setTimeout(() => search(val), 600);
   }
 
-  function selectPrediction(desc: string) {
-    setQuery(desc);
-    patch({ address: desc });
-    setPredictions([]);
+  function selectSuggestion(name: string) {
+    setQuery(name);
+    patch({ address: name });
+    setSuggestions([]);
     setOpen(false);
     setTouched(true);
-    runValidation(desc);
+    runValidation(name);
   }
 
   function runValidation(val: string): boolean {
@@ -131,7 +120,7 @@ export default function Step03Address({ data, patch, onNext, onBack }: Props) {
   }
 
   const addressOk =
-    touched && !error && !comingSoon && validateAddress(query.trim()).ok;
+    touched && !error && !comingSoon && query.trim().length >= 8 && validateAddress(query.trim()).ok;
 
   return (
     <div className="max-w-lg mx-auto px-4 pt-6 pb-4">
@@ -162,60 +151,62 @@ export default function Step03Address({ data, patch, onNext, onBack }: Props) {
             value={query}
             onChange={(e) => handleInput(e.target.value)}
             onBlur={() => {
-              setTimeout(() => setOpen(false), 150);
+              // small delay so clicking a suggestion fires first
+              setTimeout(() => setOpen(false), 180);
               setTouched(true);
               if (query.trim().length >= 8) runValidation(query);
             }}
-            onFocus={() => predictions.length > 0 && setOpen(true)}
-            className={[
-              "input w-full pr-10",
-              error ? "input-error" : "",
-            ]
-              .filter(Boolean)
-              .join(" ")}
+            onFocus={() => suggestions.length > 0 && setOpen(true)}
+            className={["input w-full pr-10", error ? "input-error" : ""].filter(Boolean).join(" ")}
           />
 
-          {/* Icon slot */}
+          {/* Pin icon / spinner */}
           <span className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-            {!mapsReady && apiKey ? (
-              <Spinner size="xs" />
+            {loading ? (
+              <span className="loading loading-spinner loading-xs" style={{ color: "var(--klova-primary)" }} />
             ) : (
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}
-                style={{ color: "var(--text-subtle)" }}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={1.5}
+                style={{ color: "var(--text-subtle)" }}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
             )}
           </span>
         </div>
 
-        {/* Dropdown */}
-        {open && predictions.length > 0 && (
+        {/* Suggestions dropdown */}
+        {open && suggestions.length > 0 && (
           <ul
             role="listbox"
-            className="absolute z-50 w-full mt-1 rounded-xl border overflow-hidden"
+            className="absolute z-50 w-full mt-1 rounded-xl overflow-hidden border"
             style={{
               background: "var(--surface-card)",
               borderColor: "var(--border-default)",
               boxShadow: "var(--shadow-lg)",
             }}
           >
-            {predictions.map((p) => (
+            {suggestions.map((s) => (
               <li
-                key={p.placeId}
+                key={s.placeId}
                 role="option"
-                aria-selected={query === p.description}
+                aria-selected={query === s.displayName}
                 onMouseDown={(e) => {
                   e.preventDefault();
-                  selectPrediction(p.description);
+                  selectSuggestion(s.displayName);
                 }}
                 className="flex items-start gap-3 px-4 py-3 cursor-pointer text-sm transition-colors"
                 style={{ borderBottom: "1px solid var(--border-default)" }}
                 onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLElement).style.background = "var(--surface-section)";
+                  (e.currentTarget as HTMLLIElement).style.background = "var(--surface-section)";
                 }}
                 onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLElement).style.background = "transparent";
+                  (e.currentTarget as HTMLLIElement).style.background = "transparent";
                 }}
               >
                 <svg
@@ -226,32 +217,28 @@ export default function Step03Address({ data, patch, onNext, onBack }: Props) {
                   strokeWidth={1.5}
                   style={{ color: "var(--text-subtle)" }}
                 >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
-                <span style={{ color: "var(--text-body)" }}>{p.description}</span>
+                <span style={{ color: "var(--text-body)" }}>{s.displayName}</span>
               </li>
             ))}
             <li
               className="px-4 py-2 text-xs text-right"
-              style={{ color: "var(--text-subtle)", background: "var(--surface-section)" }}
+              style={{
+                color: "var(--text-subtle)",
+                background: "var(--surface-section)",
+              }}
             >
-              Powered by Google
+              © OpenStreetMap contributors
             </li>
           </ul>
-        )}
-
-        {/* No-API fallback hint */}
-        {!apiKey && (
-          <p className="text-xs mt-1.5" style={{ color: "var(--text-subtle)" }}>
-            Add <code className="text-xs bg-base-200 px-1 rounded">NEXT_PUBLIC_GOOGLE_MAPS_KEY</code> to enable address suggestions.
-          </p>
         )}
 
         {/* Validation messages */}
         {error && !comingSoon && (
           <p className="text-xs mt-1.5 text-error flex items-center gap-1">
-            <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+            <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
             {error}
@@ -263,7 +250,7 @@ export default function Step03Address({ data, patch, onNext, onBack }: Props) {
         <Alert variant="warning" className="mb-4">
           <p className="font-medium">{comingSoon} isn&apos;t covered yet</p>
           <p className="mt-0.5 text-xs">
-            We&apos;re launching there soon — we&apos;ll send you an SMS the moment we go live.
+            We&apos;re launching there soon. Leave your number and we&apos;ll SMS you when we go live.
           </p>
         </Alert>
       )}
@@ -274,15 +261,15 @@ export default function Step03Address({ data, patch, onNext, onBack }: Props) {
         </Alert>
       )}
 
-      {/* Zone grid */}
-      <div
-        className="rounded-xl p-4 text-sm"
-        style={{ background: "var(--surface-section)" }}
-      >
-        <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: "var(--text-subtle)" }}>
+      {/* Zone coverage grid */}
+      <div className="rounded-xl p-4" style={{ background: "var(--surface-section)" }}>
+        <p
+          className="text-xs font-semibold uppercase tracking-wider mb-3"
+          style={{ color: "var(--text-subtle)" }}
+        >
           Where we operate
         </p>
-        <div className="grid grid-cols-2 gap-y-2">
+        <div className="grid grid-cols-2 gap-y-2 text-xs">
           {[
             { name: "Lekki", active: true },
             { name: "Ajah", active: true },
@@ -295,8 +282,9 @@ export default function Step03Address({ data, patch, onNext, onBack }: Props) {
                 className="w-2 h-2 rounded-full shrink-0"
                 style={{ background: active ? "var(--klova-success)" : "var(--border-strong)" }}
               />
-              <span className="text-xs" style={{ color: active ? "var(--text-body)" : "var(--text-subtle)" }}>
-                {name}{!active && <span className="ml-1 opacity-60">· soon</span>}
+              <span style={{ color: active ? "var(--text-body)" : "var(--text-subtle)" }}>
+                {name}
+                {!active && <span className="ml-1 opacity-60">· soon</span>}
               </span>
             </div>
           ))}
