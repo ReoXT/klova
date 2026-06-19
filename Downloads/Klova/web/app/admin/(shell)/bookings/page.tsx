@@ -489,9 +489,7 @@ function BookingDetail({
       const d = await r.json();
       if (!r.ok) throw new Error(d.error ?? "Failed");
       setConfirmIsError(false);
-      setConfirmMsg(
-        d.smsSent ? "Confirmed — SMS sent to customer." : "Confirmed. (SMS skipped — Termii not configured.)",
-      );
+      setConfirmMsg("Confirmed — n8n notification triggered.");
       await onUpdated(b.id);
     } catch (err) {
       setConfirmIsError(true);

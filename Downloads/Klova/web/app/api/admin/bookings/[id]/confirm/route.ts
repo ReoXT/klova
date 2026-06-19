@@ -1,7 +1,6 @@
 import { type NextRequest } from "next/server";
 import { verifyAdmin } from "@/app/api/admin/_auth";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { sendAdminSms } from "@/lib/termii";
 
 const CONFIRMABLE = ["matched", "paid", "confirmed"];
 
@@ -17,12 +16,7 @@ export async function POST(
 
   const { data: booking, error } = await admin
     .from("bookings")
-    .select(`
-      id, status, booking_date, address,
-      customer:customers(first_name, last_name, phone),
-      cleaner:cleaners(first_name),
-      service:services(name)
-    `)
+    .select("id, status")
     .eq("id", id)
     .single();
 
@@ -37,7 +31,7 @@ export async function POST(
     );
   }
 
-  // Flip to confirmed if not already there
+  // Flip to confirmed — n8n workflow picks this up and sends the customer email
   if (booking.status !== "confirmed") {
     const { error: updateErr } = await admin
       .from("bookings")
@@ -49,28 +43,5 @@ export async function POST(
     }
   }
 
-  // Send customer dispatch SMS (best-effort — never blocks the action)
-  const customer = booking.customer as unknown as {
-    first_name: string;
-    last_name: string;
-    phone: string;
-  } | null;
-  const cleaner = booking.cleaner as unknown as { first_name: string } | null;
-  const service = booking.service as unknown as { name: string } | null;
-
-  let smsSent = false;
-  if (customer && cleaner && service) {
-    const date = new Date((booking.booking_date as string) + "T00:00:00").toLocaleDateString(
-      "en-NG",
-      { weekday: "long", day: "numeric", month: "long", timeZone: "Africa/Lagos" },
-    );
-    const message =
-      `Hi ${customer.first_name}! Your Klova booking is confirmed. ` +
-      `${cleaner.first_name} will be with you on ${date} for your ${service.name}. ` +
-      `Questions? WhatsApp us on +234 800 000 0000.`;
-
-    smsSent = await sendAdminSms(customer.phone, message);
-  }
-
-  return Response.json({ success: true, smsSent });
+  return Response.json({ success: true });
 }
