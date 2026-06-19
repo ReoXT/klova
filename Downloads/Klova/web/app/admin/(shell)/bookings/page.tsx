@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, type ReactNode } from "react";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Spinner } from "@/components/ui/Skeleton";
+import { Button } from "@/components/ui/Button";
 import {
   BookingStatusBadge,
   type BookingStatus,
@@ -47,6 +48,17 @@ type Booking = {
 };
 
 type Zone = { id: string; name: string; slug: string; is_active: boolean };
+
+type AvailableCleaner = {
+  id: string;
+  first_name: string;
+  last_name: string;
+  phone: string;
+  photo_url: string | null;
+  nin_verified: boolean;
+  rating: number | null;
+  total_jobs: number;
+};
 
 /* ── Constants ──────────────────────────────────────────────── */
 
@@ -138,6 +150,19 @@ export default function AdminBookingsPage() {
     fetchBookings();
   }, [fetchBookings]);
 
+  async function refreshSelected(id: string) {
+    try {
+      const r = await fetch(`/api/admin/bookings/${id}`);
+      const d = await r.json();
+      if (r.ok && d.booking) {
+        setSelected(d.booking);
+        setBookings((prev) =>
+          prev.map((b) => (b.id === id ? d.booking : b)),
+        );
+      }
+    } catch {}
+  }
+
   function handleStatusChange(s: string | null) {
     setStatus(s);
     setPage(1);
@@ -161,7 +186,10 @@ export default function AdminBookingsPage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-5">
           <div>
-            <h1 className="text-2xl font-semibold" style={{ color: "var(--text-strong)" }}>
+            <h1
+              className="text-2xl font-semibold"
+              style={{ color: "var(--text-strong)" }}
+            >
               Bookings
             </h1>
             <p className="text-sm mt-0.5" style={{ color: "var(--text-muted)" }}>
@@ -220,10 +248,7 @@ export default function AdminBookingsPage() {
           ) : fetchError ? (
             <div className="flex flex-col items-center py-24 gap-3">
               <p className="text-sm text-error">{fetchError}</p>
-              <button
-                onClick={fetchBookings}
-                className="btn btn-sm btn-ghost"
-              >
+              <button onClick={fetchBookings} className="btn btn-sm btn-ghost">
                 Retry
               </button>
             </div>
@@ -272,9 +297,7 @@ export default function AdminBookingsPage() {
                         onClick={() => toggleSelected(b)}
                         className={[
                           "cursor-pointer transition-colors",
-                          isSelected
-                            ? "bg-primary/5"
-                            : "hover:bg-base-200/60",
+                          isSelected ? "bg-primary/5" : "hover:bg-base-200/60",
                         ].join(" ")}
                       >
                         <td>
@@ -400,6 +423,7 @@ export default function AdminBookingsPage() {
           <BookingDetail
             booking={selected}
             onClose={() => setSelected(null)}
+            onUpdated={refreshSelected}
           />
         </div>
       )}
@@ -412,10 +436,111 @@ export default function AdminBookingsPage() {
 function BookingDetail({
   booking: b,
   onClose,
+  onUpdated,
 }: {
   booking: Booking;
   onClose: () => void;
+  onUpdated: (id: string) => Promise<void>;
 }) {
+  const [confirming, setConfirming] = useState(false);
+  const [confirmMsg, setConfirmMsg] = useState<string | null>(null);
+  const [confirmIsError, setConfirmIsError] = useState(false);
+
+  const [availableCleaners, setAvailableCleaners] = useState<AvailableCleaner[]>([]);
+  const [loadingCleaners, setLoadingCleaners] = useState(false);
+  const [selectedNewCleaner, setSelectedNewCleaner] = useState("");
+  const [reassigning, setReassigning] = useState(false);
+  const [reassignMsg, setReassignMsg] = useState<string | null>(null);
+  const [reassignIsError, setReassignIsError] = useState(false);
+
+  const canConfirmDispatch =
+    b.cleaner !== null &&
+    ["matched", "paid", "confirmed"].includes(b.status);
+
+  const canReassign = !["completed", "cancelled"].includes(b.status);
+
+  // Fetch available cleaners whenever this booking is shown and reassign is relevant
+  useEffect(() => {
+    if (!canReassign) return;
+    setLoadingCleaners(true);
+    setAvailableCleaners([]);
+    setSelectedNewCleaner("");
+    fetch(`/api/admin/bookings/${b.id}/available-cleaners`)
+      .then((r) => r.json())
+      .then((d) => setAvailableCleaners(d.cleaners ?? []))
+      .catch(() => {})
+      .finally(() => setLoadingCleaners(false));
+  }, [b.id, canReassign]);
+
+  async function handleConfirmDispatch() {
+    const label =
+      b.status === "confirmed"
+        ? "Resend the dispatch SMS to the customer?"
+        : `Confirm dispatch — flip status to Confirmed and send "${b.customer.first_name}" the you're-all-set SMS?`;
+
+    if (!window.confirm(label)) return;
+
+    setConfirming(true);
+    setConfirmMsg(null);
+    try {
+      const r = await fetch(`/api/admin/bookings/${b.id}/confirm`, {
+        method: "POST",
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error ?? "Failed");
+      setConfirmIsError(false);
+      setConfirmMsg(
+        d.smsSent ? "Confirmed — SMS sent to customer." : "Confirmed. (SMS skipped — Termii not configured.)",
+      );
+      await onUpdated(b.id);
+    } catch (err) {
+      setConfirmIsError(true);
+      setConfirmMsg(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setConfirming(false);
+    }
+  }
+
+  async function handleReassign() {
+    if (!selectedNewCleaner) return;
+    const newCleaner = availableCleaners.find((c) => c.id === selectedNewCleaner);
+    if (!newCleaner) return;
+
+    const prev = b.cleaner
+      ? `${b.cleaner.first_name} ${b.cleaner.last_name}`
+      : "no one";
+
+    if (
+      !window.confirm(
+        `Reassign from ${prev} → ${newCleaner.first_name} ${newCleaner.last_name}?\n\nThe current cleaner's availability slot will be freed and the new cleaner's slot will be booked.`,
+      )
+    )
+      return;
+
+    setReassigning(true);
+    setReassignMsg(null);
+    try {
+      const r = await fetch(`/api/admin/bookings/${b.id}/reassign`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ new_cleaner_id: selectedNewCleaner }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error ?? "Failed");
+      setReassignIsError(false);
+      setReassignMsg(
+        `Reassigned to ${newCleaner.first_name} ${newCleaner.last_name}.`,
+      );
+      setSelectedNewCleaner("");
+      await onUpdated(b.id);
+    } catch (err) {
+      setReassignIsError(true);
+      setReassignMsg(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setReassigning(false);
+    }
+  }
+
   return (
     <div className="p-5">
       {/* Header */}
@@ -439,9 +564,107 @@ function BookingDetail({
       </div>
 
       <div className="divide-y divide-base-200">
+        {/* ── Actions ───────────────────────────────────────── */}
+        {(canConfirmDispatch || canReassign) && (
+          <Section label="Actions">
+            <div className="space-y-4">
+              {/* Confirm dispatch */}
+              {canConfirmDispatch && (
+                <div className="space-y-2">
+                  <Button
+                    size="sm"
+                    variant={b.status === "confirmed" ? "secondary" : "primary"}
+                    wide
+                    loading={confirming}
+                    onClick={handleConfirmDispatch}
+                  >
+                    {b.status === "confirmed"
+                      ? "Resend dispatch SMS"
+                      : "Confirm dispatch"}
+                  </Button>
+                  {confirmMsg && (
+                    <p
+                      className={`text-xs ${confirmIsError ? "text-error" : "text-success"}`}
+                    >
+                      {confirmMsg}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Reassign cleaner */}
+              {canReassign && (
+                <div className="space-y-2">
+                  <p
+                    className="text-xs font-medium"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    Reassign cleaner
+                  </p>
+                  {loadingCleaners ? (
+                    <div className="flex items-center gap-2">
+                      <Spinner size="xs" />
+                      <span
+                        className="text-xs"
+                        style={{ color: "var(--text-muted)" }}
+                      >
+                        Finding available cleaners…
+                      </span>
+                    </div>
+                  ) : availableCleaners.length === 0 ? (
+                    <p className="text-xs" style={{ color: "var(--text-subtle)" }}>
+                      No other active cleaners available for{" "}
+                      {formatDate(b.booking_date)} in {b.zone.name}.
+                    </p>
+                  ) : (
+                    <>
+                      <select
+                        value={selectedNewCleaner}
+                        onChange={(e) => setSelectedNewCleaner(e.target.value)}
+                        className="select select-sm w-full"
+                      >
+                        <option value="">Select cleaner…</option>
+                        {availableCleaners.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.first_name} {c.last_name}
+                            {c.rating != null
+                              ? ` · ★ ${Number(c.rating).toFixed(1)}`
+                              : ""}
+                            {` · ${c.total_jobs} jobs`}
+                          </option>
+                        ))}
+                      </select>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        wide
+                        loading={reassigning}
+                        disabled={!selectedNewCleaner}
+                        onClick={handleReassign}
+                      >
+                        Reassign
+                      </Button>
+                    </>
+                  )}
+                  {reassignMsg && (
+                    <p
+                      className={`text-xs ${reassignIsError ? "text-error" : "text-success"}`}
+                    >
+                      {reassignMsg}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          </Section>
+        )}
+
         {/* Customer */}
         <Section label="Customer">
-          <p className="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
+          <p
+            className="text-sm font-medium"
+            style={{ color: "var(--text-strong)" }}
+          >
             {b.customer.first_name} {b.customer.last_name}
           </p>
           <p className="text-sm mt-0.5" style={{ color: "var(--text-body)" }}>
@@ -456,7 +679,10 @@ function BookingDetail({
 
         {/* Service */}
         <Section label="Service">
-          <p className="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
+          <p
+            className="text-sm font-medium"
+            style={{ color: "var(--text-strong)" }}
+          >
             {b.service.name} · {formatBedrooms(b.bedrooms)}
           </p>
           <p className="text-sm mt-0.5" style={{ color: "var(--text-body)" }}>
@@ -523,7 +749,10 @@ function BookingDetail({
                     </span>
                   )}
                 </p>
-                <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
+                <p
+                  className="text-xs mt-0.5"
+                  style={{ color: "var(--text-muted)" }}
+                >
                   {b.cleaner.phone}
                   {b.cleaner.rating != null &&
                     ` · ★ ${Number(b.cleaner.rating).toFixed(1)}`}
@@ -552,7 +781,10 @@ function BookingDetail({
               </Row>
             )}
             <Row label="Total">
-              <span className="font-semibold" style={{ color: "var(--text-strong)" }}>
+              <span
+                className="font-semibold"
+                style={{ color: "var(--text-strong)" }}
+              >
                 {formatNGN(b.total_amount_kobo)}
               </span>
             </Row>
@@ -598,7 +830,7 @@ function BookingDetail({
   );
 }
 
-/* ── Small helpers ──────────────────────────────────────────── */
+/* ── Small layout helpers ───────────────────────────────────── */
 
 function Section({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -614,13 +846,7 @@ function Section({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function Row({
-  label,
-  children,
-}: {
-  label: string;
-  children: ReactNode;
-}) {
+function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex justify-between items-baseline gap-4 text-sm">
       <dt style={{ color: "var(--text-muted)" }}>{label}</dt>
@@ -631,12 +857,7 @@ function Row({
 
 function ClipboardIcon() {
   return (
-    <svg
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      strokeWidth={1.5}
-    >
+    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
       <path
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -655,11 +876,7 @@ function XIcon() {
       stroke="currentColor"
       strokeWidth={2}
     >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M6 18 18 6M6 6l12 12"
-      />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
     </svg>
   );
 }
