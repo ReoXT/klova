@@ -11,10 +11,11 @@ export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const from = searchParams.get("from") ?? "2020-01-01";
   const to   = searchParams.get("to")   ?? new Date().toISOString().split("T")[0];
+  const mode = searchParams.get("mode") === "services" ? "services" : "cash";
 
   const admin = createAdminClient();
 
-  const { data, error } = await admin
+  let query = admin
     .from("bookings")
     .select(`
       total_amount_kobo, commission_kobo,
@@ -22,9 +23,17 @@ export async function GET(request: NextRequest) {
       service:services(name),
       zone:zones(name)
     `)
-    .in("status", PAID_STATUSES)
-    .gte("booking_date", from)
-    .lte("booking_date", to);
+    .in("status", PAID_STATUSES);
+
+  if (mode === "cash") {
+    // Filter by when payment was received (Paystack webhook timestamp)
+    query = query.gte("confirmed_at", from).lte("confirmed_at", `${to}T23:59:59Z`).not("confirmed_at", "is", null);
+  } else {
+    // Filter by when the service is scheduled
+    query = query.gte("booking_date", from).lte("booking_date", to);
+  }
+
+  const { data, error } = await query;
 
   if (error) return Response.json({ error: "Database error" }, { status: 500 });
 
@@ -95,5 +104,5 @@ export async function GET(request: NextRequest) {
     .map(([name, v]) => ({ name, ...v }))
     .sort((a, b) => b.gross_kobo - a.gross_kobo);
 
-  return Response.json({ summary, by_service, by_zone, from, to });
+  return Response.json({ summary, by_service, by_zone, from, to, mode });
 }

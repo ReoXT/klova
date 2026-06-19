@@ -28,6 +28,7 @@ interface RevenueData {
   by_zone: BreakdownRow[];
   from: string;
   to: string;
+  mode: "cash" | "services";
 }
 
 /* ── Helpers ────────────────────────────────────────────────────────── */
@@ -236,14 +237,15 @@ export default function AdminRevenuePage() {
   const [from, setFrom]             = useState(monthStart);
   const [to,   setTo]               = useState(today);
   const [activePreset, setPreset]   = useState<number>(0);
+  const [mode, setMode]             = useState<"cash" | "services">("cash");
   const [data,    setData]          = useState<RevenueData | null>(null);
   const [loading, setLoading]       = useState(true);
   const [error,   setError]         = useState<string | null>(null);
 
-  const load = useCallback((f: string, t: string) => {
+  const load = useCallback((f: string, t: string, m: "cash" | "services") => {
     setLoading(true);
     setError(null);
-    fetch(`/api/admin/revenue?from=${f}&to=${t}`)
+    fetch(`/api/admin/revenue?from=${f}&to=${t}&mode=${m}`)
       .then((r) => r.json())
       .then((d) => {
         if (d.error) throw new Error(d.error);
@@ -253,14 +255,15 @@ export default function AdminRevenuePage() {
       .finally(() => setLoading(false));
   }, []);
 
-  useEffect(() => { load(from, to); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(from, to, mode); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function applyPreset(idx: number) {
     const p = PRESETS[idx];
     const f = p.from(); const t = p.to();
-    setPreset(idx); setFrom(f); setTo(t); load(f, t);
+    setPreset(idx); setFrom(f); setTo(t); load(f, t, mode);
   }
-  function applyCustom() { setPreset(-1); load(from, to); }
+  function applyCustom() { setPreset(-1); load(from, to, mode); }
+  function switchMode(m: "cash" | "services") { setMode(m); load(from, to, m); }
 
   const s = data?.summary;
   // Cleaning commission = what's stored minus the insurance portion (already stored exactly)
@@ -283,6 +286,24 @@ export default function AdminRevenuePage() {
           </svg>
           Print / screenshot
         </button>
+      </div>
+
+      {/* Mode toggle */}
+      <div className="flex items-center gap-1 p-1 rounded-xl w-fit" style={{ background: "var(--color-base-200)" }}>
+        {(["cash", "services"] as const).map((m) => (
+          <button
+            key={m}
+            onClick={() => switchMode(m)}
+            className="px-4 py-1.5 rounded-lg text-sm font-medium transition-all"
+            style={
+              mode === m
+                ? { background: "var(--surface-card)", color: "var(--text-strong)", boxShadow: "var(--shadow-sm)" }
+                : { background: "transparent", color: "var(--text-muted)" }
+            }
+          >
+            {m === "cash" ? "Cash received" : "Services performed"}
+          </button>
+        ))}
       </div>
 
       {/* Date controls */}
@@ -330,7 +351,7 @@ export default function AdminRevenuePage() {
       ) : data ? (
         <>
           <p className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>
-            Showing: {fmtRange(data.from, data.to)}
+            {mode === "cash" ? "Cash received" : "Services performed"}: {fmtRange(data.from, data.to)}
           </p>
 
           {/* Top KPIs */}

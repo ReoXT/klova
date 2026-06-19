@@ -6,6 +6,7 @@ import {
   notifyAdminPaidBooking,
   notifyCleanerNewJob,
 } from '../services/notificationService';
+import { handleTransferWebhook } from '../services/payoutService';
 
 // ─── Signature verification ───────────────────────────────────────────────────
 
@@ -29,6 +30,16 @@ interface PaystackChargeSuccess {
     status: string;
     amount: number;
     customer: { email: string };
+  };
+}
+
+interface PaystackTransferEvent {
+  event: 'transfer.success' | 'transfer.failed' | 'transfer.reversed';
+  data: {
+    reference: string;
+    transfer_code: string;
+    status: string;
+    reason?: string;
   };
 }
 
@@ -56,27 +67,34 @@ export async function postPaystackWebhook(req: Request, res: Response): Promise<
     return;
   }
 
-  // Only handle charge.success — return 200 for everything else
-  if (payload.event !== 'charge.success') {
-    res.sendStatus(200);
+  if (payload.event === 'charge.success') {
+    const event = payload as unknown as PaystackChargeSuccess;
+    const { reference } = event.data;
+    if (!reference) { res.sendStatus(200); return; }
+    try {
+      await processChargeSuccess(reference);
+      res.sendStatus(200);
+    } catch (err) {
+      console.error('[webhook] Unhandled processing error:', err);
+      res.sendStatus(500);
+    }
     return;
   }
 
-  const event = payload as unknown as PaystackChargeSuccess;
-  const { reference } = event.data;
-
-  if (!reference) {
-    res.sendStatus(200);
+  if (['transfer.success', 'transfer.failed', 'transfer.reversed'].includes(payload.event)) {
+    const event = payload as unknown as PaystackTransferEvent;
+    try {
+      await handleTransferWebhook(event.event as PaystackTransferEvent['event'], event.data);
+      res.sendStatus(200);
+    } catch (err) {
+      console.error('[webhook] Transfer event error:', err);
+      res.sendStatus(500);
+    }
     return;
   }
 
-  try {
-    await processChargeSuccess(reference);
-    res.sendStatus(200);
-  } catch (err) {
-    console.error('[webhook] Unhandled processing error:', err);
-    res.sendStatus(500);
-  }
+  // All other events — acknowledge and ignore
+  res.sendStatus(200);
 }
 
 // ─── Core processing ──────────────────────────────────────────────────────────
@@ -86,7 +104,7 @@ async function processChargeSuccess(reference: string): Promise<void> {
   // The cleaner was already assigned at booking creation — payment just confirms it.
   const { data: claimed, error: claimErr } = await supabase
     .from('bookings')
-    .update({ status: 'confirmed' })
+    .update({ status: 'confirmed', confirmed_at: new Date().toISOString() })
     .eq('paystack_reference', reference)
     .eq('status', 'matched')
     .select('id');

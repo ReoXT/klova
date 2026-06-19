@@ -35,11 +35,42 @@ type FormState = {
   status: "active" | "inactive" | "suspended";
 };
 
+type BankFormState = {
+  account_name: string;
+  account_number: string;
+  bank_code: string;
+  bank_name: string;
+};
+
 const BLANK_FORM: FormState = {
   first_name: "", last_name: "", phone: "",
   zone_id: "", address: "",
   nin_verified: false, status: "active",
 };
+
+const BLANK_BANK: BankFormState = {
+  account_name: "", account_number: "", bank_code: "", bank_name: "",
+};
+
+const NIGERIAN_BANKS = [
+  { code: "011", name: "First Bank of Nigeria" },
+  { code: "033", name: "United Bank for Africa (UBA)" },
+  { code: "044", name: "Access Bank" },
+  { code: "050", name: "EcoBank Nigeria" },
+  { code: "057", name: "Zenith Bank" },
+  { code: "058", name: "Guaranty Trust Bank (GTB)" },
+  { code: "070", name: "Fidelity Bank" },
+  { code: "076", name: "Polaris Bank" },
+  { code: "082", name: "Keystone Bank" },
+  { code: "221", name: "Stanbic IBTC Bank" },
+  { code: "232", name: "Sterling Bank" },
+  { code: "032", name: "Union Bank of Nigeria" },
+  { code: "035", name: "Wema Bank" },
+  { code: "50211", name: "Kuda Microfinance Bank" },
+  { code: "100004", name: "Opay (OPay Digital Services)" },
+  { code: "100033", name: "PalmPay" },
+  { code: "50515", name: "Moniepoint Microfinance Bank" },
+];
 
 const STATUS_META: Record<string, { label: string; badge: string; note: string }> = {
   active:    { label: "Active",    badge: "badge-success", note: "Cleaner is matchable and will receive new bookings." },
@@ -219,12 +250,48 @@ function CleanerPanel({
           status: cleaner.status }
       : BLANK_FORM,
   );
+  const [bankForm, setBankForm]         = useState<BankFormState>(BLANK_BANK);
+  const [bankLoaded, setBankLoaded]     = useState(false);
   const [photoFile, setPhotoFile]       = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [saving, setSaving]             = useState(false);
   const [saveError, setSaveError]       = useState<string | null>(null);
   const [fieldErrors, setFieldErrors]   = useState<Record<string, string>>({});
+  const [bankErrors, setBankErrors]     = useState<Record<string, string>>({});
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Load existing bank account when editing
+  useEffect(() => {
+    if (mode === "edit" && cleaner) {
+      fetch(`/api/admin/cleaners/${cleaner.id}/bank-account`)
+        .then((r) => r.json())
+        .then((d) => {
+          if (d.bank_account) {
+            setBankForm({
+              account_name:   d.bank_account.account_name,
+              account_number: d.bank_account.account_number,
+              bank_code:      d.bank_account.bank_code,
+              bank_name:      d.bank_account.bank_name,
+            });
+          }
+          setBankLoaded(true);
+        })
+        .catch(() => setBankLoaded(true));
+    } else {
+      setBankLoaded(true);
+    }
+  }, [mode, cleaner]);
+
+  function setBankField<K extends keyof BankFormState>(k: K, v: BankFormState[K]) {
+    setBankForm((f) => ({ ...f, [k]: v }));
+    setBankErrors((e) => { const n = { ...e }; delete n[k]; return n; });
+  }
+
+  function onBankSelect(code: string) {
+    const bank = NIGERIAN_BANKS.find((b) => b.code === code);
+    setBankForm((f) => ({ ...f, bank_code: code, bank_name: bank?.name ?? "" }));
+    setBankErrors((e) => { const n = { ...e }; delete n.bank_code; return n; });
+  }
 
   function setField<K extends keyof FormState>(k: K, v: FormState[K]) {
     setForm((f) => ({ ...f, [k]: v }));
@@ -281,6 +348,19 @@ function CleanerPanel({
       const d = await r.json();
       if (r.status === 422 && d.errors) { setFieldErrors(d.errors); return; }
       if (!r.ok) throw new Error(d.error ?? "Unknown error");
+
+      // Save bank account in parallel (edit mode only, if any field filled)
+      if (mode === "edit" && (bankForm.account_number || bankForm.bank_code || bankForm.account_name)) {
+        const hasBankErrors = !bankForm.account_name.trim() || !/^\d{10}$/.test(bankForm.account_number) || !bankForm.bank_code;
+        if (!hasBankErrors) {
+          await fetch(`/api/admin/cleaners/${d.cleaner.id}/bank-account`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(bankForm),
+          });
+        }
+      }
+
       onSaved(d.cleaner);
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : "Something went wrong");
@@ -383,6 +463,55 @@ function CleanerPanel({
             <input type="checkbox" className="toggle toggle-success toggle-sm"
               checked={form.nin_verified} onChange={(e) => setField("nin_verified", e.target.checked)} />
           </div>
+
+          {/* Bank account — edit mode only */}
+          {mode === "edit" && bankLoaded && (
+            <div className="flex flex-col gap-3 pt-2 mt-1 border-t" style={{ borderColor: "var(--border-subtle)" }}>
+              <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
+                Bank account (for payouts)
+              </p>
+
+              <PanelField label="Account name" error={bankErrors.account_name}>
+                <input
+                  className={`input input-bordered w-full text-sm${bankErrors.account_name ? " input-error" : ""}`}
+                  value={bankForm.account_name}
+                  onChange={(e) => setBankField("account_name", e.target.value)}
+                  placeholder="As it appears on the account"
+                />
+              </PanelField>
+
+              <PanelField label="Bank" error={bankErrors.bank_code}>
+                <select
+                  className={`select select-bordered w-full text-sm${bankErrors.bank_code ? " select-error" : ""}`}
+                  value={bankForm.bank_code}
+                  onChange={(e) => onBankSelect(e.target.value)}
+                >
+                  <option value="">Select bank</option>
+                  {NIGERIAN_BANKS.map((b) => (
+                    <option key={b.code} value={b.code}>{b.name}</option>
+                  ))}
+                </select>
+              </PanelField>
+
+              <PanelField label="Account number (10 digits)" error={bankErrors.account_number}>
+                <input
+                  className={`input input-bordered w-full text-sm font-mono${bankErrors.account_number ? " input-error" : ""}`}
+                  value={bankForm.account_number}
+                  onChange={(e) => setBankField("account_number", e.target.value.replace(/\D/g, "").slice(0, 10))}
+                  placeholder="0123456789"
+                  maxLength={10}
+                />
+              </PanelField>
+
+              {bankForm.bank_code && bankForm.account_number.length === 10 && bankForm.account_name && (
+                <div className="rounded-xl px-3 py-2.5 text-xs" style={{ background: "oklch(0.97 0.01 145)", border: "1px solid oklch(0.85 0.06 145)" }}>
+                  <p style={{ color: "oklch(0.4 0.1 145)" }}>
+                    ✓ {bankForm.account_name} · {NIGERIAN_BANKS.find((b) => b.code === bankForm.bank_code)?.name ?? bankForm.bank_code} · ****{bankForm.account_number.slice(-4)}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
           {saveError && (
             <div className="alert alert-soft alert-error text-sm py-2">{saveError}</div>
