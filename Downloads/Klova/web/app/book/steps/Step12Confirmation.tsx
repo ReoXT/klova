@@ -95,7 +95,7 @@ export default function Step12Confirmation({ data, price }: Props) {
               </svg>
             </div>
             <div>
-              <p className="font-semibold text-sm" style={{ color: "var(--text-strong)" }}>NIN Verified Keeper</p>
+              <p className="font-semibold text-sm" style={{ color: "var(--text-strong)" }}>Verified Keeper</p>
               <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
                 Full details sent to {data.email || "your email"}
               </p>
@@ -107,7 +107,7 @@ export default function Step12Confirmation({ data, price }: Props) {
 
       {/* Reminder */}
       <Alert variant="warning" title="Before your keeper arrives" className="mb-6">
-        Please have a broom, mop, bin liners, cleaning sprays and gloves ready at home — your keeper brings no equipment.
+        Please have a broom, mop, bin liners, cleaning sprays and gloves ready at home, your keeper brings no equipment.
       </Alert>
 
       <div className="flex flex-col gap-3">

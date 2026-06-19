@@ -282,7 +282,7 @@ export default function Step10Checkout({ data, patch, price, onSubmit, submitSta
             </h2>
 
             <p className="text-sm mb-3" style={{ color: "var(--text-body)" }}>
-              Klova Keepers are NIN-verified and thoroughly vetted — but life is unpredictable. For just{" "}
+              Klova Keepers are thoroughly vetted and background-checked — but life is unpredictable. For just{" "}
               <strong>{formatNGN(INSURANCE_FEE)}</strong> per visit, booking insurance protects you for
               stolen or damaged items up to <strong>₦200,000</strong>.
             </p>
@@ -313,7 +313,7 @@ export default function Step10Checkout({ data, patch, price, onSubmit, submitSta
                 <p className="font-semibold mb-2" style={{ color: "var(--text-strong)" }}>Covered</p>
                 <ul className="list-disc list-inside space-y-1 mb-3">
                   <li>Accidental breakage of household items by your keeper</li>
-                  <li>Theft by a Klova Keeper (verified via NIN + investigation)</li>
+                  <li>Theft by a Klova Keeper (background-verified and investigated)</li>
                   <li>Damage to furniture or fixtures during the clean</li>
                 </ul>
                 <p className="font-semibold mb-2" style={{ color: "var(--text-strong)" }}>Not covered</p>

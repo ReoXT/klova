@@ -741,7 +741,7 @@ function BookingDetail({
                   {b.cleaner.first_name} {b.cleaner.last_name}
                   {b.cleaner.nin_verified && (
                     <span className="badge badge-xs badge-success badge-soft">
-                      NIN ✓
+                      ✓ Verified
                     </span>
                   )}
                 </p>

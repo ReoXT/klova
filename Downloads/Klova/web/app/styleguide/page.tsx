@@ -174,7 +174,7 @@ export default function StyleGuidePage() {
               </div>
               {[
                 { cls: "text-lg font-semibold", sample: "Adaeze will arrive between 9:00 – 9:30 AM on Friday." },
-                { cls: "text-base leading-relaxed", sample: "All our cleaners are NIN-verified, background-checked, and rated by real customers. You'll see exactly who's coming before they arrive." },
+                { cls: "text-base leading-relaxed", sample: "All our cleaners are thoroughly vetted, background-checked, and rated by real customers. You'll see exactly who's coming before they arrive." },
                 { cls: "text-sm text-base-content/70", sample: "Booking ref: KL-2024-00142 · Paid ₦24,000 · Dec 18, 2024 · Standard Clean" },
                 { cls: "text-xs text-base-content/50 uppercase tracking-wider", sample: "Service type · Standard clean · Lekki/Ajah zone" },
               ].map(({ cls, sample }) => (
@@ -374,7 +374,7 @@ export default function StyleGuidePage() {
                   </div>
                   <div className="flex gap-2 flex-wrap justify-center">
                     <span className="badge badge-primary badge-outline badge-sm">84 cleans</span>
-                    <span className="badge badge-success badge-outline badge-sm">NIN Verified</span>
+                    <span className="badge badge-success badge-outline badge-sm">✓ Verified</span>
                   </div>
                 </CardBody>
               </Card>

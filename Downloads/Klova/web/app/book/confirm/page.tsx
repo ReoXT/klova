@@ -141,7 +141,7 @@ export default function BookConfirmPage() {
                       <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
                     </svg>
                     <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                      {summary.cleaner.rating.toFixed(1)} · {summary.cleaner.total_jobs} jobs · NIN Verified
+                      {summary.cleaner.rating.toFixed(1)} · {summary.cleaner.total_jobs} jobs · Verified
                     </span>
                   </div>
                 </div>
@@ -152,7 +152,7 @@ export default function BookConfirmPage() {
       )}
 
       <Alert variant="warning" title="Before your keeper arrives" className="mb-6">
-        Please have a broom, mop, bin liners, cleaning sprays and gloves ready at home — your keeper brings no equipment.
+        Please have a broom, mop, bin liners, cleaning sprays and gloves ready at home your keeper brings no equipment.
       </Alert>
 
       <div className="flex flex-col gap-3">

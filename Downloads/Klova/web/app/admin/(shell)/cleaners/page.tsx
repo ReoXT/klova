@@ -138,7 +138,7 @@ export default function CleanersPage() {
                   <th>Phone</th>
                   <th>Zone</th>
                   <th>Status</th>
-                  <th>NIN</th>
+                  <th>Verified</th>
                   <th>Rating</th>
                   <th>Jobs</th>
                 </tr>
@@ -372,10 +372,10 @@ function CleanerPanel({
             </PanelField>
           )}
 
-          {/* NIN toggle */}
+          {/* Verified toggle */}
           <div className="flex items-center justify-between py-1">
             <div>
-              <p className="text-sm font-medium">NIN verified</p>
+              <p className="text-sm font-medium">Verified</p>
               <p className="text-xs" style={{ color: "var(--text-muted)" }}>
                 Shows the verified badge on the cleaner profile
               </p>

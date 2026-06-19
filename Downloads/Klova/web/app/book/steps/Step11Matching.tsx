@@ -111,7 +111,7 @@ export default function Step11Matching({ cleaner, serverTotal, payStatus, payErr
                   fontSize: "0.65rem",
                 }}
               >
-                NIN Verified
+                ✓ Verified
               </span>
             </div>
             {cleaner && (
@@ -144,7 +144,7 @@ export default function Step11Matching({ cleaner, serverTotal, payStatus, payErr
         )}
 
         <p className="text-xs mt-3" style={{ color: "var(--text-muted)" }}>
-          {cleaner ? cleaner.first_name : "Your keeper"} is NIN-verified and highly rated.
+          {cleaner ? cleaner.first_name : "Your keeper"} is thoroughly vetted and highly rated.
           Your full details will be shared once payment is confirmed.
         </p>
       </div>

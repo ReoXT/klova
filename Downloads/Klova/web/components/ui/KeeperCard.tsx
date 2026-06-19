@@ -19,7 +19,7 @@ function Star({ className = "w-4 h-4" }: { className?: string }) {
   );
 }
 
-/** Shield + tick — NIN Verified badge icon */
+/** Shield + tick — Verified badge icon */
 function Shield({ className = "w-3.5 h-3.5" }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none"
@@ -32,7 +32,7 @@ function Shield({ className = "w-3.5 h-3.5" }: { className?: string }) {
 
 /**
  * KeeperCard — shown to the customer once a cleaner is matched.
- * Always assumes NIN-verified (the API only surfaces verified, active cleaners).
+ * Always assumes verified (the API only surfaces verified, active cleaners).
  *
  * Handles missing data gracefully:
  * - No photo → initials avatar
@@ -61,7 +61,7 @@ export function KeeperCard({ firstName, photoUrl, rating, totalJobs }: KeeperCar
       >
         <Shield className="w-3.5 h-3.5" />
         <span className="text-xs font-semibold tracking-wide">
-          NIN Verified · Background Checked
+          Thoroughly vetted · Background checked
         </span>
       </div>
 
