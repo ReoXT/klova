@@ -3,7 +3,7 @@ import { verifyAdmin } from "@/app/api/admin/_auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const BOOKING_SELECT = `
-  id, bedrooms, booking_date, address,
+  id, bedrooms, booking_date, time_slot, address,
   total_amount_kobo, commission_kobo,
   status, paystack_reference, refunded_at,
   created_at, updated_at,

@@ -35,6 +35,7 @@ export interface BookingInput {
   bedrooms: string;
   addon_slugs: string[];
   booking_date: string; // YYYY-MM-DD
+  time_slot?: string | null;
   keeper_count?: number;
   wants_insurance?: boolean;
   requested_cleaner_id?: string;
@@ -116,6 +117,7 @@ export function validateBookingInput(body: Record<string, unknown>): BookingInpu
       ? (body.addon_slugs as unknown[]).filter((s): s is string => typeof s === 'string')
       : [],
     booking_date: (body.booking_date as string).trim(),
+    time_slot: typeof body.time_slot === 'string' && body.time_slot.trim() ? body.time_slot.trim() : null,
     keeper_count:
       typeof body.keeper_count === 'number' && body.keeper_count >= 1
         ? Math.round(body.keeper_count)
@@ -198,6 +200,7 @@ export async function createBooking(input: BookingInput): Promise<BookingResult>
       service_id:           breakdown.service_id,
       bedrooms:             input.bedrooms,
       booking_date:         input.booking_date,
+      time_slot:            input.time_slot ?? null,
       address:              input.address,
       base_amount_kobo:     baseKobo,
       addons_amount_kobo:   addonsKobo,

@@ -15,6 +15,7 @@ type Booking = {
   id: string;
   bedrooms: string;
   booking_date: string;
+  time_slot: string | null;
   address: string;
   total_amount_kobo: number;
   commission_kobo: number;
@@ -337,11 +338,15 @@ export default function AdminBookingsPage() {
                             {formatBedrooms(b.bedrooms)}
                           </p>
                         </td>
-                        <td
-                          className="text-sm whitespace-nowrap"
-                          style={{ color: "var(--text-body)" }}
-                        >
-                          {formatDate(b.booking_date)}
+                        <td className="whitespace-nowrap">
+                          <p className="text-sm" style={{ color: "var(--text-body)" }}>
+                            {formatDate(b.booking_date)}
+                          </p>
+                          {b.time_slot && (
+                            <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
+                              {b.time_slot}
+                            </p>
+                          )}
                         </td>
                         <td
                           className="text-sm"
@@ -736,6 +741,14 @@ function BookingDetail({
           </p>
           <p className="text-sm mt-0.5" style={{ color: "var(--text-body)" }}>
             {formatDate(b.booking_date)}
+            {b.time_slot && (
+              <span
+                className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+                style={{ background: "var(--klova-accent-soft)", color: "var(--klova-primary)" }}
+              >
+                {b.time_slot}
+              </span>
+            )}
           </p>
           <p className="text-sm mt-1" style={{ color: "var(--text-body)" }}>
             {b.address}
