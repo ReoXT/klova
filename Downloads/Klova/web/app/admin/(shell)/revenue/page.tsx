@@ -263,9 +263,9 @@ export default function AdminRevenuePage() {
   function applyCustom() { setPreset(-1); load(from, to); }
 
   const s = data?.summary;
-  const commissionRate = s && s.gross_kobo
-    ? ((s.commission_kobo / s.gross_kobo) * 100).toFixed(2)
-    : "22.00";
+  // Cleaning commission = what's stored minus the insurance portion (already stored exactly)
+  const cleaningCommissionKobo = s ? s.commission_kobo - s.insurance_kobo : 0;
+  const cleanerPayoutKobo      = s ? s.cleaning_fee_kobo - cleaningCommissionKobo : 0;
 
   return (
     <div className="space-y-6">
@@ -393,13 +393,13 @@ export default function AdminRevenuePage() {
                     <div className="flex justify-between border-t pt-1.5" style={{ borderColor: "var(--color-base-200)" }}>
                       <span>Klova cut (22%)</span>
                       <span className="tabular-nums font-medium" style={{ color: "var(--color-primary)" }}>
-                        {ngn(Math.round(s!.cleaning_fee_kobo * 0.22))}
+                        {ngn(cleaningCommissionKobo)}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span>Cleaner payout (78%)</span>
                       <span className="tabular-nums font-medium" style={{ color: "var(--text-body)" }}>
-                        {ngn(Math.round(s!.cleaning_fee_kobo * 0.78))}
+                        {ngn(cleanerPayoutKobo)}
                       </span>
                     </div>
                   </div>
@@ -446,7 +446,7 @@ export default function AdminRevenuePage() {
                   <path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm13.36-1.814a.75.75 0 1 0-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.14-.094l3.75-5.25Z" clipRule="evenodd" />
                 </svg>
                 <p className="text-xs font-medium" style={{ color: "oklch(0.4 0.1 145)" }}>
-                  Cleaning {ngn(Math.round(s!.cleaning_fee_kobo * 0.22))} + Insurance {ngn(s!.insurance_kobo)} = Commission {ngn(s!.commission_kobo)} · Reconciled ✓
+                  Cleaning commission {ngn(cleaningCommissionKobo)} + Insurance {ngn(s!.insurance_kobo)} = {ngn(s!.commission_kobo)} total · Reconciled ✓
                 </p>
               </div>
             </div>
