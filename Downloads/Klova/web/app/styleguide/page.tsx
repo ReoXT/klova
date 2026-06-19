@@ -8,6 +8,7 @@ import { SkeletonText, SkeletonCard, SkeletonAvatar, Spinner } from "@/component
 import { EmptyState }   from "@/components/ui/EmptyState";
 import { Alert }        from "@/components/ui/Alert";
 import { AlertDismissDemo } from "./_components/AlertDismissDemo";
+import { KeeperCard }      from "@/components/ui/KeeperCard";
 
 export const metadata: Metadata = { title: "Design System — Klova" };
 
@@ -62,6 +63,7 @@ const NAV_LINKS = [
   { id: "loading",     label: "Loading" },
   { id: "empty-state", label: "Empty" },
   { id: "shadows",     label: "Shadows" },
+  { id: "keeper-card", label: "Keeper" },
 ];
 
 export default function StyleGuidePage() {
@@ -527,6 +529,30 @@ export default function StyleGuidePage() {
               ))}
             </div>
           </Card>
+        </Section>
+
+        {/* KEEPER CARD ────────────────────────────────── */}
+        <Section id="keeper-card" title="Keeper Card">
+          <p className="text-sm text-base-content/60 -mt-1">
+            Shown to the customer once a cleaner is matched — the trust moment before payment.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-3xl">
+            {/* Established keeper — no photo yet */}
+            <div className="space-y-2">
+              <Sub>Established keeper</Sub>
+              <KeeperCard firstName="Chidi" rating={4.8} totalJobs={187} />
+            </div>
+            {/* Newer keeper */}
+            <div className="space-y-2">
+              <Sub>Newer keeper</Sub>
+              <KeeperCard firstName="Amara" rating={4.6} totalJobs={9} />
+            </div>
+            {/* New keeper — graceful empty state */}
+            <div className="space-y-2">
+              <Sub>New keeper</Sub>
+              <KeeperCard firstName="Seun" />
+            </div>
+          </div>
         </Section>
 
       </div>
