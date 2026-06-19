@@ -63,14 +63,12 @@ type AvailableCleaner = {
 /* ── Constants ──────────────────────────────────────────────── */
 
 const STATUS_FILTERS: { key: string | null; label: string }[] = [
-  { key: null,              label: "All" },
-  { key: "pending_payment", label: "Awaiting Payment" },
-  { key: "matched",         label: "Matched" },
-  { key: "paid",            label: "Paid" },
-  { key: "confirmed",       label: "Confirmed" },
-  { key: "completed",       label: "Completed" },
-  { key: "cancelled",       label: "Cancelled" },
-  { key: "no_match",        label: "No Match" },
+  { key: null,          label: "All" },
+  { key: "matched",     label: "Matched" },
+  { key: "confirmed",   label: "Confirmed" },
+  { key: "completed",   label: "Completed" },
+  { key: "cancelled",   label: "Cancelled" },
+  { key: "no_match",    label: "No Match" },
 ];
 
 /* ── Helpers ────────────────────────────────────────────────── */
