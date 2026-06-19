@@ -34,11 +34,13 @@ export interface PayoutHistoryRow {
  * Called when a booking transitions to 'completed'.
  * Inserts a cleaner_earnings row = 78% of the cleaning fee.
  * Idempotent: the UNIQUE constraint on booking_id prevents double-inserts.
+ * If the booking already has a refund recorded, the earning is inserted
+ * as 'refunded' (zero kobo) so it never reaches the payout queue.
  */
 export async function recordEarning(bookingId: string): Promise<void> {
   const { data: booking, error: bErr } = await supabase
     .from('bookings')
-    .select('cleaner_id, base_amount_kobo, addons_amount_kobo, insurance_amount_kobo, commission_kobo')
+    .select('cleaner_id, base_amount_kobo, addons_amount_kobo, insurance_amount_kobo, commission_kobo, total_amount_kobo, refund_kobo')
     .eq('id', bookingId)
     .eq('status', 'completed')
     .single();
@@ -51,12 +53,26 @@ export async function recordEarning(bookingId: string): Promise<void> {
     throw new Error(`Booking ${bookingId} has no cleaner assigned`);
   }
 
-  const cleaningFeeKobo = (booking.base_amount_kobo as number) + (booking.addons_amount_kobo as number);
-  // commission_kobo = round(cleaningFee × 0.22) + insurance; so cleaning commission alone is:
-  const insuranceKobo       = booking.insurance_amount_kobo as number;
-  const commissionKobo      = booking.commission_kobo as number;
-  const cleaningCommission  = commissionKobo - insuranceKobo;
-  const earningKobo         = cleaningFeeKobo - cleaningCommission; // = 78% of cleaning fee
+  const cleaningFeeKobo    = (booking.base_amount_kobo as number) + (booking.addons_amount_kobo as number);
+  const insuranceKobo      = booking.insurance_amount_kobo as number;
+  const commissionKobo     = booking.commission_kobo as number;
+  const cleaningCommission = commissionKobo - insuranceKobo;
+  const baseEarningKobo    = cleaningFeeKobo - cleaningCommission; // = 78% of cleaning fee
+
+  const refundKobo = (booking.refund_kobo as number) ?? 0;
+  const totalKobo  = booking.total_amount_kobo as number;
+
+  // Adjust earning for any pre-existing refund on this booking
+  let earningKobo = baseEarningKobo;
+  let status: 'unpaid' | 'refunded' = 'unpaid';
+
+  if (refundKobo >= totalKobo) {
+    earningKobo = 0;
+    status = 'refunded';
+  } else if (refundKobo > 0) {
+    const keepFraction = 1 - (refundKobo / totalKobo);
+    earningKobo = Math.max(0, Math.round(baseEarningKobo * keepFraction));
+  }
 
   const { error: insErr } = await supabase
     .from('cleaner_earnings')
@@ -65,7 +81,7 @@ export async function recordEarning(bookingId: string): Promise<void> {
         booking_id:   bookingId,
         cleaner_id:   booking.cleaner_id as string,
         earning_kobo: earningKobo,
-        status:       'unpaid',
+        status,
       },
       { onConflict: 'booking_id', ignoreDuplicates: true },
     );
@@ -74,10 +90,51 @@ export async function recordEarning(bookingId: string): Promise<void> {
 }
 
 /**
+ * Called when a refund is confirmed for a booking.
+ * Adjusts or cancels the cleaner's pending earning.
+ * Safe to call multiple times — idempotent if already refunded.
+ * Will NOT claw back earnings that are already paid (logs warning instead).
+ */
+export async function adjustEarningForRefund(
+  bookingId: string,
+  refundKobo: number,
+  totalBookingKobo: number,
+): Promise<void> {
+  const { data: earning } = await supabase
+    .from('cleaner_earnings')
+    .select('id, earning_kobo, status')
+    .eq('booking_id', bookingId)
+    .maybeSingle();
+
+  if (!earning) return; // Not yet recorded — recordEarning will handle it when called
+
+  if (earning.status === 'paid') {
+    console.warn(`[earnings] Refund for booking ${bookingId} but earning already paid — manual review needed`);
+    return;
+  }
+
+  if (earning.status === 'refunded') return; // Already zeroed
+
+  if (refundKobo >= totalBookingKobo) {
+    await supabase
+      .from('cleaner_earnings')
+      .update({ status: 'refunded', earning_kobo: 0 })
+      .eq('id', earning.id as string);
+  } else {
+    const keepFraction = 1 - (refundKobo / totalBookingKobo);
+    const newEarning   = Math.max(0, Math.round((earning.earning_kobo as number) * keepFraction));
+    await supabase
+      .from('cleaner_earnings')
+      .update({ earning_kobo: newEarning })
+      .eq('id', earning.id as string);
+  }
+}
+
+/**
  * Returns per-cleaner aggregates of unpaid earnings for the admin payout screen.
+ * Excludes earnings with status 'refunded'.
  */
 export async function getPendingPayoutSummary(): Promise<EarningSummary[]> {
-  // Fetch all unpaid earnings
   const { data: earnings, error: eErr } = await supabase
     .from('cleaner_earnings')
     .select('cleaner_id, earning_kobo')
@@ -86,7 +143,6 @@ export async function getPendingPayoutSummary(): Promise<EarningSummary[]> {
   if (eErr) throw eErr;
   if (!earnings || earnings.length === 0) return [];
 
-  // Group by cleaner
   const grouped: Record<string, { jobs: number; kobo: number }> = {};
   for (const e of earnings) {
     const cid = e.cleaner_id as string;
@@ -97,7 +153,6 @@ export async function getPendingPayoutSummary(): Promise<EarningSummary[]> {
 
   const cleanerIds = Object.keys(grouped);
 
-  // Fetch cleaner profiles
   const { data: cleaners, error: cErr } = await supabase
     .from('cleaners')
     .select('id, first_name, last_name, photo_url')
@@ -105,7 +160,6 @@ export async function getPendingPayoutSummary(): Promise<EarningSummary[]> {
 
   if (cErr) throw cErr;
 
-  // Fetch primary bank accounts
   const { data: accounts, error: aErr } = await supabase
     .from('cleaner_bank_accounts')
     .select('id, cleaner_id, bank_name, account_number, account_name')

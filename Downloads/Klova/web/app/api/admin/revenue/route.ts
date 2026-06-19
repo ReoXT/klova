@@ -20,16 +20,15 @@ export async function GET(request: NextRequest) {
     .select(`
       total_amount_kobo, commission_kobo,
       base_amount_kobo, addons_amount_kobo, insurance_amount_kobo,
+      refund_kobo,
       service:services(name),
       zone:zones(name)
     `)
     .in("status", PAID_STATUSES);
 
   if (mode === "cash") {
-    // Filter by when payment was received (Paystack webhook timestamp)
     query = query.gte("confirmed_at", from).lte("confirmed_at", `${to}T23:59:59Z`).not("confirmed_at", "is", null);
   } else {
-    // Filter by when the service is scheduled
     query = query.gte("booking_date", from).lte("booking_date", to);
   }
 
@@ -41,7 +40,10 @@ export async function GET(request: NextRequest) {
 
   type Acc = {
     total_bookings: number;
+    refunded_bookings: number;
     gross_kobo: number;
+    refunds_kobo: number;
+    net_kobo: number;
     cleaning_fee_kobo: number;
     base_kobo: number;
     addons_kobo: number;
@@ -51,37 +53,51 @@ export async function GET(request: NextRequest) {
 
   const summary = rows.reduce<Acc>(
     (acc, r) => {
-      const base      = (r.base_amount_kobo      as number) ?? 0;
-      const addons    = (r.addons_amount_kobo     as number) ?? 0;
-      const insurance = (r.insurance_amount_kobo  as number) ?? 0;
+      const base      = (r.base_amount_kobo     as number) ?? 0;
+      const addons    = (r.addons_amount_kobo    as number) ?? 0;
+      const insurance = (r.insurance_amount_kobo as number) ?? 0;
+      const gross     = (r.total_amount_kobo     as number) ?? 0;
+      const refund    = (r.refund_kobo           as number) ?? 0;
       return {
-        total_bookings:    acc.total_bookings + 1,
-        gross_kobo:        acc.gross_kobo        + (r.total_amount_kobo as number),
+        total_bookings:    acc.total_bookings    + 1,
+        refunded_bookings: acc.refunded_bookings + (refund > 0 ? 1 : 0),
+        gross_kobo:        acc.gross_kobo        + gross,
+        refunds_kobo:      acc.refunds_kobo      + refund,
+        net_kobo:          acc.net_kobo          + gross - refund,
         cleaning_fee_kobo: acc.cleaning_fee_kobo + base + addons,
         base_kobo:         acc.base_kobo         + base,
-        addons_kobo:       acc.addons_kobo        + addons,
-        insurance_kobo:    acc.insurance_kobo     + insurance,
-        commission_kobo:   acc.commission_kobo    + (r.commission_kobo  as number),
+        addons_kobo:       acc.addons_kobo       + addons,
+        insurance_kobo:    acc.insurance_kobo    + insurance,
+        commission_kobo:   acc.commission_kobo   + ((r.commission_kobo as number) ?? 0),
       };
     },
-    { total_bookings: 0, gross_kobo: 0, cleaning_fee_kobo: 0, base_kobo: 0, addons_kobo: 0, insurance_kobo: 0, commission_kobo: 0 },
+    {
+      total_bookings: 0, refunded_bookings: 0,
+      gross_kobo: 0, refunds_kobo: 0, net_kobo: 0,
+      cleaning_fee_kobo: 0, base_kobo: 0, addons_kobo: 0,
+      insurance_kobo: 0, commission_kobo: 0,
+    },
   );
 
-  type RowAcc = { bookings: number; gross_kobo: number; cleaning_fee_kobo: number; addons_kobo: number; insurance_kobo: number; commission_kobo: number };
+  type RowAcc = {
+    bookings: number; gross_kobo: number; refunds_kobo: number;
+    cleaning_fee_kobo: number; addons_kobo: number; insurance_kobo: number; commission_kobo: number;
+  };
 
-  const svcMap: Record<string, RowAcc> = {};
+  const svcMap: Record<string, RowAcc>  = {};
   const zoneMap: Record<string, RowAcc> = {};
 
   for (const r of rows) {
-    const base      = (r.base_amount_kobo      as number) ?? 0;
-    const addons    = (r.addons_amount_kobo     as number) ?? 0;
-    const insurance = (r.insurance_amount_kobo  as number) ?? 0;
+    const base      = (r.base_amount_kobo     as number) ?? 0;
+    const addons    = (r.addons_amount_kobo    as number) ?? 0;
+    const insurance = (r.insurance_amount_kobo as number) ?? 0;
     const cleaning  = base + addons;
+    const refund    = (r.refund_kobo           as number) ?? 0;
 
     const svc  = (r.service as unknown as { name: string } | null)?.name ?? "Unknown";
     const zone = (r.zone    as unknown as { name: string } | null)?.name ?? "Unknown";
 
-    const blank: RowAcc = { bookings: 0, gross_kobo: 0, cleaning_fee_kobo: 0, addons_kobo: 0, insurance_kobo: 0, commission_kobo: 0 };
+    const blank: RowAcc = { bookings: 0, gross_kobo: 0, refunds_kobo: 0, cleaning_fee_kobo: 0, addons_kobo: 0, insurance_kobo: 0, commission_kobo: 0 };
 
     if (!svcMap[svc])   svcMap[svc]   = { ...blank };
     if (!zoneMap[zone]) zoneMap[zone] = { ...blank };
@@ -89,10 +105,11 @@ export async function GET(request: NextRequest) {
     for (const map of [svcMap[svc], zoneMap[zone]]) {
       map.bookings++;
       map.gross_kobo        += r.total_amount_kobo as number;
+      map.refunds_kobo      += refund;
       map.cleaning_fee_kobo += cleaning;
       map.addons_kobo       += addons;
       map.insurance_kobo    += insurance;
-      map.commission_kobo   += r.commission_kobo as number;
+      map.commission_kobo   += (r.commission_kobo as number) ?? 0;
     }
   }
 

@@ -1,23 +1,22 @@
 import { supabase } from '../lib/supabase';
 import { config } from '../config';
+import { adjustEarningForRefund } from './earningsService';
 
 /**
- * Issues a Paystack refund for a booking that was paid but could not be fulfilled.
+ * Issues a full Paystack refund for a booking and immediately adjusts the
+ * cleaner's pending earning so it is never included in a payout run.
  *
- * Guards (all logged and silently skipped):
+ * Guards:
  *   - Booking not found
  *   - Booking has no paystack_reference (was never charged)
- *   - Booking already has refunded_at set (double-refund protection)
+ *   - Booking already fully refunded (refund_kobo >= total_amount_kobo)
  *
- * On success: sets refunded_at on the booking row.
- * On Paystack failure: throws so the caller (webhook handler) can surface a 500
- *   and allow Paystack to retry delivery.
+ * On Paystack failure: throws so the caller can surface a 500.
  */
 export async function issueRefund(bookingId: string, paystackReference: string): Promise<void> {
-  // ── Guard: load booking and check preconditions ──────────────────────────────
   const { data: booking, error: lookupErr } = await supabase
     .from('bookings')
-    .select('id, paystack_reference, refunded_at')
+    .select('id, paystack_reference, refund_kobo, total_amount_kobo, refunded_at')
     .eq('id', bookingId)
     .single();
 
@@ -31,12 +30,13 @@ export async function issueRefund(bookingId: string, paystackReference: string):
     return;
   }
 
-  if (booking.refunded_at) {
-    console.warn(`[refund] Booking ${bookingId} already refunded at ${booking.refunded_at} — skipping`);
+  const totalKobo       = booking.total_amount_kobo as number;
+  const alreadyRefunded = (booking.refund_kobo as number) >= totalKobo;
+  if (alreadyRefunded) {
+    console.warn(`[refund] Booking ${bookingId} already fully refunded — skipping`);
     return;
   }
 
-  // ── Issue refund via Paystack ─────────────────────────────────────────────────
   console.log(`[refund] Initiating refund for booking ${bookingId} (ref: ${paystackReference})`);
 
   const response = await fetch('https://api.paystack.co/refund', {
@@ -56,16 +56,20 @@ export async function issueRefund(bookingId: string, paystackReference: string):
     throw new Error(`Refund failed: ${msg}`);
   }
 
-  // ── Mark refunded in DB ───────────────────────────────────────────────────────
+  // Mark booking as fully refunded — the refund.processed webhook will also fire
+  // but adjustEarningForRefund is idempotent so calling it twice is safe
   const { error: updateErr } = await supabase
     .from('bookings')
-    .update({ refunded_at: new Date().toISOString() })
+    .update({ refunded_at: new Date().toISOString(), refund_kobo: totalKobo })
     .eq('id', bookingId);
 
   if (updateErr) {
-    console.error(`[refund] Failed to set refunded_at for booking ${bookingId}:`, updateErr);
+    console.error(`[refund] Failed to update booking ${bookingId}:`, updateErr);
     throw updateErr;
   }
+
+  // Zero out the cleaner's earning so it never reaches the payout queue
+  await adjustEarningForRefund(bookingId, totalKobo, totalKobo);
 
   console.log(`[refund] Refund successful for booking ${bookingId} (ref: ${paystackReference})`);
 }

@@ -7,6 +7,7 @@ import {
   notifyCleanerNewJob,
 } from '../services/notificationService';
 import { handleTransferWebhook } from '../services/payoutService';
+import { adjustEarningForRefund } from '../services/earningsService';
 
 // ─── Signature verification ───────────────────────────────────────────────────
 
@@ -40,6 +41,15 @@ interface PaystackTransferEvent {
     transfer_code: string;
     status: string;
     reason?: string;
+  };
+}
+
+interface PaystackRefundEvent {
+  event: 'refund.processed';
+  data: {
+    amount: number;               // refund amount in kobo
+    transaction_reference: string; // original charge reference
+    status: string;
   };
 }
 
@@ -93,11 +103,52 @@ export async function postPaystackWebhook(req: Request, res: Response): Promise<
     return;
   }
 
+  if (payload.event === 'refund.processed') {
+    const event = payload as unknown as PaystackRefundEvent;
+    try {
+      await processRefundProcessed(event.data.transaction_reference, event.data.amount);
+      res.sendStatus(200);
+    } catch (err) {
+      console.error('[webhook] Refund event error:', err);
+      res.sendStatus(500);
+    }
+    return;
+  }
+
   // All other events — acknowledge and ignore
   res.sendStatus(200);
 }
 
 // ─── Core processing ──────────────────────────────────────────────────────────
+
+async function processRefundProcessed(transactionRef: string, refundKobo: number): Promise<void> {
+  const { data: booking } = await supabase
+    .from('bookings')
+    .select('id, total_amount_kobo, refund_kobo')
+    .eq('paystack_reference', transactionRef)
+    .maybeSingle();
+
+  if (!booking) {
+    console.warn(`[webhook] No booking found for refund reference: ${transactionRef}`);
+    return;
+  }
+
+  // Accumulate in case of multiple partial refunds, then cap at total
+  const totalKobo      = booking.total_amount_kobo as number;
+  const previousRefund = (booking.refund_kobo as number) ?? 0;
+  const newRefundTotal = Math.min(totalKobo, previousRefund + refundKobo);
+
+  await supabase
+    .from('bookings')
+    .update({
+      refund_kobo:  newRefundTotal,
+      refunded_at:  new Date().toISOString(),
+    })
+    .eq('id', booking.id as string);
+
+  // Adjust or cancel cleaner earning (idempotent — safe if issueRefund already ran)
+  await adjustEarningForRefund(booking.id as string, newRefundTotal, totalKobo);
+}
 
 async function processChargeSuccess(reference: string): Promise<void> {
   // Atomically confirm: flip matched → confirmed.

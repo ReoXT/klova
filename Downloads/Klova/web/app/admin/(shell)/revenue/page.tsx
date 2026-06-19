@@ -15,7 +15,10 @@ interface BreakdownRow {
 }
 interface Summary {
   total_bookings: number;
+  refunded_bookings: number;
   gross_kobo: number;
+  refunds_kobo: number;
+  net_kobo: number;
   cleaning_fee_kobo: number;
   base_kobo: number;
   addons_kobo: number;
@@ -355,21 +358,26 @@ export default function AdminRevenuePage() {
           </p>
 
           {/* Top KPIs */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <KpiCard
               label="Total bookings"
               value={String(s!.total_bookings)}
-              sub="confirmed + completed"
+              sub={s!.refunded_bookings > 0 ? `${s!.refunded_bookings} refunded` : "confirmed + completed"}
             />
             <KpiCard
-              label="Gross revenue"
+              label="Gross collected"
               value={ngn(s!.gross_kobo)}
-              sub="cleaning fees + insurance"
+              sub="before refunds"
             />
             <KpiCard
-              label="My commission"
-              value={ngn(s!.commission_kobo)}
-              sub={`22% of cleaning + 100% of insurance`}
+              label="Refunds issued"
+              value={s!.refunds_kobo > 0 ? `−${ngn(s!.refunds_kobo)}` : "—"}
+              sub={s!.refunded_bookings > 0 ? `${s!.refunded_bookings} booking${s!.refunded_bookings > 1 ? "s" : ""}` : "none this period"}
+            />
+            <KpiCard
+              label="Net revenue"
+              value={ngn(s!.net_kobo)}
+              sub={`commission ${ngn(s!.commission_kobo)}`}
               accent
             />
           </div>
