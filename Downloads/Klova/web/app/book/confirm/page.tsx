@@ -70,11 +70,11 @@ export default function BookConfirmPage() {
         </p>
       </div>
 
-      <Alert variant="success" className="mb-6">
+      <Alert variant="success" title="Booking confirmed" className="mb-6">
         <p>
-          <strong>We&apos;ll send a confirmation SMS</strong>
-          {summary?.phone ? ` to ${summary.phone}` : ""} shortly once the payment clears.
-          {summary?.email ? ` Check ${summary.email} for your receipt.` : ""}
+          Order updates and your full receipt will be sent to{" "}
+          <strong>{summary?.email || "your email"}</strong>.
+          Your keeper will be in touch before arrival.
         </p>
       </Alert>
 
@@ -151,8 +151,8 @@ export default function BookConfirmPage() {
         </div>
       )}
 
-      <Alert variant="warning" className="mb-6">
-        <strong>Reminder:</strong> Please have your cleaning supplies ready — broom, mop, bin liners, cleaning sprays and gloves.
+      <Alert variant="warning" title="Before your keeper arrives" className="mb-6">
+        Please have a broom, mop, bin liners, cleaning sprays and gloves ready at home — your keeper brings no equipment.
       </Alert>
 
       <div className="flex flex-col gap-3">

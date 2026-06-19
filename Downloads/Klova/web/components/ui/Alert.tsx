@@ -27,20 +27,25 @@ const icons: Record<AlertVariant, ReactNode> = {
 
 export interface AlertProps {
   variant: AlertVariant;
+  /** Optional bold heading line rendered above the body */
+  title?: string;
   children: ReactNode;
   /** Provide a handler to show the dismiss button; parent controls visibility */
   onDismiss?: () => void;
   className?: string;
 }
 
-export function Alert({ variant, children, onDismiss, className = "" }: AlertProps) {
+export function Alert({ variant, title, children, onDismiss, className = "" }: AlertProps) {
   return (
     <div
       role="alert"
       className={`alert alert-${variant} alert-soft flex items-start gap-3 ${className}`}
     >
       {icons[variant]}
-      <div className="flex-1 text-sm">{children}</div>
+      <div className="flex-1 text-sm">
+        {title && <p className="font-semibold mb-0.5">{title}</p>}
+        {children}
+      </div>
       {onDismiss && (
         <button
           type="button"

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { BookingData } from "../types";
 import type { PriceBreakdown } from "../types";
-import { SERVICES, FAKE_KEEPER, formatNGN } from "../data";
+import { SERVICES, formatNGN } from "../data";
 import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
 
@@ -53,10 +53,11 @@ export default function Step12Confirmation({ data, price }: Props) {
         </p>
       </div>
 
-      <Alert variant="success" className="mb-6">
+      <Alert variant="success" title="Booking confirmed" className="mb-6">
         <p>
-          <strong>You&apos;ll get a confirmation SMS</strong> to {data.phone} shortly. Check your email at{" "}
-          {data.email} for the full booking receipt.
+          Order updates and your full receipt will be sent to{" "}
+          <strong>{data.email || "your email"}</strong>.
+          Your keeper will be in touch before arrival.
         </p>
       </Alert>
 
@@ -78,38 +79,11 @@ export default function Step12Confirmation({ data, price }: Props) {
           </div>
         </div>
 
-        {/* Keeper */}
-        <div className="px-5 py-4">
-          <p className="text-xs font-medium uppercase tracking-wider mb-3" style={{ color: "var(--text-subtle)" }}>
-            Your keeper
-          </p>
-          <div className="flex items-center gap-3">
-            <div
-              className="w-12 h-12 rounded-full flex items-center justify-center font-semibold shrink-0"
-              style={{ background: "var(--klova-primary-soft)", color: "var(--klova-primary)" }}
-            >
-              {FAKE_KEEPER.firstName[0]}{FAKE_KEEPER.lastName[0]}
-            </div>
-            <div>
-              <p className="font-semibold" style={{ color: "var(--text-strong)" }}>
-                {FAKE_KEEPER.firstName} {FAKE_KEEPER.lastName}
-              </p>
-              <div className="flex items-center gap-1 mt-0.5">
-                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor" style={{ color: "var(--klova-accent)" }}>
-                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                </svg>
-                <span className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>
-                  {FAKE_KEEPER.rating} · {FAKE_KEEPER.totalJobs} jobs · NIN Verified
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Reminder */}
-      <Alert variant="warning" className="mb-6">
-        <strong>Reminder:</strong> Please have your cleaning supplies ready before your keeper arrives, broom, mop, bin liners, cleaning sprays and gloves.
+      <Alert variant="warning" title="Before your keeper arrives" className="mb-6">
+        Please have a broom, mop, bin liners, cleaning sprays and gloves ready at home — your keeper brings no equipment.
       </Alert>
 
       <div className="flex flex-col gap-3">
