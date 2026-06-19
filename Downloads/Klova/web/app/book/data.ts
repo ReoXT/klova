@@ -140,6 +140,7 @@ export const DEFAULT_BOOKING: BookingData = {
   lastName: "",
   phone: "",
   email: "",
+  requestedCleanerId: null,
   payMonths: 1,
   wantsInsurance: true,
   promoCode: "",
@@ -254,7 +255,7 @@ export function buildBookingPayload(data: BookingData) {
     bedrooms:             data.bedrooms,
     addon_slugs:          addonSlugs,
     booking_date:         data.bookingDate,
-    requested_cleaner_id: null,
+    requested_cleaner_id: data.requestedCleanerId ?? null,
   };
 }
 

@@ -59,6 +59,9 @@ export interface BookingData {
   phone: string;
   email: string;
 
+  // Step 8b — returning customer keeper request (null = no preference)
+  requestedCleanerId: string | null;
+
   // Step 10 — checkout
   payMonths: number; // 1–3
   wantsInsurance: boolean;

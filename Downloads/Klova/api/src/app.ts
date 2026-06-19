@@ -9,6 +9,7 @@ import bookingsRouter from './routes/bookings';
 import availabilityRouter from './routes/availability';
 import paymentsRouter from './routes/payments';
 import webhooksRouter from './routes/webhooks';
+import customersRouter from './routes/customers';
 
 const app = express();
 
@@ -26,6 +27,7 @@ app.use('/pricing', pricingRouter);
 app.use('/bookings', bookingsRouter);
 app.use('/availability', availabilityRouter);
 app.use('/payments', paymentsRouter);
+app.use('/customers', customersRouter);
 
 app.use(errorHandler);
 
