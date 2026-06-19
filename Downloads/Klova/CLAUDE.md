@@ -1,23 +1,22 @@
 # Klova — Project Context
 
-Paste this file at the start of any new Claude session to resume work without losing context.
-The full step-by-step build guide is in `Klova Prompts.md`. The master schema, pricing, and matching logic are in `MASTER-ROADMAP.md`.
+Full build guide: `Klova Prompts.md`. Schema, pricing, matching logic: `MASTER-ROADMAP.md`.
 
 ---
 
 ## What Klova Is
 
-On-demand home cleaning for Lagos, Nigeria. Customers book a clean, get assigned a vetted cleaner instantly, see who's coming (name, photo, rating), then pay. V1 launches in Lekki / Ajah only.
+On-demand home cleaning for Lagos, Nigeria. Customers book → get assigned a vetted cleaner instantly → see cleaner profile → pay. V1 is Lekki/Ajah only.
 
-**Core differentiator:** NIN-verified, rated cleaners. The customer sees the cleaner's name, photo, star rating, and completed-job count before they pay. Trust is the whole product.
+**Core differentiator:** NIN-verified, rated cleaners shown before payment.
 
-**The confirmed booking flow:**
-1. Customer fills in booking details (service, date, address)
-2. Backend assigns the best available cleaner immediately
-3. Customer sees cleaner profile (name, photo, rating, job count) → proceeds to pay
-4. Paystack webhook confirms payment → booking flips to `confirmed` → cleaner gets notified
+**Booking flow:**
+1. Customer fills in service, date, address
+2. Backend assigns best available cleaner immediately (pre-payment)
+3. Customer sees cleaner profile → pays via Paystack
+4. Paystack webhook confirms payment → booking → `confirmed` → cleaner notified via SMS
 
-**Pricing (live in DB — from MASTER-ROADMAP.md Section 9):**
+**Pricing (live in DB):**
 
 | Service | 1-bed | 2-bed | 3-bed | 4-bed+ |
 |---|---|---|---|---|
@@ -28,33 +27,28 @@ On-demand home cleaning for Lagos, Nigeria. Customers book a clean, get assigned
 
 **Add-ons:** Laundry ₦3,500 · Ironing ₦4,600 · Wardrobe organising ₦4,000
 
-**Commission:** 22% (env var `COMMISSION_RATE=0.22`)
+**Commission:** 22% (`COMMISSION_RATE=0.22`). All amounts stored in **kobo**; API returns NGN.
 
-**Zones:** Lekki/Ajah (live), Victoria Island / Ikeja / Surulere (coming soon — `is_active = false`).
+**Zones:** `lekki-ajah` (live). VI / Ikeja / Surulere seeded with `is_active = false`.
 
 ---
 
 ## Tech Stack (fixed — do not change)
 
-| Layer | Choice | Version |
-|-------|--------|---------|
-| Frontend framework | Next.js App Router | 16.2.9 |
-| Language | TypeScript | ^5 |
-| Styling | Tailwind CSS | v4 (`@import "tailwindcss"` in CSS — NO tailwind.config.js) |
-| Component layer | daisyUI | v5.5.23 (registered via `@plugin "daisyui"` in globals.css) |
-| Package manager | pnpm | v11.7.0 |
-| Backend | Node.js + Express + TypeScript | live on Railway |
-| Database | Supabase (Postgres + auth) | schema applied, RLS on |
-| Payments | Paystack | test keys active |
-| Notifications | Termii (SMS/WhatsApp) | wired up — Section 5 complete |
-| Frontend hosting | Vercel | Live: https://klova-nine.vercel.app |
-| Backend hosting | Railway | Live: https://klova-production.up.railway.app |
-| Test runner | Vitest | v2.1.9 (in api/ only) |
-| Repo | GitHub | https://github.com/ReoXT/klova.git |
+| Layer | Choice |
+|-------|--------|
+| Frontend | Next.js App Router, TypeScript, Tailwind v4, daisyUI v5.5.23, pnpm v11.7.0 |
+| Backend | Node.js + Express + TypeScript → Railway |
+| Database | Supabase (Postgres + RLS on all 10 tables, service role key bypasses RLS) |
+| Payments | Paystack (test keys) |
+| Notifications | Termii (SMS/WhatsApp) |
+| Frontend hosting | Vercel — https://klova-nine.vercel.app |
+| Backend hosting | Railway — https://klova-production.up.railway.app |
+| Tests | Vitest (api/ only) — 41 passing |
 
-**Critical Tailwind v4 note:** There is NO `tailwind.config.js`. All config lives in `web/app/globals.css` via `@import "tailwindcss"` and `@plugin "daisyui"`. Custom theme tokens are in a `[data-theme="klova"]` CSS block using OKLCH colors.
+**Tailwind v4:** NO `tailwind.config.js`. All config in `web/app/globals.css` via `@import "tailwindcss"` + `@plugin "daisyui"`. Theme is `data-theme="klova"`, OKLCH colors.
 
-**Git repo root is `/Users/reoxt` (home dir), NOT `/Users/reoxt/Downloads/Klova`.** Railway root directory must be set to `Downloads/Klova/api` — this is already configured correctly.
+**Git repo root is `/Users/reoxt` (home dir).** Railway root dir: `Downloads/Klova/api`.
 
 ---
 
@@ -62,517 +56,133 @@ On-demand home cleaning for Lagos, Nigeria. Customers book a clean, get assigned
 
 ```
 Klova/
-├── web/                        # Next.js frontend → Vercel
+├── web/                     # Next.js → Vercel
 │   ├── app/
-│   │   ├── layout.tsx          # Root layout — fonts, data-theme="klova"
-│   │   ├── globals.css         # Design system — theme, tokens, grid classes, animations
-│   │   ├── icon.svg            # Favicon — copy of logo.svg, auto-served by Next.js App Router
-│   │   ├── (site)/             # Route group: public pages with nav+footer
-│   │   │   ├── layout.tsx      # Wraps children in SiteNav + SiteFooter
-│   │   │   ├── page.tsx        # Home/landing page — FULLY IMPLEMENTED (Claude Design)
-│   │   │   ├── terms/page.tsx
-│   │   │   ├── privacy/page.tsx
-│   │   │   └── cancellation/page.tsx
-│   │   └── styleguide/         # Design system reference (not public-facing)
+│   │   ├── layout.tsx       # Root layout, fonts, data-theme="klova"
+│   │   ├── globals.css      # Design system — ALL tokens, grids, animations live here
+│   │   ├── (site)/          # Public pages with SiteNav + SiteFooter
+│   │   │   ├── layout.tsx
+│   │   │   ├── page.tsx     # Landing page (fully implemented)
+│   │   │   └── terms/ privacy/ cancellation/
+│   │   ├── book/            # Booking flow (Prompt 4.1 — in progress)
+│   │   └── styleguide/
 │   ├── components/
-│   │   ├── layout/
-│   │   │   ├── SiteNav.tsx     # "use client" — sticky nav, mobile drawer, logo+wordmark
-│   │   │   └── SiteFooter.tsx  # Footer — logo+wordmark, WhatsApp, legal links
-│   │   └── ui/                 # Reusable primitives — always use these
-│   │       ├── Button.tsx
-│   │       ├── FormField.tsx   # exports FormField + SelectField
-│   │       ├── Card.tsx        # exports Card + CardBody
-│   │       ├── Skeleton.tsx    # exports Skeleton, SkeletonText, SkeletonCard, SkeletonAvatar, Spinner
-│   │       ├── EmptyState.tsx
-│   │       └── Alert.tsx
-│   ├── public/
-│   │   └── logo.svg            # Klova squircle logo — dark green bg + amber K, viewBox 459×459
-│   ├── pnpm-workspace.yaml     # packages: ['.'], allowBuilds: sharp + unrs-resolver
-│   └── package.json
-├── api/                        # Express backend → Railway
-│   ├── src/
-│   │   ├── __tests__/
-│   │   │   ├── pricingService.test.ts       # 5 tests
-│   │   │   ├── bookingService.test.ts       # 12 tests
-│   │   │   ├── matchingService.test.ts      # 9 tests
-│   │   │   ├── assignmentService.test.ts    # 4 tests
-│   │   │   ├── availabilityService.test.ts  # 6 tests
-│   │   │   └── refundService.test.ts        # 5 tests  (41 total)
-│   │   ├── controllers/
-│   │   │   ├── healthController.ts
-│   │   │   ├── pricingController.ts
-│   │   │   ├── bookingController.ts
-│   │   │   ├── availabilityController.ts    # GET /availability/alternatives
-│   │   │   ├── paymentController.ts         # POST /payments/initiate
-│   │   │   └── webhookController.ts         # POST /webhooks/paystack
-│   │   ├── lib/
-│   │   │   ├── supabase.ts                  # service-role client (bypasses RLS)
-│   │   │   ├── termiiClient.ts              # sendSms, sendWhatsApp, normalizePhone
-│   │   │   └── messageTemplates.ts          # customerConfirmedMsg, cleanerAssignedMsg, adminConfirmedMsg
-│   │   ├── middleware/
-│   │   │   ├── errorHandler.ts              # returns { error: { message, fields?, stack? } }
-│   │   │   └── requestLogger.ts
-│   │   ├── routes/
-│   │   │   ├── health.ts
-│   │   │   ├── pricing.ts
-│   │   │   ├── bookings.ts
-│   │   │   ├── availability.ts              # GET /alternatives
-│   │   │   ├── payments.ts                  # POST /initiate
-│   │   │   └── webhooks.ts                  # POST /paystack
-│   │   ├── services/
-│   │   │   ├── pricingService.ts            # computePrice(), getPricingGrid()
-│   │   │   ├── bookingService.ts            # validateBookingInput(), createBooking()
-│   │   │   ├── matchingService.ts           # matchCleaner() → ranked string[]
-│   │   │   ├── assignmentService.ts         # assignCleaner() → { outcome, cleanerId }
-│   │   │   ├── availabilityService.ts       # getAlternativeDates()
-│   │   │   ├── paymentService.ts            # initializePayment() → Paystack checkout URL
-│   │   │   ├── notificationService.ts       # notifyCustomerConfirmed, notifyCleanerAssigned, notifyAdminConfirmed
-│   │   │   └── refundService.ts             # issueRefund() — live Paystack call, safety net only
-│   │   ├── app.ts
-│   │   ├── config.ts
-│   │   └── server.ts
-│   ├── pnpm-workspace.yaml     # packages: ['.'], allowBuilds: esbuild
-│   └── package.json
-├── supabase/
-│   └── migrations/
-│       ├── 20260617000001_schema.sql               # all 10 tables
-│       ├── 20260617000002_seed.sql                 # zones, services, pricing, addons
-│       ├── 20260617000003_rls.sql                  # RLS enabled, no permissive policies
-│       └── 20260617000004_assign_cleaner_fn.sql    # assign_cleaner() Postgres fn — applied ✅
-├── CLAUDE.md                   # This file — update after every session
-├── MASTER-ROADMAP.md           # Schema, matching algorithm, pricing (source of truth)
-├── Klova Prompts.md            # Step-by-step build prompts (Sections 0–13)
-├── .gitignore
-└── README.md
+│   │   ├── layout/SiteNav.tsx SiteFooter.tsx
+│   │   └── ui/              # Button FormField(+SelectField) Card(+CardBody)
+│   │                        # Skeleton(+SkeletonText/Card/Avatar) Spinner EmptyState Alert
+│   └── public/logo.svg      # Squircle logo, viewBox 459×459, always render square
+├── api/src/
+│   ├── services/            # pricingService bookingService matchingService
+│   │                        # assignmentService availabilityService paymentService
+│   │                        # notificationService refundService
+│   ├── controllers/ routes/ middleware/ lib/
+│   └── __tests__/           # 41 tests
+└── supabase/migrations/     # 4 files: schema, seed, rls, assign_cleaner fn
 ```
 
 ---
 
-## Database Schema
+## Database
 
-All tables are in the `public` schema. RLS is **enabled on all 10 tables** with no permissive policies — the anon key has zero access. The Express backend uses the service role key, which bypasses RLS.
+10 tables, RLS enabled, anon key has zero access.
 
-### Tables
-
-| Table | Key columns | Notes |
-|---|---|---|
-| `zones` | id (uuid), name, slug, is_active | 4 rows seeded |
-| `services` | id (uuid), name, slug, description | 4 rows seeded |
-| `pricing` | id, service_id→services, bedrooms ('1'/'2'/'3'/'4+'), amount_kobo | 16 rows seeded |
-| `addons` | id, name, slug, amount_kobo | 3 rows seeded |
-| `cleaners` | id, first_name, last_name, phone (unique), photo_url, zone_id→zones, status ('active'/'inactive'/'suspended'), nin_verified, rating (1–5), total_jobs | **no test data seeded yet** |
-| `cleaner_availability` | id, cleaner_id→cleaners, available_date (date), is_booked | UNIQUE (cleaner_id, available_date) |
-| `customers` | id, first_name, last_name, phone (unique), email | upserted on phone at booking time |
-| `bookings` | id, customer_id, cleaner_id (null until matched), requested_cleaner_id, zone_id, service_id, bedrooms, booking_date, address, total_amount_kobo, commission_kobo, status, paystack_reference, refunded_at, created_at, updated_at | updated_at trigger |
-| `booking_addons` | id, booking_id→bookings, addon_id→addons | UNIQUE (booking_id, addon_id) |
-| `ratings` | id, booking_id (unique)→bookings, customer_id, cleaner_id, score (1–5 CHECK), comment | — |
+**Key tables:** `zones` `services` `pricing` `addons` `cleaners` `cleaner_availability` `customers` `bookings` `booking_addons` `ratings`
 
 **Booking status flow:** `pending_payment` → `matched` → `confirmed` → `completed` / `cancelled` / `no_match`
 
-- `pending_payment` — booking row created, assignment in progress
-- `matched` — cleaner assigned (set by assign_cleaner Postgres RPC); customer can now pay
-- `confirmed` — payment received via webhook; cleaner notified
-- `no_match` — no cleaner available for that date (customer sees 409, never reaches payment)
+- `matched` — cleaner assigned by `assign_cleaner` Postgres RPC (SELECT FOR UPDATE); customer can pay
+- `confirmed` — Paystack webhook received; cleaner notified
+- `no_match` — no cleaner available; customer gets 409
 
-**Amounts:** all stored as integers in **kobo** (1 NGN = 100 kobo). API responses return NGN.
-
-**recent_jobs** is NOT a stored column — computed at match time as `COUNT(*) of bookings WHERE cleaner_id = x AND booking_date >= CURRENT_DATE - INTERVAL '7 days'`.
+**No cleaners seeded yet** — insert a `cleaners` row + `cleaner_availability` row before end-to-end testing.
 
 ---
 
 ## API Endpoints
 
-Base URL (production): `https://klova-production.up.railway.app`
+Base: `https://klova-production.up.railway.app`
 
-| Method | Path | Description |
+| Method | Path | Notes |
 |---|---|---|
-| GET | `/health` | Returns `{ ok: true }` |
-| GET | `/pricing` | Full pricing grid + add-on list for the frontend calculator |
-| POST | `/bookings` | Creates booking, immediately assigns cleaner, returns `booking_id` + cleaner profile |
-| GET | `/availability/alternatives` | `?zone_slug=lekki-ajah&date=2026-07-01` → available dates in next 14 days |
-| POST | `/payments/initiate` | `{ booking_id }` → Paystack `authorization_url` + `reference` (booking must be `matched`) |
-| POST | `/webhooks/paystack` | Paystack webhook — HMAC verify, `charge.success` → `confirmed`, notify cleaner |
-
-### POST /bookings
-
-**Request body:**
-```json
-{
-  "first_name": "Amara",
-  "last_name": "Obi",
-  "phone": "08012345678",
-  "email": "amara@example.com",
-  "address": "14 Admiralty Way, Lekki Phase 1",
-  "zone_slug": "lekki-ajah",
-  "service_slug": "standard",
-  "bedrooms": "2",
-  "addon_slugs": ["laundry"],
-  "booking_date": "2026-07-01",
-  "requested_cleaner_id": null
-}
-```
-
-**Success (201):**
-```json
-{
-  "ok": true,
-  "data": {
-    "booking_id": "uuid",
-    "total_amount": 13000,
-    "commission_amount": 2860,
-    "commission_rate": 0.22,
-    "cleaner": {
-      "id": "uuid",
-      "first_name": "Chidi",
-      "last_name": "Okafor",
-      "photo_url": "https://...",
-      "rating": 4.8,
-      "total_jobs": 42
-    }
-  }
-}
-```
-
-**No cleaners available (409):**
-```json
-{ "error": { "message": "No cleaners available in lekki-ajah on 2026-07-01. Try a different date." } }
-```
-
-**Validation error (400):**
-```json
-{ "error": { "message": "Validation failed", "fields": { "phone": "phone is required." } } }
-```
-
----
-
-## Key Service Functions
-
-### `pricingService.ts`
-- `computePrice(serviceSlug, bedrooms, addonSlugs[])` → `PriceBreakdown` — server-side source of truth. Returns `service_id`, `addon_ids`, `base_amount`, `addons_amount`, `total_amount`, `commission_amount`, `commission_rate` (all NGN). Throws `ValidationError` (400) for unknown service, invalid bedrooms, unknown add-ons.
-- `getPricingGrid()` → `PricingGrid` — all services with price grids + all add-ons.
-
-### `bookingService.ts`
-- `validateBookingInput(body)` → `BookingInput` — pure sync, no DB. Collects ALL field errors before throwing `FieldValidationError`.
-- `createBooking(input)` → `BookingResult` — validates zone, computes price, upserts customer, inserts booking, calls `assignCleaner()` immediately, fetches cleaner profile, returns everything. Throws `NoAvailabilityError` (409) if no_match.
-
-### `matchingService.ts`
-- `matchCleaner(booking)` → `string[] | 'NO_MATCH'` — pure selection, no DB writes. Priority: [P1 requested cleaner?, P2 customer's 5-star picks, P3 general pool by rating/load]. Returns ranked ID list for RPC fallback.
-
-### `assignmentService.ts`
-- `assignCleaner(bookingId, booking)` → `{ outcome: 'matched'; cleanerId: string } | { outcome: 'no_match' }` — calls `matchCleaner()` then the `assign_cleaner` Postgres RPC (SELECT FOR UPDATE concurrency). No longer takes `paystackReference` — assignment is pre-payment.
-
-### `availabilityService.ts`
-- `getAlternativeDates(zoneSlug, requestedDate, days=14)` → `string[]` — dates in next N days with at least one free cleaner slot in the zone.
-
-### `paymentService.ts`
-- `initializePayment(bookingId)` → `PaymentInitResult` — booking must be `matched`; calls Paystack `/transaction/initialize` with kobo amount + customer email; stores reference on booking row.
-- Exports `PaymentError` class (has `.status`).
-
-### `refundService.ts`
-- `issueRefund(bookingId, paystackReference)` → live Paystack `/refund` call. Guards: skips if no `paystack_reference`, skips if `refunded_at` already set (double-refund protection), sets `refunded_at` on success. **Not called automatically** — available as a safety net for manual use.
-
-### `notificationService.ts`
-- `notifyCustomerConfirmed(bookingId)` — sends SMS to customer via Termii
-- `notifyCleanerAssigned(bookingId)` — sends SMS to cleaner via Termii
-- `notifyAdminConfirmed(bookingId)` — sends SMS to `ADMIN_PHONE` via Termii (skipped if unset)
-- All three are **graceful-failure**: Termii errors are caught and logged; a failed SMS never rolls back a confirmed booking.
-
-### `termiiClient.ts` (`api/src/lib/`)
-- `sendSms(to, message)` — sends via Termii `generic` channel
-- `sendWhatsApp(to, message)` — sends via Termii `whatsapp` channel (requires WhatsApp Business integration approval in Termii dashboard)
-- `normalizePhone(raw)` — accepts `0803…`, `+234803…`, `234803…` → `2348XXXXXXXXX`
-
-### `messageTemplates.ts` (`api/src/lib/`)
-- All three message templates in one place: `customerConfirmedMsg`, `cleanerAssignedMsg`, `adminConfirmedMsg`
-
-### Error classes
-- `ValidationError` — status 400, from pricingService
-- `FieldValidationError` — status 400, from bookingService (has `.fields`)
-- `NoAvailabilityError` — status 409, from bookingService when no_match
-- `PaymentError` — status 400/404/502/503, from paymentService
-
----
-
-## Design System
-
-### Theme
-
-- **Name:** `klova` — set via `data-theme="klova"` on `<html>` in `app/layout.tsx`
-- **Color space:** OKLCH throughout
-
-```css
-/* Key palette values in web/app/globals.css */
---color-primary:   oklch(0.29 0.09 152);   /* deep forest green */
---color-secondary: oklch(0.92 0.015 78);   /* warm stone */
---color-accent:    oklch(0.68 0.14 67);    /* Lagos amber */
---color-base-100:  oklch(0.99 0.004 85);   /* warm near-white */
---color-base-200:  oklch(0.96 0.01 85);    /* section backgrounds */
-```
-
-### Semantic CSS tokens (`:root` in globals.css)
-
-These tokens are used throughout the landing page. Use them for new pages — never hardcode raw OKLCH values when a token exists.
-
-```css
-/* Brand */
---klova-primary, --klova-primary-content, --klova-primary-soft
---klova-accent, --klova-accent-content, --klova-accent-soft
---klova-success, --klova-success-soft
-
-/* Surfaces */
---surface-page      /* oklch(0.99 0.004 85) — main bg */
---surface-section   /* oklch(0.96 0.01 85)  — alternate section bg */
---surface-card      /* oklch(0.99 0.004 85) — card bg */
-
-/* Borders */
---border-default    /* oklch(0.91 0.015 85) */
---border-strong     /* oklch(0.84 0.018 85) */
-
-/* Text */
---text-strong       /* oklch(0.18 0.007 85)        — headings */
---text-body         /* oklch(0.18 0.007 85 / 0.78) — body copy */
---text-muted        /* oklch(0.18 0.007 85 / 0.55) — secondary text */
---text-subtle       /* oklch(0.18 0.007 85 / 0.38) — hints, labels */
---text-on-primary   /* oklch(0.97 0.01 152)         — text on green */
-
-/* Radius extras */
---radius-lg: 1rem   --radius-xl: 1.5rem   --radius-pill: 9999px
-
-/* Shadows (warm-tinted) */
---shadow-sm, --shadow-md, --shadow-lg, --shadow-float, --shadow-hero
-```
-
-### CSS grid classes (globals.css — for landing page sections)
-
-```css
-.hero-grid   /* 2-col: 1fr 360px, collapses to 1-col at 1023px */
-.svc-grid    /* 4-col, 2-col at 1023px, 1-col at 560px */
-.trust-grid  /* 2-col: 1fr 340px, collapses at 1023px */
-.trust-card  /* sticky top-6rem, goes static at 1023px */
-.steps-grid  /* 4-col, 2-col at 1023px, 1-col at 560px */
-.zones-grid  /* 2-col equal, collapses at 1023px */
-.avail-grid  /* auto 1fr, collapses at 1023px */
-.slots-grid  /* 3-col, 1-col at 560px */
-```
-
-### CSS animation classes (globals.css)
-
-```css
-.fade-up, .fade-up-1 through .fade-up-4   /* staggered entrance */
-.hero-float, .hero-float-alt               /* floating card animations */
-.pulse-dot                                 /* live zone indicator pulse */
-```
-
-### Fonts
-
-Loaded in `app/layout.tsx` via `next/font/google`, exposed as CSS variables:
-
-- **`--font-dm-serif`** → DM Serif Display (weight 400) — all headings (h1–h6 get it automatically via globals.css)
-- **`--font-plus-jakarta`** → Plus Jakarta Sans (weights 400/500/600/700) — body and UI text
-- **`.wordmark`** CSS class — applies DM Serif + `-0.015em` letter-spacing to the Klova brand name. Use this class on every instance of the "Klova" wordmark (nav, footer, etc.)
-
-### Radius system
-
-```
---radius-selector: 0.375rem   /* checkboxes, radios */
---radius-field:    0.5rem     /* inputs, selects */
---radius-box:      0.75rem    /* cards, alerts, dropdowns */
-```
-
-### Key CSS overrides in globals.css
-
-- `.badge { line-height: 1; padding-bottom: 0.5px; }` — fixes Plus Jakarta Sans vertical centering in badges
-- `body { text-rendering: optimizeLegibility; font-optical-sizing: auto; }` — improves font rendering
+| GET | `/health` | `{ ok: true }` |
+| GET | `/pricing` | Full grid + add-ons for frontend calculator |
+| POST | `/bookings` | Create booking + assign cleaner; returns `booking_id` + cleaner profile |
+| GET | `/availability/alternatives` | `?zone_slug=lekki-ajah&date=YYYY-MM-DD` → dates in next 14 days |
+| POST | `/payments/initiate` | `{ booking_id }` → Paystack `authorization_url` (booking must be `matched`) |
+| POST | `/webhooks/paystack` | HMAC verify → `matched→confirmed` → notify customer + cleaner |
 
 ---
 
 ## Component Rules
 
-**Always import from `components/ui/` — never write raw daisyUI classes inline when a component exists.**
+Always use `components/ui/` — never inline raw daisyUI when a primitive exists.
 
-| Need | Import |
-|------|--------|
-| Any button | `Button` from `@/components/ui/Button` |
-| Text/email/tel input | `FormField` from `@/components/ui/FormField` |
-| Select/dropdown | `SelectField` from `@/components/ui/FormField` |
-| Content card | `Card`, `CardBody` from `@/components/ui/Card` |
-| Loading placeholder | `SkeletonCard`, `SkeletonText`, `SkeletonAvatar` from `@/components/ui/Skeleton` |
-| Spinner | `Spinner` from `@/components/ui/Skeleton` |
-| Empty state | `EmptyState` from `@/components/ui/EmptyState` |
-| Alert/toast | `Alert` from `@/components/ui/Alert` |
+- Button → `Button`
+- Text/email/tel input → `FormField`
+- Select → `SelectField` (from FormField)
+- Card → `Card` + `CardBody`
+- Loading → `SkeletonCard`, `SkeletonText`, `SkeletonAvatar`, `Spinner`
+- Empty state → `EmptyState`
+- Alert → `Alert` with `alert-soft` variant
 
-**Alert style:** `alert-soft` — pale tinted background, NOT solid color blocks.
+Design tokens live in `globals.css` as CSS variables (`--text-muted`, `--surface-card`, etc.). Use `style={{ color: "var(--text-muted)" }}` for tokens Tailwind can't reach — this is intentional.
 
-**Badges:** Use daisyUI `badge` classes directly (no Badge component needed).
-
-**Landing page inline styles:** `web/app/(site)/page.tsx` uses `style={{ color: "var(--text-muted)" }}` etc. for semantic tokens — this is intentional. Tailwind classes handle spacing/flex/grid; CSS variables handle color/surface tokens.
+Fonts: `--font-dm-serif` (headings, auto-applied) · `--font-plus-jakarta` (body). Use `.wordmark` class on every "Klova" brand name.
 
 ---
 
-## Logo
+## Current Work: Prompt 4.1 — Booking Flow Frontend
 
-- **File:** `web/public/logo.svg` — Klova squircle logo. Dark green (`#113e28`) rounded-rect background + amber (`#f59a00`) K letterform. ViewBox `0 0 459.86 459.33` (nearly square, zero whitespace padding around the mark).
-- **Favicon:** `web/app/icon.svg` — identical copy of logo.svg, auto-served by Next.js App Router as the site favicon. No extra config needed.
-- **Usage in nav/footer:** `<Image src="/logo.svg" alt="" width={28} height={28} />` + `<span className="wordmark text-2xl text-primary">Klova</span>` in `flex items-center gap-2`.
-- **Always render square** — viewBox is 1:1, width must equal height.
+**Route:** `web/app/book/` (NOT inside `(site)/`). SiteNav "Book a cleaning" and FinalCTA both point to `/book`.
 
----
+**5 steps:**
+1. **Service** — service type + bedrooms + add-ons. Fetch `GET /pricing`, show live price as selections change.
+2. **Date** — date picker. Zone always `lekki-ajah`. On no availability → call `GET /availability/alternatives` and show date chips.
+3. **Details** — first name, last name, phone, email, address. Use `FormField`.
+4. **Cleaner reveal** — `POST /bookings`, show Spinner, reveal cleaner profile (photo, name, rating, total_jobs, NIN badge). CTA: "Looks good — pay now". Handle 409 (no match) + 400 field errors inline.
+5. **Payment** — `POST /payments/initiate` → redirect to Paystack URL. On return, show "Booking confirmed, you'll get an SMS shortly."
 
-## SiteNav Details
-
-- Sticky, `z-40`, `bg-base-100/95 backdrop-blur-sm`, `h-16`
-- Desktop: logo (28×28) + Klova wordmark left | "Zones we serve" dropdown centre | "Book a cleaning" CTA right → `href="/book"`
-- Mobile: logo + wordmark + hamburger → right-side drawer with backdrop + ESC-to-close + body scroll lock
-- `"use client"` — uses React `useState` for drawer open/close
-- Zones array is hardcoded in `SiteNav.tsx`: Lekki/Ajah active, others `active: false`
-
-## SiteFooter Details
-
-- `bg-base-100`, top border, `mt-auto`
-- Left: logo (28×28) + Klova wordmark + tagline
-- Right: WhatsApp support link (`wa.me/2348000000000` — placeholder, replace before launch)
-- Bottom: copyright + legal links (Terms / Privacy / Cancellation & Refunds)
+**Rules:**
+- Never compute totals in the browser — display what the API returns
+- Single `useBooking` hook or context for all step state
+- Store `booking_id` in `sessionStorage` (not URL params)
+- `photo_url` may be null — always show avatar fallback
+- Format amounts as `₦X,XXX` NGN everywhere
 
 ---
 
-## Landing Page (`web/app/(site)/page.tsx`)
+## Security Rules (never break)
 
-**Fully implemented.** Built from Claude Design output and styled with the design system tokens above. Sections in order:
-
-1. **Hero** — two-column grid (text left, KeeperCard right). Amber accents: thin amber rule above h1, `₦5,000` price in amber, `4.8/5` rating in amber, amber ambient orb behind card. Floating badge cards animated with `hero-float` / `hero-float-alt`.
-2. **Services** — 4-col `.svc-grid` of service cards with icon, name, price-from.
-3. **Trust** — left copy block, right sticky trust card showing cleaner profile preview with NIN badge and star rating.
-4. **HowItWorks** — 4-step `.steps-grid` with amber step numerals, icons, descriptions.
-5. **Zones** — `.zones-grid`. Left: list of zones with `pulse-dot` live indicator on Lekki/Ajah. Right: map placeholder.
-6. **Availability** — `.avail-grid` calendar-style date UI with `.slots-grid` time slots.
-7. **FinalCTA** — dark green full-bleed section, headline + "Book your first clean" button → `href="/book"`.
-
----
-
-## What's Been Completed
-
-| Prompt | Status | Notes |
-|--------|--------|-------|
-| 0.1 Tooling setup | ✅ Done | Node, pnpm, Vercel CLI, Railway CLI, Supabase CLI, git config |
-| 0.2 Monorepo | ✅ Done | `/web` + `/api`, .gitignore, README, .env.example files |
-| 1.1 Next.js scaffold | ✅ Done | App Router, TypeScript, Tailwind v4, daisyUI v5, deployed to Vercel |
-| 1.2 Design system | ✅ Done | Custom "klova" theme, DM Serif + Plus Jakarta Sans, styleguide at /styleguide |
-| 1.3 Shared layout | ✅ Done | SiteNav (mobile drawer + logo), SiteFooter (logo), (site) route group, stub legal pages |
-| 1.4 UI primitives | ✅ Done | Button, FormField, SelectField, Card, Skeleton, EmptyState, Alert — all in styleguide |
-| 1.5 Logo + favicon | ✅ Done | `web/public/logo.svg` (squircle, 459×459 viewBox), `web/app/icon.svg` (favicon) |
-| 1.6 Landing page | ✅ Done | Full 7-section landing page from Claude Design — live at https://klova-nine.vercel.app |
-| 2.1 Express scaffold | ✅ Done | Health endpoint live at https://klova-production.up.railway.app/health |
-| 2.2 Supabase connection | ✅ Done | Service client in api/src/lib/supabase.ts, round-trip verified in production |
-| 2.3 Schema + seed | ✅ Done | 10 tables, 4 migration files, pricing/zones/services/addons seeded |
-| 2.4 Row-level security | ✅ Done | RLS on all tables, zero anon access, service role bypasses |
-| 3.1 Pricing service | ✅ Done | computePrice(), GET /pricing, 5 passing tests |
-| 3.2 Booking creation | ✅ Done | POST /bookings — validates, assigns cleaner immediately, returns cleaner profile |
-| 3.3 Matching algorithm | ✅ Done | matchCleaner() — 3-tier priority, returns ranked candidate list |
-| 3.4 Concurrency-safe assignment | ✅ Done | assignCleaner() + assign_cleaner Postgres RPC (SELECT FOR UPDATE) |
-| 3.5 No-availability experience | ✅ Done | getAlternativeDates(), GET /availability/alternatives, 409 on no_match |
-| 3.6a Paystack payment init | ✅ Done | POST /payments/initiate — booking must be matched; stores reference |
-| 3.6b Paystack webhook | ✅ Done | POST /webhooks/paystack — HMAC verify, matched→confirmed, notify stubs |
-| 3.7 Refund service | ✅ Done | issueRefund() — live Paystack call, double-refund guard, sets refunded_at |
-| 3.8 Flow rewire | ✅ Done | Assignment at booking time (not webhook); webhook just confirms + notifies |
-| 5.1 Termii notifications | ✅ Done | sendSms + sendWhatsApp, phone normalisation, graceful failure, message templates |
-
-**41 tests passing. Backend is feature-complete. Landing page is live.**
-
----
-
-## Next: Prompt 4.1 — Booking Flow Frontend
-
-**Route:** `/book` — multi-step form. The "Book a cleaning" button in SiteNav and the FinalCTA section already point to `/book`.
-
-**Steps (in order):**
-1. **Service** — pick service type (Standard / Deep / Move-in / Post-construction) + bedrooms + optional add-ons. Fetch pricing from `GET /pricing`. Show live price update as selections change.
-2. **Date** — date picker for booking date. Zone is always `lekki-ajah` for now (V1). If no availability on chosen date, call `GET /availability/alternatives?zone_slug=lekki-ajah&date=…` and surface suggestion chips.
-3. **Details** — first name, last name, phone, email, address fields. Use `FormField` from `components/ui/`.
-4. **Cleaner reveal** — POST all data to `POST /bookings`. Show a loading state (cleaner being assigned), then reveal the assigned cleaner profile (photo, name, rating, total_jobs, NIN badge). CTA: "Looks good — pay now". Handle 409 (no match) with alternative dates. Handle 400 field errors inline.
-5. **Payment** — call `POST /payments/initiate` with `booking_id`. Redirect browser to Paystack `authorization_url`. On return to site, show a confirmation screen (webhook is async — show "Booking confirmed, you'll get an SMS shortly").
-
-**Key rules for the booking flow:**
-- Never calculate totals in the browser — always display the `total_amount` the API returns
-- Keep all booking state in a single `useBooking` hook or React context shared across steps
-- Store `booking_id` in sessionStorage (not URL params) until after payment
-- Cleaner `photo_url` may be null — always show an avatar fallback
-- Format all amounts as `₦X,XXX` NGN — no kobo on the frontend
-- The step flow lives at `web/app/book/` — create the route there, NOT inside `(site)/` (it gets its own layout without the marketing nav, or the same nav if preferred)
-- Use the existing UI primitives (Button, FormField, SelectField, Alert, Spinner) — don't re-invent them
-
-**Blocker for end-to-end testing:** No cleaners are seeded in the DB. Before `POST /bookings` can return a `matched` result you need to insert at least one cleaner row + a `cleaner_availability` row into Supabase directly (use the Supabase dashboard SQL editor or a one-off migration).
+1. `.env` files never committed — only `.env.example` with blank values
+2. `SUPABASE_SERVICE_ROLE_KEY` — server only, never in frontend or git
+3. All pricing computed server-side — never trust browser-sent prices
+4. Paystack webhook is the ONLY trusted payment confirmation — not the redirect
+5. Frontend never talks to Supabase directly — always via Express API
+6. Admin routes must be behind Supabase auth
 
 ---
 
 ## Environment Variables
 
-### web/.env.example
-```
-NEXT_PUBLIC_API_URL=    # URL of the Express backend
-```
+`web/.env` → `NEXT_PUBLIC_API_URL`
 
-### api/.env.example
-```
-PORT=4000
-SUPABASE_URL=
-SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=   # NEVER send to frontend or commit
-PAYSTACK_SECRET_KEY=         # used for both API calls and HMAC webhook verification
-PAYSTACK_PUBLIC_KEY=
-TERMII_API_KEY=
-TERMII_SENDER_ID=
-COMMISSION_RATE=0.22
-FRONTEND_ORIGIN=             # CORS allowed origin
-```
+`api/.env` → `PORT` `SUPABASE_URL` `SUPABASE_ANON_KEY` `SUPABASE_SERVICE_ROLE_KEY` `PAYSTACK_SECRET_KEY` `PAYSTACK_PUBLIC_KEY` `TERMII_API_KEY` `TERMII_SENDER_ID` `COMMISSION_RATE` `FRONTEND_ORIGIN` `ADMIN_PHONE`
 
-**Railway env vars set:** `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `PAYSTACK_SECRET_KEY`, `PORT`, `COMMISSION_RATE`, `FRONTEND_ORIGIN`
-
-**To add for notifications (Railway + local .env):** `TERMII_API_KEY`, `TERMII_SENDER_ID`, `ADMIN_PHONE`
+Railway has: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `PAYSTACK_SECRET_KEY`, `PORT`, `COMMISSION_RATE`, `FRONTEND_ORIGIN`. Still need: `TERMII_API_KEY`, `TERMII_SENDER_ID`, `ADMIN_PHONE`.
 
 ---
 
 ## Commands
 
 ```bash
-# Run frontend locally (port 3000)
-cd web && pnpm dev
-
-# Run backend locally (port 4000)
-cd api && pnpm dev
-
-# Run backend tests
-cd api && pnpm test
-
-# Build frontend
-cd web && pnpm build
-
-# Push to deploy (Railway + Vercel auto-deploy on push to main)
-git push origin main
+cd web && pnpm dev        # frontend :3000
+cd api && pnpm dev        # backend :4000
+cd api && pnpm test       # 41 tests
+git push origin main      # deploys both Vercel + Railway
 ```
-
-**pnpm notes:**
-- `web/pnpm-workspace.yaml` — must have `packages: ['.']` and `allowBuilds: { sharp, unrs-resolver }`
-- `api/pnpm-workspace.yaml` — must have `packages: ['.']` and `allowBuilds: { esbuild }`
-- Both files need the `packages` field or pnpm v9 fails with "packages field missing or empty"
-
----
-
-## Security Rules (never break these)
-
-1. `.env` files are never committed — only `.env.example` with blank values
-2. `SUPABASE_SERVICE_ROLE_KEY` is server-only — never in frontend code or git
-3. All pricing is computed server-side — never trust a price sent from the browser
-4. The Paystack webhook is the ONLY trusted source for confirming payment — never the frontend redirect
-5. The frontend never talks to Supabase directly — all data goes through the Express API
-6. Admin routes must be behind Supabase auth — never accessible to customers
-
----
 
 ## Git
 
-- Branch: `main`
-- Remote: `https://github.com/ReoXT/klova.git`
-- **Repo root is `/Users/reoxt` (home directory)** — git commands work from anywhere but paths in commits are relative to home
-- Vercel auto-deploys on push to `main`
-- Railway auto-deploys on push to `main` (root dir: `Downloads/Klova/api`)
-- Commit style: `feat(web):`, `fix(web):`, `refactor(web):`, `feat(api):`, `feat(db):` etc.
+- Branch: `main` · Remote: `https://github.com/ReoXT/klova.git`
+- Commit style: `feat(web):` `fix(web):` `feat(api):` `feat(db):` etc.
+- Vercel auto-deploys on push. Railway auto-deploys (root: `Downloads/Klova/api`).

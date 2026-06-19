@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import type { BookingData } from "./types";
-import { DEFAULT_BOOKING, computePrice, formatNGN } from "./data";
+import { DEFAULT_BOOKING, computePrice } from "./data";
 import Step01Service from "./steps/Step01Service";
 import Step02Size from "./steps/Step02Size";
 import Step03Address from "./steps/Step03Address";
@@ -89,8 +89,6 @@ export default function BookPage() {
   const totalSteps = steps.length;
   const progressPct = ((stepIndex + 1) / totalSteps) * 100;
 
-  const showPriceBar = step >= 1 && step <= 8 && price.base > 0;
-
   return (
     <div className="flex flex-col min-h-[calc(100vh-3.5rem)]">
       {/* Progress bar */}
@@ -105,60 +103,20 @@ export default function BookPage() {
       </div>
 
       {/* Step content */}
-      <div key={animKey} className="fade-up flex-1 pb-32">
-        {step === 1  && <Step01Service data={data} patch={patch} onNext={goNext} />}
-        {step === 2  && <Step02Size    data={data} patch={patch} onNext={goNext} onBack={goBack} />}
-        {step === 3  && <Step03Address data={data} patch={patch} onNext={goNext} onBack={goBack} />}
-        {step === 4  && <Step04DateTime data={data} patch={patch} onNext={goNext} onBack={goBack} />}
-        {step === 5  && <Step05Extras  data={data} patch={patch} onNext={goNext} onBack={goBack} />}
-        {step === 6  && <Step06ExtrasConfig data={data} patch={patch} onNext={goNext} onBack={goBack} />}
-        {step === 7  && <Step07Preferences data={data} patch={patch} onNext={goNext} onBack={goBack} />}
-        {step === 8  && <Step08Details data={data} patch={patch} onNext={goNext} onBack={goBack} />}
+      <div key={animKey} className="fade-up flex-1 pb-40">
+        {step === 1  && <Step01Service data={data} patch={patch} price={price} onNext={goNext} />}
+        {step === 2  && <Step02Size    data={data} patch={patch} price={price} onNext={goNext} onBack={goBack} />}
+        {step === 3  && <Step03Address data={data} patch={patch} price={price} onNext={goNext} onBack={goBack} />}
+        {step === 4  && <Step04DateTime data={data} patch={patch} price={price} onNext={goNext} onBack={goBack} />}
+        {step === 5  && <Step05Extras  data={data} patch={patch} price={price} onNext={goNext} onBack={goBack} />}
+        {step === 6  && <Step06ExtrasConfig data={data} patch={patch} price={price} onNext={goNext} onBack={goBack} />}
+        {step === 7  && <Step07Preferences data={data} patch={patch} price={price} onNext={goNext} onBack={goBack} />}
+        {step === 8  && <Step08Details data={data} patch={patch} price={price} onNext={goNext} onBack={goBack} />}
         {step === 9  && <Step09Summary data={data} price={price} onNext={goNext} onBack={goBack} />}
         {step === 10 && <Step10Checkout data={data} patch={patch} price={price} onNext={goNext} onBack={goBack} />}
         {step === 11 && <Step11Matching data={data} onNext={goNext} />}
         {step === 12 && <Step12Confirmation data={data} price={price} />}
       </div>
-
-      {/* Sticky price bar */}
-      {showPriceBar && (
-        <div
-          className="fixed bottom-0 left-0 right-0 z-30 border-t"
-          style={{
-            background: "var(--surface-page)",
-            borderColor: "var(--border-default)",
-            boxShadow: "0 -4px 20px oklch(0.18 0.007 85 / 0.08)",
-          }}
-        >
-          <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between gap-4">
-            <div>
-              <p className="text-xs" style={{ color: "var(--text-subtle)" }}>
-                Estimated total
-              </p>
-              <p className="text-xl font-semibold" style={{ color: "var(--text-strong)" }}>
-                {formatNGN(price.total)}
-              </p>
-            </div>
-            {price.discount > 0 && (
-              <span
-                className="badge badge-sm"
-                style={{
-                  background: "var(--klova-success-soft)",
-                  color: "var(--klova-success)",
-                  border: "none",
-                }}
-              >
-                {formatNGN(price.discount)} off
-              </span>
-            )}
-            {price.base === 0 && (
-              <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-                Select service &amp; size to see price
-              </p>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

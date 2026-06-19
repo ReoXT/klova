@@ -3,13 +3,14 @@
 import { useState } from "react";
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/style.css";
-import type { BookingData, TimeSlot } from "../types";
-import { TIME_SLOTS } from "../data";
+import type { BookingData, PriceBreakdown, TimeSlot } from "../types";
+import { TIME_SLOTS, formatNGN } from "../data";
 import { Button } from "@/components/ui/Button";
 
 interface Props {
   data: BookingData;
   patch: (p: Partial<BookingData>) => void;
+  price: PriceBreakdown;
   onNext: () => void;
   onBack: () => void;
 }
@@ -19,7 +20,7 @@ today.setHours(0, 0, 0, 0);
 const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
 const threeMonthsOut = new Date(today.getFullYear(), today.getMonth() + 3, 0);
 
-export default function Step04DateTime({ data, patch, onNext, onBack }: Props) {
+export default function Step04DateTime({ data, patch, price, onNext, onBack }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   const selected = data.bookingDate
@@ -173,9 +174,33 @@ export default function Step04DateTime({ data, patch, onNext, onBack }: Props) {
         </p>
       )}
 
-      <div className="flex gap-3 mt-6">
-        <Button variant="ghost" onClick={onBack} className="flex-1">Back</Button>
-        <Button variant="primary" onClick={handleNext} className="flex-1">Continue</Button>
+      {/* Sticky footer */}
+      <div
+        className="fixed bottom-0 left-0 right-0 z-30"
+        style={{
+          background: "var(--surface-card)",
+          borderTop: "1px solid var(--border-default)",
+          boxShadow: "0 -4px 24px oklch(0.18 0.007 85 / 0.08)",
+        }}
+      >
+        <div className="max-w-lg mx-auto px-4 pt-4 pb-6">
+          {price.base > 0 && (
+            <div className="flex items-start justify-between mb-3">
+              <div>
+                <p className="font-semibold text-sm" style={{ color: "var(--text-strong)" }}>Total amount</p>
+                <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
+                  {data.keeperCount === 2 ? "2 keepers" : "1 keeper"}
+                  {data.bedrooms ? ` · ${data.bedrooms} bed${data.bedrooms === "1" ? "" : "s"}` : ""}
+                </p>
+              </div>
+              <span className="text-xl font-bold" style={{ color: "var(--klova-accent)" }}>{formatNGN(price.total)}</span>
+            </div>
+          )}
+          <div className="flex gap-3">
+            <Button variant="ghost" onClick={onBack} className="flex-1">Back</Button>
+            <Button variant="primary" onClick={handleNext} className="flex-1">Continue</Button>
+          </div>
+        </div>
       </div>
     </div>
   );

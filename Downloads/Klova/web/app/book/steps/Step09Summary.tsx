@@ -22,10 +22,6 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-function Divider() {
-  return <div style={{ height: "1px", background: "var(--border-default)" }} />;
-}
-
 export default function Step09Summary({ data, price, onNext, onBack }: Props) {
   const service = SERVICES.find((s) => s.slug === data.service);
 
@@ -102,8 +98,6 @@ export default function Step09Summary({ data, price, onNext, onBack }: Props) {
           )}
         </div>
 
-        <Divider />
-
         {/* Address */}
         <div>
           <SectionLabel>Address</SectionLabel>
@@ -113,18 +107,13 @@ export default function Step09Summary({ data, price, onNext, onBack }: Props) {
         </div>
 
         {selectedExtras.length > 0 && (
-          <>
-            <Divider />
-            <div>
-              <SectionLabel>Add-ons</SectionLabel>
-              <p className="text-sm" style={{ color: "var(--text-body)" }}>
-                {extrasLabel}
-              </p>
-            </div>
-          </>
+          <div>
+            <SectionLabel>Add-ons</SectionLabel>
+            <p className="text-sm" style={{ color: "var(--text-body)" }}>
+              {extrasLabel}
+            </p>
+          </div>
         )}
-
-        <Divider />
 
         {/* Contact */}
         <div>
@@ -186,7 +175,7 @@ export default function Step09Summary({ data, price, onNext, onBack }: Props) {
             style={{ borderTop: "1px solid var(--border-default)" }}
           >
             <span className="font-semibold text-sm" style={{ color: "var(--text-strong)" }}>
-              Total per visit
+              Total amount
             </span>
             <span className="text-xl font-bold" style={{ color: "var(--klova-accent)" }}>
               {formatNGN(perVisitNet + price.insurance)}

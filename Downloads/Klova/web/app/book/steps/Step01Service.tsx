@@ -1,16 +1,17 @@
 "use client";
 
-import type { BookingData, ServiceSlug } from "../types";
-import { SERVICES } from "../data";
+import type { BookingData, PriceBreakdown, ServiceSlug } from "../types";
+import { SERVICES, formatNGN } from "../data";
 import { Button } from "@/components/ui/Button";
 
 interface Props {
   data: BookingData;
   patch: (p: Partial<BookingData>) => void;
+  price: PriceBreakdown;
   onNext: () => void;
 }
 
-export default function Step01Service({ data, patch, onNext }: Props) {
+export default function Step01Service({ data, patch, price, onNext }: Props) {
   return (
     <div className="max-w-lg mx-auto px-4 pt-6 pb-4">
       <h1 className="text-2xl font-semibold mb-1" style={{ color: "var(--text-strong)" }}>
@@ -49,15 +50,32 @@ export default function Step01Service({ data, patch, onNext }: Props) {
         })}
       </div>
 
-      <div className="mt-6">
-        <Button
-          variant="primary"
-          className="w-full"
-          disabled={!data.service}
-          onClick={onNext}
-        >
-          Continue
-        </Button>
+      {/* Sticky footer */}
+      <div
+        className="fixed bottom-0 left-0 right-0 z-30"
+        style={{
+          background: "var(--surface-card)",
+          borderTop: "1px solid var(--border-default)",
+          boxShadow: "0 -4px 24px oklch(0.18 0.007 85 / 0.08)",
+        }}
+      >
+        <div className="max-w-lg mx-auto px-4 pt-4 pb-6">
+          {price.base > 0 && (
+            <div className="flex items-start justify-between mb-3">
+              <div>
+                <p className="font-semibold text-sm" style={{ color: "var(--text-strong)" }}>Total amount</p>
+                <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
+                  {data.keeperCount === 2 ? "2 keepers" : "1 keeper"}
+                  {data.bedrooms ? ` · ${data.bedrooms} bed${data.bedrooms === "1" ? "" : "s"}` : ""}
+                </p>
+              </div>
+              <span className="text-xl font-bold" style={{ color: "var(--klova-accent)" }}>{formatNGN(price.total)}</span>
+            </div>
+          )}
+          <Button variant="primary" className="w-full" disabled={!data.service} onClick={onNext}>
+            Continue
+          </Button>
+        </div>
       </div>
     </div>
   );

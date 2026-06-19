@@ -39,9 +39,9 @@ export default function Step10Checkout({ data, patch, price, onNext, onBack }: P
   }
 
   const monthOptions = [
-    { months: 1, label: "1 month (this booking only)" },
-    { months: 2, label: "2 months upfront" },
-    { months: 3, label: "3 months upfront" },
+    { months: 1, label: "This booking only", desc: "" },
+    { months: 2, label: "2 months upfront", desc: "We'll repeat this exact booking for the next 2 months and charge you upfront." },
+    { months: 3, label: "3 months upfront", desc: "We'll repeat this exact booking for the next 3 months and charge you upfront." },
   ];
 
   const perVisitGross = price.base + price.keeperSurcharge + price.extras;
@@ -62,28 +62,33 @@ export default function Step10Checkout({ data, patch, price, onNext, onBack }: P
           How many months would you like to pay for?
         </p>
         <div className="flex flex-col gap-2.5">
-          {monthOptions.map(({ months, label }) => {
+          {monthOptions.map(({ months, label, desc }) => {
             const sel = data.payMonths === months;
             return (
               <button
                 key={months}
                 type="button"
                 onClick={() => patch({ payMonths: months })}
-                className="w-full text-left rounded-xl border-2 px-4 py-3 flex items-center gap-3 transition-all duration-150"
+                className="w-full text-left rounded-xl border-2 px-4 py-3 flex items-start gap-3 transition-all duration-150"
                 style={{
                   borderColor: sel ? "var(--klova-accent)" : "var(--border-default)",
                   background: sel ? "var(--klova-accent-soft)" : "var(--surface-card)",
                 }}
               >
                 <div
-                  className="w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0"
+                  className="w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5"
                   style={{ borderColor: sel ? "var(--klova-accent)" : "var(--border-strong)" }}
                 >
                   {sel && <div className="w-2 h-2 rounded-full" style={{ background: "var(--klova-accent)" }} />}
                 </div>
-                <p className="font-semibold text-base" style={{ color: sel ? "var(--klova-primary)" : "var(--text-strong)" }}>
-                  {label}
-                </p>
+                <div>
+                  <p className="font-semibold text-base" style={{ color: sel ? "var(--klova-primary)" : "var(--text-strong)" }}>
+                    {label}
+                  </p>
+                  {desc && (
+                    <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>{desc}</p>
+                  )}
+                </div>
               </button>
             );
           })}
@@ -122,7 +127,7 @@ export default function Step10Checkout({ data, patch, price, onNext, onBack }: P
               className="font-semibold text-sm"
               style={{ color: data.wantsInsurance ? "var(--klova-primary)" : "var(--text-strong)" }}
             >
-              Add insurance — {formatNGN(INSURANCE_FEE)} per visit
+              Add insurance — {formatNGN(INSURANCE_FEE)}
             </p>
             <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
               Protection against stolen or damaged items. Covers up to ₦200,000.
