@@ -8,7 +8,7 @@ const BOOKING_SELECT = `
   status, paystack_reference, refunded_at,
   created_at, updated_at,
   customer:customers(id, first_name, last_name, phone, email),
-  cleaner:cleaners(id, first_name, last_name, phone, photo_url, nin_verified, rating, total_jobs),
+  cleaner:cleaners!cleaner_id(id, first_name, last_name, phone, photo_url, nin_verified, rating, total_jobs),
   zone:zones(id, name, slug),
   service:services(id, name, slug),
   booking_addons(addon:addons(id, name, slug, amount_kobo))
