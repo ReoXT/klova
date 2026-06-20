@@ -8,7 +8,12 @@ vi.mock('../lib/supabase', () => ({
   supabase: { from: vi.fn() },
 }));
 
+vi.mock('../services/notificationService', () => ({
+  notifyAdminTransportPaid: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { supabase } from '../lib/supabase';
+import { notifyAdminTransportPaid } from '../services/notificationService';
 import {
   createTransportInvoice,
   resendTransportInvoice,
@@ -298,19 +303,17 @@ describe('handleTransportInvoicePaid — booking not found', () => {
 describe('handleTransportInvoicePaid — idempotency', () => {
   it('does nothing when transport_status is already paid', async () => {
     vi.mocked(supabase.from).mockReturnValueOnce(
-      chain({
-        data: { id: 'b6', transport_status: 'paid' },
-        error: null,
-      }) as any,
+      chain({ data: { id: 'b6', transport_status: 'paid' }, error: null }) as any,
     );
     await expect(handleTransportInvoicePaid('PRQ_already_paid')).resolves.toBeUndefined();
-    // Only one supabase call (the fetch) — no update call
+    // Only one supabase call (the fetch) — no update, no notification
     expect(vi.mocked(supabase.from)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(notifyAdminTransportPaid)).not.toHaveBeenCalled();
   });
 });
 
 describe('handleTransportInvoicePaid — happy path', () => {
-  it('sets transport_status to paid and transport_paid_at', async () => {
+  it('sets transport_status to paid, stamps transport_paid_at, and notifies admin', async () => {
     vi.mocked(supabase.from)
       .mockReturnValueOnce(
         chain({ data: { id: 'b7', transport_status: 'awaiting_payment' }, error: null }) as any,
@@ -319,7 +322,21 @@ describe('handleTransportInvoicePaid — happy path', () => {
 
     await expect(handleTransportInvoicePaid('PRQ_paid_001')).resolves.toBeUndefined();
 
-    // Two calls: maybeSingle fetch + update
+    // Two DB calls: maybeSingle fetch + update
     expect(vi.mocked(supabase.from)).toHaveBeenCalledTimes(2);
+
+    // Admin is notified that transport is paid and booking is ready to dispatch
+    expect(vi.mocked(notifyAdminTransportPaid)).toHaveBeenCalledOnce();
+    expect(vi.mocked(notifyAdminTransportPaid)).toHaveBeenCalledWith('b7');
+  });
+
+  it('does NOT notify admin when the booking was already paid (duplicate webhook)', async () => {
+    vi.mocked(supabase.from).mockReturnValueOnce(
+      chain({ data: { id: 'b6-dup', transport_status: 'paid' }, error: null }) as any,
+    );
+
+    await handleTransportInvoicePaid('PRQ_already_paid_2');
+
+    expect(vi.mocked(notifyAdminTransportPaid)).not.toHaveBeenCalled();
   });
 });

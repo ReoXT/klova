@@ -43,6 +43,24 @@ export function cleanerNewJobMsg(ctx: BookingNotifContext): string {
   );
 }
 
+// ─── Admin — transport paid ───────────────────────────────────────────────────
+// Fires when the customer pays the Paystack transport Payment Request.
+// Short enough for a quick glance — full details are in the dashboard.
+
+export function adminTransportPaidMsg(
+  bookingId: string,
+  fareNgn: number,
+  customerName: string,
+  bookingDate: string,
+): string {
+  return (
+    `Transport paid — booking ${bookingId.slice(0, 8).toUpperCase()}. ` +
+    `₦${fareNgn.toLocaleString('en-NG')} received. ` +
+    `Customer: ${customerName}. Date: ${bookingDate}. ` +
+    `Confirm dispatch when ready.`
+  );
+}
+
 // ─── Customer ─────────────────────────────────────────────────────────────────
 // Reserved for when the admin panel can trigger dispatch confirmation.
 // Not sent automatically — admin contacts the customer manually for V1.

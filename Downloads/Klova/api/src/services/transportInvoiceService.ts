@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase';
 import { config } from '../config';
 import { TransportFareError } from './transportFareService';
+import { notifyAdminTransportPaid } from './notificationService';
 
 // ─── Paystack response types ──────────────────────────────────────────────────
 
@@ -214,4 +215,8 @@ export async function handleTransportInvoicePaid(requestCode: string): Promise<v
     .eq('id', booking.id as string);
 
   console.log(`[transport-invoice] PRQ ${requestCode} paid — booking ${booking.id as string} transport_status → paid`);
+
+  // Notify admin: transport settled, booking ready to dispatch.
+  // notifyAdminTransportPaid uses safeSend internally — never throws.
+  await notifyAdminTransportPaid(booking.id as string);
 }

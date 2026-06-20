@@ -4,6 +4,7 @@ import { sendSms, sendWhatsApp } from '../lib/termiiClient';
 import {
   BookingNotifContext,
   adminPaidBookingMsg,
+  adminTransportPaidMsg,
   cleanerNewJobMsg,
   customerDispatchConfirmedMsg,
 } from '../lib/messageTemplates';
@@ -113,6 +114,35 @@ export async function notifyCleanerNewJob(bookingId: string): Promise<void> {
 
   await safeSend(() => sendWhatsApp(ctx.cleanerPhone, msg), 'cleaner-whatsapp');
   await safeSend(() => sendSms(ctx.cleanerPhone, msg),      'cleaner-sms');
+}
+
+// Fires when the Paystack transport Payment Request is paid.
+// Tells admin the transport is settled and the booking is ready to dispatch.
+export async function notifyAdminTransportPaid(bookingId: string): Promise<void> {
+  const { data } = await supabase
+    .from('bookings')
+    .select('id, transport_fare, booking_date, customers:customer_id(first_name, last_name)')
+    .eq('id', bookingId)
+    .single();
+
+  if (!data) {
+    console.error(`[notify] Could not fetch booking ${bookingId} for transport paid notification`);
+    return;
+  }
+  if (!config.adminPhone) {
+    console.log(`[notify] ADMIN_PHONE not set — skipping transport paid SMS for booking ${bookingId}`);
+    return;
+  }
+
+  const customer = data.customers as unknown as { first_name: string; last_name: string } | null;
+  const customerName = customer ? `${customer.first_name} ${customer.last_name}` : 'Customer';
+  const fareNgn = Math.round(Number(data.transport_fare));
+  const bookingDate = formatDate(data.booking_date as string);
+
+  await safeSend(
+    () => sendSms(config.adminPhone!, adminTransportPaidMsg(bookingId, fareNgn, customerName, bookingDate)),
+    'admin-transport-paid',
+  );
 }
 
 // Reserved for the admin panel — fires when admin manually confirms cleaner dispatch.

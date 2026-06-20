@@ -31,9 +31,14 @@ vi.mock('../services/refundService', () => ({
   issueRefund: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock('../services/transportInvoiceService', () => ({
+  handleTransportInvoicePaid: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { supabase } from '../lib/supabase';
 import { notifyAdminPaidBooking, notifyCleanerNewJob } from '../services/notificationService';
 import { issueRefund } from '../services/refundService';
+import { handleTransportInvoicePaid } from '../services/transportInvoiceService';
 import { postPaystackWebhook } from '../controllers/webhookController';
 
 // ─── Mock helpers ─────────────────────────────────────────────────────────────
@@ -235,6 +240,120 @@ describe('postPaystackWebhook — unhandled / other events', () => {
     );
 
     expect(res.sendStatus).toHaveBeenCalledWith(200);
+    expect(vi.mocked(supabase.from)).not.toHaveBeenCalled();
+  });
+});
+
+// ─── invoice.payment_successful — transport fare paid ─────────────────────────
+//
+// Paystack fires this event when a Payment Request is paid. The handler must:
+//  - call handleTransportInvoicePaid with the request_code
+//  - leave the clean-payment path (charge.success / matching / clean fields) untouched
+//  - be idempotent on duplicate delivery
+
+describe('postPaystackWebhook — invoice.payment_successful', () => {
+  it('calls handleTransportInvoicePaid with the correct request_code and returns 200', async () => {
+    const REQ_CODE = 'PRQ_transport_001';
+
+    const res = mockRes();
+    await postPaystackWebhook(
+      signedReq({
+        event: 'invoice.payment_successful',
+        data: { request_code: REQ_CODE, paid: true, paid_at: new Date().toISOString(), amount: 250000 },
+      }) as any,
+      res,
+    );
+
+    expect(res.sendStatus).toHaveBeenCalledWith(200);
+    expect(vi.mocked(handleTransportInvoicePaid)).toHaveBeenCalledOnce();
+    expect(vi.mocked(handleTransportInvoicePaid)).toHaveBeenCalledWith(REQ_CODE);
+  });
+
+  it('is idempotent — a duplicate delivery calls handleTransportInvoicePaid again and still returns 200', async () => {
+    // handleTransportInvoicePaid's internal idempotency guard (transport_status === 'paid')
+    // prevents double-processing; the webhook layer just passes through both times.
+    const REQ_CODE = 'PRQ_transport_dup';
+
+    const res1 = mockRes();
+    const res2 = mockRes();
+
+    await postPaystackWebhook(
+      signedReq({ event: 'invoice.payment_successful', data: { request_code: REQ_CODE } }) as any,
+      res1,
+    );
+    await postPaystackWebhook(
+      signedReq({ event: 'invoice.payment_successful', data: { request_code: REQ_CODE } }) as any,
+      res2,
+    );
+
+    expect(res1.sendStatus).toHaveBeenCalledWith(200);
+    expect(res2.sendStatus).toHaveBeenCalledWith(200);
+    expect(vi.mocked(handleTransportInvoicePaid)).toHaveBeenCalledTimes(2);
+  });
+
+  it('returns 200 and skips handleTransportInvoicePaid when request_code is absent', async () => {
+    const res = mockRes();
+    await postPaystackWebhook(
+      signedReq({ event: 'invoice.payment_successful', data: {} }) as any,
+      res,
+    );
+
+    expect(res.sendStatus).toHaveBeenCalledWith(200);
+    expect(vi.mocked(handleTransportInvoicePaid)).not.toHaveBeenCalled();
+  });
+
+  it('rejects an invoice.payment_successful with a bad signature — does not call handleTransportInvoicePaid', async () => {
+    const req = {
+      body: Buffer.from('{"event":"invoice.payment_successful","data":{"request_code":"PRQ_hack"}}', 'utf8'),
+      headers: { 'x-paystack-signature': 'deadbeefdeadbeef' },
+    };
+    const res = mockRes();
+    await postPaystackWebhook(req as any, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(vi.mocked(handleTransportInvoicePaid)).not.toHaveBeenCalled();
+  });
+});
+
+// ─── Path isolation — clean-payment and transport must never cross ─────────────
+//
+// A charge.success (clean payment) must NEVER call handleTransportInvoicePaid.
+// An invoice.payment_successful (transport) must NEVER call notifyAdminPaidBooking,
+// notifyCleanerNewJob, or issueRefund — and must never trigger any matching logic.
+
+describe('postPaystackWebhook — path isolation', () => {
+  it('charge.success does NOT call handleTransportInvoicePaid', async () => {
+    vi.mocked(supabase.from)
+      .mockReturnValueOnce(chain({ data: [{ id: 'bid-iso-clean' }], error: null }) as any);
+
+    const res = mockRes();
+    await postPaystackWebhook(
+      signedReq({ event: 'charge.success', data: { reference: 'txn_iso_clean' } }) as any,
+      res,
+    );
+
+    expect(res.sendStatus).toHaveBeenCalledWith(200);
+    expect(vi.mocked(handleTransportInvoicePaid)).not.toHaveBeenCalled();
+    // Clean-payment notifications still fire
+    expect(vi.mocked(notifyAdminPaidBooking)).toHaveBeenCalledOnce();
+    expect(vi.mocked(notifyCleanerNewJob)).toHaveBeenCalledOnce();
+  });
+
+  it('invoice.payment_successful does NOT call notifyAdminPaidBooking, notifyCleanerNewJob, or issueRefund', async () => {
+    const res = mockRes();
+    await postPaystackWebhook(
+      signedReq({
+        event: 'invoice.payment_successful',
+        data: { request_code: 'PRQ_iso_transport' },
+      }) as any,
+      res,
+    );
+
+    expect(res.sendStatus).toHaveBeenCalledWith(200);
+    expect(vi.mocked(notifyAdminPaidBooking)).not.toHaveBeenCalled();
+    expect(vi.mocked(notifyCleanerNewJob)).not.toHaveBeenCalled();
+    expect(vi.mocked(issueRefund)).not.toHaveBeenCalled();
+    // No direct DB access from the webhook layer — all DB work is inside the mocked service
     expect(vi.mocked(supabase.from)).not.toHaveBeenCalled();
   });
 });
