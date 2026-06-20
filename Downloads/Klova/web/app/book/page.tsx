@@ -324,7 +324,7 @@ export default function BookPage() {
       </div>
 
       {/* Step content */}
-      <div key={animKey} className="fade-up flex-1 pb-40">
+      <div key={animKey} className="fade-in flex-1 pb-40">
         {noMatchDates !== null ? (
           <StepNoMatch
             data={data}

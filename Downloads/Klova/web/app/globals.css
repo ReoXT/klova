@@ -158,6 +158,17 @@ body {
 .fade-up-3 { animation-delay: 0.24s; }
 .fade-up-4 { animation-delay: 0.36s; }
 
+/* Opacity-only entrance. Use on any wrapper that contains a position:fixed
+   child (e.g. the booking-step footer): a lingering transform would make the
+   wrapper the containing block for the fixed footer and push it below the
+   viewport. Opacity does not establish a containing block, so the footer stays
+   anchored to the viewport. */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.fade-in { animation: fade-in 0.45s ease both; }
+
 @keyframes float {
   0%, 100% { transform: translateY(0px); }
   50%       { transform: translateY(-10px); }
