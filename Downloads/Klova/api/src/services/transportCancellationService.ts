@@ -85,8 +85,8 @@ export async function getAwaitingTransportBookings(): Promise<AwaitingTransportB
       address:                 row.address as string,
       transport_fare:          row.transport_fare as number,
       transport_awaiting_since: (row.transport_awaiting_since as string | null) ?? null,
-      customer:                row.customers as AwaitingTransportBooking['customer'],
-      cleaner:                 row.cleaners  as AwaitingTransportBooking['cleaner'],
+      customer:                row.customers as unknown as AwaitingTransportBooking['customer'],
+      cleaner:                 row.cleaners  as unknown as AwaitingTransportBooking['cleaner'],
       hours_waiting:           Math.round(hours * 10) / 10, // 1 d.p.
       is_soft_overdue:         softOverdue,
       is_booking_date_passed:  bookingDatePassed,
