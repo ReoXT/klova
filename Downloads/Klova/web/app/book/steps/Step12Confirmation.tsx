@@ -7,6 +7,7 @@ import { SERVICES, formatNGN } from "../data";
 import { SUPPORT_PHONE } from "@/lib/contact";
 import { Button } from "@/components/ui/Button";
 import { ConfirmNextSteps } from "../ConfirmNextSteps";
+import { Section, SoftCard, Field } from "../confirmUI";
 
 interface Props {
   data: BookingData;
@@ -54,53 +55,60 @@ export default function Step12Confirmation({ data, price }: Props) {
         </p>
       </div>
 
-      <ConfirmNextSteps email={data.email} className="mb-6" />
+      <div className="space-y-7">
+        <ConfirmNextSteps email={data.email} />
 
-      {/* Booking card */}
-      <div
-        className="rounded-2xl border divide-y text-sm mb-6"
-        style={{ borderColor: "var(--border-default)", background: "var(--surface-card)" }}
-      >
-        <div className="px-5 py-4">
-          <p className="text-xs font-medium uppercase tracking-wider mb-3" style={{ color: "var(--text-subtle)" }}>
-            Booking details
-          </p>
-          <div className="space-y-2">
-            <ConfRow label="Service">{service?.name}</ConfRow>
-            <ConfRow label="Date">{bookingDate}</ConfRow>
-            <ConfRow label="Time">{data.timeSlot}</ConfRow>
-            <ConfRow label="Address">{data.address}</ConfRow>
-            <ConfRow label="Paid">{formatNGN(price.monthlyTotal)}</ConfRow>
-          </div>
-        </div>
-
-        {/* Keeper — details confirmed post-payment via /book/confirm */}
-        <div className="px-5 py-4">
-          <p className="text-xs font-medium uppercase tracking-wider mb-3" style={{ color: "var(--text-subtle)" }}>
-            Your keeper
-          </p>
-          <div className="flex items-center gap-3">
-            <div
-              className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
-              style={{ background: "var(--klova-primary-soft)" }}
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}
-                style={{ color: "var(--klova-primary)" }}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
+        <Section title="Booking details">
+          <SoftCard>
+            <div className="space-y-5">
+              <Field label="Service">{service?.name}</Field>
+              <Field label="Address">{data.address}</Field>
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Date">{bookingDate}</Field>
+                <Field label="Arrival">{data.timeSlot}</Field>
+              </div>
             </div>
-            <div>
-              <p className="font-semibold text-sm" style={{ color: "var(--text-strong)" }}>Verified Keeper</p>
-              <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
-                Full details sent to {data.email || "your email"}
+          </SoftCard>
+        </Section>
+
+        <Section title="Your keeper">
+          <SoftCard>
+            <div className="flex items-center gap-4">
+              <div
+                className="w-14 h-14 rounded-full flex items-center justify-center shrink-0"
+                style={{ background: "var(--klova-primary-soft)" }}
+              >
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}
+                  style={{ color: "var(--klova-primary)" }}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              </div>
+              <div className="min-w-0">
+                <p className="text-[15px] font-semibold" style={{ color: "var(--text-strong)" }}>Verified Keeper</p>
+                <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
+                  Full details sent to {data.email || "your email"}
+                </p>
+              </div>
+            </div>
+          </SoftCard>
+        </Section>
+
+        <Section title="Payment">
+          <SoftCard>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-[15px] font-medium" style={{ color: "var(--text-strong)" }}>Total paid</p>
+                <p className="text-xs mt-0.5" style={{ color: "var(--text-subtle)" }}>Paid securely via Paystack</p>
+              </div>
+              <p className="text-xl font-bold tabular-nums" style={{ color: "var(--klova-accent)" }}>
+                {formatNGN(price.monthlyTotal)}
               </p>
             </div>
-          </div>
-        </div>
-
+          </SoftCard>
+        </Section>
       </div>
 
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-3 mt-8">
         <Link href="/" className="w-full">
           <Button variant="primary" className="w-full">Back to home</Button>
         </Link>
@@ -111,15 +119,6 @@ export default function Step12Confirmation({ data, price }: Props) {
           </a>
         </p>
       </div>
-    </div>
-  );
-}
-
-function ConfRow({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex justify-between gap-2">
-      <span style={{ color: "var(--text-muted)" }}>{label}</span>
-      <span className="font-medium text-right" style={{ color: "var(--text-body)" }}>{children}</span>
     </div>
   );
 }

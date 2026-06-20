@@ -7,6 +7,7 @@ import type { ApiCleaner, ServiceSlug } from "../types";
 import { SUPPORT_PHONE } from "@/lib/contact";
 import { Button } from "@/components/ui/Button";
 import { ConfirmNextSteps } from "../ConfirmNextSteps";
+import { Section, SoftCard, Field, Pill } from "../confirmUI";
 
 interface BookingSummary {
   booking_id: string;
@@ -79,82 +80,86 @@ export default function BookConfirmPage() {
         </p>
       </div>
 
-      <ConfirmNextSteps email={summary?.email} className="mb-6" />
+      <div className="space-y-7">
+        <ConfirmNextSteps email={summary?.email} />
 
-      {/* Booking card */}
-      {summary && (
-        <div
-          className="rounded-2xl border text-sm mb-6 overflow-hidden"
-          style={{ borderColor: "var(--border-default)", background: "var(--surface-card)" }}
-        >
-          <div className="px-5 py-4">
-            <p className="text-xs font-medium uppercase tracking-wider mb-3" style={{ color: "var(--text-subtle)" }}>
-              Booking details
-            </p>
-            <div className="space-y-2">
-              {service && <ConfRow label="Service">{service.name}</ConfRow>}
-              {summary.bedrooms && (
-                <ConfRow label="Size">
-                  {summary.bedrooms} bedroom{summary.bedrooms === "1" ? "" : "s"}
-                </ConfRow>
-              )}
-              {bookingDate && <ConfRow label="Date">{bookingDate}</ConfRow>}
-              {summary.timeSlot && <ConfRow label="Arrival">{summary.timeSlot}</ConfRow>}
-              {summary.address && <ConfRow label="Address">{summary.address}</ConfRow>}
-              {summary.serverTotal !== null && (
-                <ConfRow label="Paid">
-                  <span style={{ color: "var(--klova-accent)", fontWeight: 700 }}>
-                    {formatNGN(summary.serverTotal)}
-                  </span>
-                </ConfRow>
-              )}
-            </div>
-          </div>
+        {summary && (
+          <Section title="Booking details">
+            <SoftCard>
+              <div className="space-y-5">
+                {service && <Field label="Service">{service.name}</Field>}
+                {summary.bedrooms && (
+                  <Field label="Home size">
+                    <Pill>
+                      {summary.bedrooms} bedroom{summary.bedrooms === "1" ? "" : "s"}
+                    </Pill>
+                  </Field>
+                )}
+                {summary.address && <Field label="Address">{summary.address}</Field>}
+                {(bookingDate || summary.timeSlot) && (
+                  <div className="grid grid-cols-2 gap-4">
+                    {bookingDate && <Field label="Date">{bookingDate}</Field>}
+                    {summary.timeSlot && <Field label="Arrival">{summary.timeSlot}</Field>}
+                  </div>
+                )}
+              </div>
+            </SoftCard>
+          </Section>
+        )}
 
-          {summary.cleaner && (
-            <div
-              className="px-5 py-4"
-              style={{ borderTop: "1px solid var(--border-default)" }}
-            >
-              <p className="text-xs font-medium uppercase tracking-wider mb-3" style={{ color: "var(--text-subtle)" }}>
-                Your keeper
-              </p>
-              <div className="flex items-center gap-3">
+        {summary?.cleaner && (
+          <Section title="Your keeper">
+            <SoftCard>
+              <div className="flex items-center gap-4">
                 {summary.cleaner.photo_url ? (
                   <img
                     src={summary.cleaner.photo_url}
                     alt={summary.cleaner.first_name}
-                    className="w-12 h-12 rounded-full object-cover shrink-0"
+                    className="w-14 h-14 rounded-full object-cover shrink-0"
                   />
                 ) : (
                   <div
-                    className="w-12 h-12 rounded-full flex items-center justify-center font-semibold text-lg shrink-0"
+                    className="w-14 h-14 rounded-full flex items-center justify-center font-semibold text-lg shrink-0"
                     style={{ background: "var(--klova-primary-soft)", color: "var(--klova-primary)" }}
                   >
                     {summary.cleaner.first_name[0]}{summary.cleaner.last_name[0]}
                   </div>
                 )}
-                <div>
-                  <p className="font-semibold" style={{ color: "var(--text-strong)" }}>
+                <div className="min-w-0">
+                  <p className="text-[15px] font-semibold" style={{ color: "var(--text-strong)" }}>
                     {summary.cleaner.first_name} {summary.cleaner.last_name}
                   </p>
-                  <div className="flex items-center gap-1 mt-0.5">
-                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"
+                  <div className="flex items-center gap-1.5 mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
+                    <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="currentColor"
                       style={{ color: "var(--klova-accent)" }}>
                       <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
                     </svg>
-                    <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                      {summary.cleaner.rating.toFixed(1)} · {summary.cleaner.total_jobs} jobs · Verified
-                    </span>
+                    <span>{summary.cleaner.rating.toFixed(1)} · {summary.cleaner.total_jobs} jobs · Verified</span>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
-        </div>
-      )}
+            </SoftCard>
+          </Section>
+        )}
 
-      <div className="flex flex-col gap-3">
+        {summary?.serverTotal != null && (
+          <Section title="Payment">
+            <SoftCard>
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-[15px] font-medium" style={{ color: "var(--text-strong)" }}>Total paid</p>
+                  <p className="text-xs mt-0.5" style={{ color: "var(--text-subtle)" }}>Paid securely via Paystack</p>
+                </div>
+                <p className="text-xl font-bold tabular-nums" style={{ color: "var(--klova-accent)" }}>
+                  {formatNGN(summary.serverTotal)}
+                </p>
+              </div>
+            </SoftCard>
+          </Section>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-3 mt-8">
         <Link href="/" className="w-full" onClick={clearSummary}>
           <Button variant="primary" className="w-full">Back to home</Button>
         </Link>
@@ -165,15 +170,6 @@ export default function BookConfirmPage() {
           </a>
         </p>
       </div>
-    </div>
-  );
-}
-
-function ConfRow({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex justify-between gap-4">
-      <span style={{ color: "var(--text-muted)" }}>{label}</span>
-      <span className="font-medium text-right" style={{ color: "var(--text-body)" }}>{children}</span>
     </div>
   );
 }

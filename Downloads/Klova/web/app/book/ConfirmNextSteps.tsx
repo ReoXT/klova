@@ -1,12 +1,12 @@
 import type { ReactNode } from "react";
+import { Section, SoftCard } from "./confirmUI";
 
 /**
- * The "what happens next" card on the booking confirmation screen.
+ * The "what's next" card on the booking confirmation screen.
  *
- * Replaces three separate full-colour alert blocks (green / blue / amber) with a
- * single calm, cohesive card. Colour is retained only as a small icon accent per
- * row so each item keeps its meaning, while the overall look stays premium and
- * low-noise — matching the booking-details card directly below it.
+ * Three rows (confirmed / transport / prepare) separated by whitespace, not
+ * divider lines. Colour lives only in the small icon tile per row, so the card
+ * stays calm and premium while each item keeps its meaning.
  */
 
 type Tone = "confirmed" | "transport" | "prepare";
@@ -36,12 +36,9 @@ const ICON: Record<Tone, ReactNode> = {
   ),
 };
 
-function Row({ tone, title, children, first }: { tone: Tone; title: string; children: ReactNode; first?: boolean }) {
+function Row({ tone, title, children }: { tone: Tone; title: string; children: ReactNode }) {
   return (
-    <div
-      className="flex items-start gap-3.5 px-5 py-4"
-      style={first ? undefined : { borderTop: "1px solid var(--border-default)" }}
-    >
+    <div className="flex items-start gap-3.5">
       <span
         className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
         style={{ background: TONE[tone].bg, color: TONE[tone].fg }}
@@ -58,22 +55,23 @@ function Row({ tone, title, children, first }: { tone: Tone; title: string; chil
 
 export function ConfirmNextSteps({ email, className = "" }: { email?: string; className?: string }) {
   return (
-    <div
-      className={`rounded-2xl border overflow-hidden ${className}`}
-      style={{ borderColor: "var(--border-default)", background: "var(--surface-card)" }}
-    >
-      <Row tone="confirmed" title="Booking confirmed" first>
-        Order updates and your full receipt will be sent to{" "}
-        <strong style={{ color: "var(--text-body)" }}>{email || "your email"}</strong>.
-        Your keeper will be in touch before arrival.
-      </Row>
-      <Row tone="transport" title="One more thing">
-        Expect a Paystack payment link shortly for a small transport fare to get your keeper to your home.
-      </Row>
-      <Row tone="prepare" title="Before your keeper arrives">
-        Please have a broom, mop, bin liners, cleaning sprays, gloves and other cleaning equipment ready at home.
-        Your keeper brings none of their own.
-      </Row>
-    </div>
+    <Section title="What's next" className={className}>
+      <SoftCard>
+        <div className="space-y-5">
+          <Row tone="confirmed" title="Booking confirmed">
+            Order updates and your full receipt will be sent to{" "}
+            <strong style={{ color: "var(--text-body)" }}>{email || "your email"}</strong>.
+            Your keeper will be in touch before arrival.
+          </Row>
+          <Row tone="transport" title="One more thing">
+            Expect a Paystack payment link shortly for a small transport fare to get your keeper to your home.
+          </Row>
+          <Row tone="prepare" title="Before your keeper arrives">
+            Please have a broom, mop, bin liners, cleaning sprays, gloves and other cleaning equipment ready at home.
+            Your keeper brings none of their own.
+          </Row>
+        </div>
+      </SoftCard>
+    </Section>
   );
 }
