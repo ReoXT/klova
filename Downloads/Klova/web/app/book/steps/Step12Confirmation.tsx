@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { BookingData } from "../types";
 import type { PriceBreakdown } from "../types";
 import { SERVICES, formatNGN } from "../data";
+import { SUPPORT_PHONE } from "@/lib/contact";
 import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
 
@@ -116,8 +117,8 @@ export default function Step12Confirmation({ data, price }: Props) {
         </Link>
         <p className="text-xs text-center" style={{ color: "var(--text-subtle)" }}>
           Questions? WhatsApp us at{" "}
-          <a href="https://wa.me/2348000000000" className="underline" target="_blank" rel="noopener">
-            +234 800 000 0000
+          <a href={`https://wa.me/${SUPPORT_PHONE}`} className="underline" target="_blank" rel="noopener">
+            WhatsApp
           </a>
         </p>
       </div>

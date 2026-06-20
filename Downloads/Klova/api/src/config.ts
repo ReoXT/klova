@@ -8,9 +8,14 @@ function required(key: string): string {
   return value;
 }
 
+// Strip trailing slash so CORS matches what browsers send (origin never has a slash)
+function cleanOrigin(raw: string): string {
+  return raw.replace(/\/+$/, '');
+}
+
 export const config = {
   port: parseInt(process.env.PORT ?? '4000', 10),
-  frontendOrigin: process.env.FRONTEND_ORIGIN ?? 'http://localhost:3000',
+  frontendOrigin: cleanOrigin(process.env.FRONTEND_ORIGIN ?? 'http://localhost:3000'),
   commissionRate: parseFloat(process.env.COMMISSION_RATE ?? '0.22'),
   nodeEnv: process.env.NODE_ENV ?? 'development',
   supabaseUrl: required('SUPABASE_URL'),
@@ -22,3 +27,9 @@ export const config = {
   // Phone to receive the admin confirmation SMS per paid booking
   adminPhone: process.env.ADMIN_PHONE,
 };
+
+// Startup diagnostics — visible in Railway logs immediately after deploy
+console.log('[config] CORS origin:', config.frontendOrigin);
+console.log('[config] Paystack key present:', config.paystackSecretKey.startsWith('sk_live_') ? 'LIVE ✓' : config.paystackSecretKey.startsWith('sk_test_') ? 'TEST (switch to live!)' : 'MISSING ✗');
+console.log('[config] Termii:', config.termiiApiKey ? 'configured ✓' : 'not set — SMS disabled');
+console.log('[config] Admin phone:', config.adminPhone ? 'set ✓' : 'not set — admin SMS disabled');

@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { SUPPORT_PHONE } from "@/lib/contact";
 
 const LEGAL_LINKS = [
   { label: "Terms of Service",       href: "/terms" },
@@ -33,7 +34,7 @@ export function SiteFooter() {
               Support
             </p>
             <a
-              href="https://wa.me/2348000000000"
+              href={`https://wa.me/${SUPPORT_PHONE}`}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2.5 text-sm text-base-content hover:text-primary transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 rounded-sm"
