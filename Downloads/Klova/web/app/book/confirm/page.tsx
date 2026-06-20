@@ -6,8 +6,7 @@ import { SERVICES, formatNGN } from "../data";
 import type { ApiCleaner, ServiceSlug } from "../types";
 import { SUPPORT_PHONE } from "@/lib/contact";
 import { Button } from "@/components/ui/Button";
-import { Alert } from "@/components/ui/Alert";
-import { TransportNote } from "../TransportNote";
+import { ConfirmNextSteps } from "../ConfirmNextSteps";
 
 interface BookingSummary {
   booking_id: string;
@@ -29,15 +28,23 @@ export default function BookConfirmPage() {
   useEffect(() => {
     try {
       const raw = sessionStorage.getItem("klova_booking_summary");
-      if (raw) {
-        setSummary(JSON.parse(raw) as BookingSummary);
-        sessionStorage.removeItem("klova_booking_summary");
-        sessionStorage.removeItem("klova_booking_id");
-      }
+      if (raw) setSummary(JSON.parse(raw) as BookingSummary);
+      // Reset the in-progress booking id so the /book flow starts fresh, but keep
+      // the summary so the confirmation (and keeper card) survives a page refresh.
+      sessionStorage.removeItem("klova_booking_id");
     } catch {
       // session storage unavailable — show generic confirmation
     }
   }, []);
+
+  // Clear the saved summary only when the customer actually leaves this screen.
+  function clearSummary() {
+    try {
+      sessionStorage.removeItem("klova_booking_summary");
+    } catch {
+      // ignore
+    }
+  }
 
   const service = SERVICES.find((s) => s.slug === summary?.service);
 
@@ -72,15 +79,7 @@ export default function BookConfirmPage() {
         </p>
       </div>
 
-      <Alert variant="success" title="Booking confirmed" className="mb-6">
-        <p>
-          Order updates and your full receipt will be sent to{" "}
-          <strong>{summary?.email || "your email"}</strong>.
-          Your keeper will be in touch before arrival.
-        </p>
-      </Alert>
-
-      <TransportNote className="mb-6" />
+      <ConfirmNextSteps email={summary?.email} className="mb-6" />
 
       {/* Booking card */}
       {summary && (
@@ -155,12 +154,8 @@ export default function BookConfirmPage() {
         </div>
       )}
 
-      <Alert variant="warning" title="Before your keeper arrives" className="mb-6">
-        Please have a broom, mop, bin liners, cleaning sprays and gloves ready at home your keeper brings no equipment.
-      </Alert>
-
       <div className="flex flex-col gap-3">
-        <Link href="/" className="w-full">
+        <Link href="/" className="w-full" onClick={clearSummary}>
           <Button variant="primary" className="w-full">Back to home</Button>
         </Link>
         <p className="text-xs text-center" style={{ color: "var(--text-subtle)" }}>

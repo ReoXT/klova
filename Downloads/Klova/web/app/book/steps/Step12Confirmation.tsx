@@ -6,8 +6,7 @@ import type { PriceBreakdown } from "../types";
 import { SERVICES, formatNGN } from "../data";
 import { SUPPORT_PHONE } from "@/lib/contact";
 import { Button } from "@/components/ui/Button";
-import { Alert } from "@/components/ui/Alert";
-import { TransportNote } from "../TransportNote";
+import { ConfirmNextSteps } from "../ConfirmNextSteps";
 
 interface Props {
   data: BookingData;
@@ -55,15 +54,7 @@ export default function Step12Confirmation({ data, price }: Props) {
         </p>
       </div>
 
-      <Alert variant="success" title="Booking confirmed" className="mb-6">
-        <p>
-          Order updates and your full receipt will be sent to{" "}
-          <strong>{data.email || "your email"}</strong>.
-          Your keeper will be in touch before arrival.
-        </p>
-      </Alert>
-
-      <TransportNote className="mb-6" />
+      <ConfirmNextSteps email={data.email} className="mb-6" />
 
       {/* Booking card */}
       <div
@@ -108,11 +99,6 @@ export default function Step12Confirmation({ data, price }: Props) {
         </div>
 
       </div>
-
-      {/* Reminder */}
-      <Alert variant="warning" title="Before your keeper arrives" className="mb-6">
-        Please have a broom, mop, bin liners, cleaning sprays and gloves ready at home, your keeper brings no equipment.
-      </Alert>
 
       <div className="flex flex-col gap-3">
         <Link href="/" className="w-full">
