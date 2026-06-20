@@ -7,6 +7,7 @@ import { SERVICES, formatNGN } from "../data";
 import { SUPPORT_PHONE } from "@/lib/contact";
 import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
+import { TransportNote } from "../TransportNote";
 
 interface Props {
   data: BookingData;
@@ -61,6 +62,8 @@ export default function Step12Confirmation({ data, price }: Props) {
           Your keeper will be in touch before arrival.
         </p>
       </Alert>
+
+      <TransportNote className="mb-6" />
 
       {/* Booking card */}
       <div
