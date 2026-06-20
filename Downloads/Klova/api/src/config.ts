@@ -29,7 +29,7 @@ export const config = {
   // Static bearer token required on all /admin/* routes
   adminApiKey: process.env.ADMIN_API_KEY,
   // Highest transport fare the system will accept without rejecting as a fat-finger (NGN)
-  transportFareCeilingNgn: parseInt(process.env.TRANSPORT_FARE_CEILING_NGN ?? '15000', 10),
+  transportFareCeilingNgn: parseInt(process.env.TRANSPORT_FARE_CEILING_NGN ?? '5000', 10),
 };
 
 // Startup diagnostics — visible in Railway logs immediately after deploy

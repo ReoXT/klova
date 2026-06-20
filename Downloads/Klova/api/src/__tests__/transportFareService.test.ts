@@ -1,7 +1,7 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 
 vi.mock('../config', () => ({
-  config: { transportFareCeilingNgn: 15000 },
+  config: { transportFareCeilingNgn: 5000 },
 }));
 
 vi.mock('../lib/supabase', () => ({
@@ -53,8 +53,8 @@ describe('validateTransportFareInput — valid inputs', () => {
   });
 
   it('accepts amount at exactly the ceiling', () => {
-    const result = validateTransportFareInput({ amount: 15000 });
-    expect(result).toEqual({ action: 'quote', amount_ngn: 15000 });
+    const result = validateTransportFareInput({ amount: 5000 });
+    expect(result).toEqual({ action: 'quote', amount_ngn: 5000 });
   });
 });
 
@@ -82,7 +82,7 @@ describe('validateTransportFareInput — invalid inputs', () => {
 
   it('rejects an amount above the ceiling with 422', () => {
     try {
-      validateTransportFareInput({ amount: 150000 }); // 10× the ₦15,000 ceiling
+      validateTransportFareInput({ amount: 50000 }); // 10× the ₦5,000 ceiling
       expect.fail('should have thrown');
     } catch (err) {
       expect(err).toBeInstanceOf(TransportFareError);
