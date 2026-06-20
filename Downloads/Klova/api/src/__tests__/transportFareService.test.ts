@@ -108,11 +108,11 @@ describe('validateTransportFareInput — invalid inputs', () => {
     } catch (err) {
       expect(err).toBeInstanceOf(TransportFareError);
       expect((err as TransportFareError).status).toBe(400);
-      expect((err as TransportFareError).message).toMatch(/not both/i);
+      expect((err as TransportFareError).message).toMatch(/only one/i);
     }
   });
 
-  it('rejects when neither amount nor waive is provided with 400', () => {
+  it('rejects when neither amount nor waive nor not_required is provided with 400', () => {
     try {
       validateTransportFareInput({});
       expect.fail('should have thrown');
@@ -120,6 +120,24 @@ describe('validateTransportFareInput — invalid inputs', () => {
       expect(err).toBeInstanceOf(TransportFareError);
       expect((err as TransportFareError).status).toBe(400);
     }
+  });
+
+  it('rejects when not_required and amount are both provided with 400', () => {
+    try {
+      validateTransportFareInput({ not_required: true, amount: 500 });
+      expect.fail('should have thrown');
+    } catch (err) {
+      expect(err).toBeInstanceOf(TransportFareError);
+      expect((err as TransportFareError).status).toBe(400);
+      expect((err as TransportFareError).message).toMatch(/only one/i);
+    }
+  });
+});
+
+describe('validateTransportFareInput — not_required', () => {
+  it('accepts not_required: true and returns a not_required action', () => {
+    const result = validateTransportFareInput({ not_required: true });
+    expect(result).toEqual({ action: 'not_required' });
   });
 });
 
@@ -259,5 +277,38 @@ describe('recordTransportFare — happy path waive', () => {
 
     expect(result.transport_fare).toBe(0);
     expect(result.transport_status).toBe('waived');
+  });
+});
+
+describe('recordTransportFare — happy path not_required', () => {
+  it('sets transport_fare to null and transport_status to not_required', async () => {
+    const BOOKING_ID = 'b-notreq-1';
+    const updatedRow = {
+      id: BOOKING_ID,
+      status: 'confirmed',
+      cleaner_id: 'cleaner-local',
+      booking_date: '2026-06-27',
+      address: '3 Eko Street',
+      total_amount_kobo: 1400000,
+      commission_kobo: 308000,
+      transport_fare: null,
+      transport_status: 'not_required',
+      transport_payment_ref: null,
+      transport_paid_at: null,
+    };
+
+    vi.mocked(supabase.from)
+      .mockReturnValueOnce(
+        chain({
+          data: { id: BOOKING_ID, status: 'confirmed', cleaner_id: 'cleaner-local', transport_status: 'pending_quote' },
+          error: null,
+        }) as any,
+      )
+      .mockReturnValueOnce(chain({ data: updatedRow, error: null }) as any);
+
+    const result = await recordTransportFare(BOOKING_ID, { action: 'not_required' });
+
+    expect(result.transport_fare).toBeNull();
+    expect(result.transport_status).toBe('not_required');
   });
 });

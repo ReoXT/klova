@@ -16,34 +16,39 @@ export class TransportFareError extends Error {
 
 export type ValidatedTransportFare =
   | { action: 'quote'; amount_ngn: number }
-  | { action: 'waive' };
+  | { action: 'waive' }
+  | { action: 'not_required' };
 
 // ─── Validation ───────────────────────────────────────────────────────────────
 
 /**
  * Pure synchronous validation — no DB calls.
- * Accepts { amount: <NGN number> } OR { waive: true }, never both.
- * Zero is not a valid quote; pass waive: true instead.
+ * Accepts exactly one of:
+ *   { amount: <positive NGN number> }  — quote a fare
+ *   { waive: true }                    — fare waived (Klova absorbs it)
+ *   { not_required: true }             — no transport needed (Keeper is local)
  */
 export function validateTransportFareInput(body: Record<string, unknown>): ValidatedTransportFare {
-  const hasAmount = body.amount !== undefined && body.amount !== null;
-  const isWaive = body.waive === true;
+  const hasAmount    = body.amount       !== undefined && body.amount       !== null;
+  const isWaive      = body.waive        === true;
+  const isNotRequired = body.not_required === true;
 
-  if (isWaive && hasAmount) {
+  const flagCount = [hasAmount, isWaive, isNotRequired].filter(Boolean).length;
+  if (flagCount === 0) {
     throw new TransportFareError(
-      'Provide either amount or waive: true, not both.',
+      'Provide one of: amount (NGN), waive: true, or not_required: true.',
       400,
     );
   }
-  if (!isWaive && !hasAmount) {
+  if (flagCount > 1) {
     throw new TransportFareError(
-      'Provide either amount (NGN) or waive: true.',
+      'Provide only one of: amount, waive: true, or not_required: true.',
       400,
     );
   }
-  if (isWaive) {
-    return { action: 'waive' };
-  }
+
+  if (isNotRequired) return { action: 'not_required' };
+  if (isWaive)       return { action: 'waive' };
 
   const amount = Number(body.amount);
   if (!Number.isFinite(amount) || amount <= 0) {
@@ -122,9 +127,9 @@ export async function recordTransportFare(
   }
 
   const updates =
-    input.action === 'waive'
-      ? { transport_fare: 0, transport_status: 'waived' }
-      : { transport_fare: input.amount_ngn, transport_status: 'awaiting_payment' };
+    input.action === 'waive'        ? { transport_fare: 0,               transport_status: 'waived'           }
+  : input.action === 'not_required' ? { transport_fare: null,            transport_status: 'not_required'     }
+  :                                   { transport_fare: input.amount_ngn, transport_status: 'awaiting_payment' };
 
   const { data: updated, error: updateErr } = await supabase
     .from('bookings')

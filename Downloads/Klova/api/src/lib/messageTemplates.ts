@@ -61,6 +61,21 @@ export function adminTransportPaidMsg(
   );
 }
 
+// ─── Keeper — dispatch confirmed ─────────────────────────────────────────────
+// Fires when admin hits confirm-dispatch. Transport is already settled by this point.
+// Distinct from cleanerNewJobMsg (which fires on clean-payment) — this is the "go now".
+
+export function keeperDispatchedMsg(ctx: BookingNotifContext): string {
+  return (
+    `Hi ${ctx.cleanerFirstName}! You're confirmed to go for today's Klova job.\n` +
+    `Service: ${ctx.serviceName}\n` +
+    `Date: ${ctx.bookingDate}\n` +
+    `Address: ${ctx.address}\n` +
+    `Customer: ${ctx.customerFirstName} ${ctx.customerLastName} (${ctx.customerPhone})\n` +
+    `Head out on time — the customer has been notified you're coming.`
+  );
+}
+
 // ─── Customer ─────────────────────────────────────────────────────────────────
 // Reserved for when the admin panel can trigger dispatch confirmation.
 // Not sent automatically — admin contacts the customer manually for V1.

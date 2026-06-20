@@ -6,6 +6,7 @@ import {
   adminPaidBookingMsg,
   adminTransportPaidMsg,
   cleanerNewJobMsg,
+  keeperDispatchedMsg,
   customerDispatchConfirmedMsg,
 } from '../lib/messageTemplates';
 
@@ -145,8 +146,19 @@ export async function notifyAdminTransportPaid(bookingId: string): Promise<void>
   );
 }
 
-// Reserved for the admin panel — fires when admin manually confirms cleaner dispatch.
-// Not called from the Paystack webhook. The admin contacts the customer directly for V1.
+// Fires when admin confirms dispatch — "go time" reminder to the Keeper.
+// Always fires alongside notifyCustomerDispatchConfirmed through the gated dispatch endpoint.
+export async function notifyKeeperDispatched(bookingId: string): Promise<void> {
+  const ctx = await fetchNotifContext(bookingId);
+  if (!ctx) return;
+
+  const msg = keeperDispatchedMsg(ctx);
+  await safeSend(() => sendWhatsApp(ctx.cleanerPhone, msg), 'keeper-dispatched-whatsapp');
+  await safeSend(() => sendSms(ctx.cleanerPhone, msg),      'keeper-dispatched-sms');
+}
+
+// Fires when admin confirms dispatch — "you're all set" to the customer.
+// Only ever called through the gated dispatch endpoint (transport must be settled first).
 export async function notifyCustomerDispatchConfirmed(bookingId: string): Promise<void> {
   const ctx = await fetchNotifContext(bookingId);
   if (!ctx) return;
