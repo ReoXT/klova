@@ -78,6 +78,7 @@ export interface BookingTransportRow {
   transport_status: string;
   transport_payment_ref: string | null;
   transport_paid_at: string | null;
+  transport_awaiting_since: string | null;
 }
 
 /**
@@ -126,17 +127,19 @@ export async function recordTransportFare(
     );
   }
 
+  // transport_awaiting_since starts the deadline clock for the admin cockpit.
+  // Only stamp it on a real quote — waived/not_required bookings never need paying.
   const updates =
-    input.action === 'waive'        ? { transport_fare: 0,               transport_status: 'waived'           }
-  : input.action === 'not_required' ? { transport_fare: null,            transport_status: 'not_required'     }
-  :                                   { transport_fare: input.amount_ngn, transport_status: 'awaiting_payment' };
+    input.action === 'waive'        ? { transport_fare: 0,               transport_status: 'waived',           transport_awaiting_since: null }
+  : input.action === 'not_required' ? { transport_fare: null,            transport_status: 'not_required',     transport_awaiting_since: null }
+  :                                   { transport_fare: input.amount_ngn, transport_status: 'awaiting_payment', transport_awaiting_since: new Date().toISOString() };
 
   const { data: updated, error: updateErr } = await supabase
     .from('bookings')
     .update(updates)
     .eq('id', bookingId)
     .select(
-      'id, status, cleaner_id, booking_date, address, total_amount_kobo, commission_kobo, transport_fare, transport_status, transport_payment_ref, transport_paid_at',
+      'id, status, cleaner_id, booking_date, address, total_amount_kobo, commission_kobo, transport_fare, transport_status, transport_payment_ref, transport_paid_at, transport_awaiting_since',
     )
     .single();
 

@@ -61,6 +61,18 @@ export function adminTransportPaidMsg(
   );
 }
 
+// ─── Keeper — job cancelled (transport not paid) ──────────────────────────────
+// Fires when admin cancels a booking because the customer never paid transport.
+// The Keeper's date is freed at the same time this message is sent.
+
+export function keeperJobCancelledMsg(ctx: BookingNotifContext): string {
+  return (
+    `Hi ${ctx.cleanerFirstName}, unfortunately the ${ctx.bookingDate} job has been cancelled. ` +
+    `The customer did not complete their transport payment. ` +
+    `Your date has been freed — you'll receive a new booking soon.`
+  );
+}
+
 // ─── Keeper — dispatch confirmed ─────────────────────────────────────────────
 // Fires when admin hits confirm-dispatch. Transport is already settled by this point.
 // Distinct from cleanerNewJobMsg (which fires on clean-payment) — this is the "go now".

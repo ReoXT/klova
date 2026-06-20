@@ -6,6 +6,7 @@ import {
   adminPaidBookingMsg,
   adminTransportPaidMsg,
   cleanerNewJobMsg,
+  keeperJobCancelledMsg,
   keeperDispatchedMsg,
   customerDispatchConfirmedMsg,
 } from '../lib/messageTemplates';
@@ -144,6 +145,17 @@ export async function notifyAdminTransportPaid(bookingId: string): Promise<void>
     () => sendSms(config.adminPhone!, adminTransportPaidMsg(bookingId, fareNgn, customerName, bookingDate)),
     'admin-transport-paid',
   );
+}
+
+// Fires when admin cancels a booking due to unpaid transport — tells the Keeper
+// their date has been freed and they should expect a new assignment.
+export async function notifyKeeperJobCancelled(bookingId: string): Promise<void> {
+  const ctx = await fetchNotifContext(bookingId);
+  if (!ctx) return;
+
+  const msg = keeperJobCancelledMsg(ctx);
+  await safeSend(() => sendWhatsApp(ctx.cleanerPhone, msg), 'keeper-job-cancelled-whatsapp');
+  await safeSend(() => sendSms(ctx.cleanerPhone, msg),      'keeper-job-cancelled-sms');
 }
 
 // Fires when admin confirms dispatch — "go time" reminder to the Keeper.
