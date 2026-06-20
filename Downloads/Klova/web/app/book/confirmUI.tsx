@@ -44,7 +44,7 @@ export function SoftCard({
       style={{
         borderColor: "var(--border-default)",
         background: "var(--surface-card)",
-        boxShadow: "0 1px 2px oklch(0 0 0 / 0.03)",
+        boxShadow: "var(--shadow-md)",
       }}
     >
       {children}
