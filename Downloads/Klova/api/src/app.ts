@@ -10,6 +10,7 @@ import availabilityRouter from './routes/availability';
 import paymentsRouter from './routes/payments';
 import webhooksRouter from './routes/webhooks';
 import customersRouter from './routes/customers';
+import adminRouter from './routes/admin';
 
 const app = express();
 
@@ -28,6 +29,7 @@ app.use('/bookings', bookingsRouter);
 app.use('/availability', availabilityRouter);
 app.use('/payments', paymentsRouter);
 app.use('/customers', customersRouter);
+app.use('/admin', adminRouter);
 
 app.use(errorHandler);
 

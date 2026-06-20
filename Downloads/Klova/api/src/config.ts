@@ -26,6 +26,10 @@ export const config = {
   termiiSenderId: process.env.TERMII_SENDER_ID,
   // Phone to receive the admin confirmation SMS per paid booking
   adminPhone: process.env.ADMIN_PHONE,
+  // Static bearer token required on all /admin/* routes
+  adminApiKey: process.env.ADMIN_API_KEY,
+  // Highest transport fare the system will accept without rejecting as a fat-finger (NGN)
+  transportFareCeilingNgn: parseInt(process.env.TRANSPORT_FARE_CEILING_NGN ?? '15000', 10),
 };
 
 // Startup diagnostics — visible in Railway logs immediately after deploy
