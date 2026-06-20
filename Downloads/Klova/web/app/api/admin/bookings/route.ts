@@ -8,9 +8,12 @@ const BOOKING_SELECT = `
   id, bedrooms, booking_date, time_slot, address,
   total_amount_kobo, commission_kobo,
   status, paystack_reference, refunded_at,
+  transport_fare, transport_status, transport_payment_ref,
+  transport_paid_at, transport_awaiting_since, dispatched_at,
+  cancellation_reason,
   created_at, updated_at,
   customer:customers(id, first_name, last_name, phone, email),
-  cleaner:cleaners!cleaner_id(id, first_name, last_name, phone, photo_url, nin_verified, rating, total_jobs),
+  cleaner:cleaners!cleaner_id(id, first_name, last_name, phone, photo_url, nin_verified, rating, total_jobs, home_area),
   zone:zones(id, name, slug),
   service:services(id, name, slug),
   booking_addons(addon:addons(id, name, slug, amount_kobo))

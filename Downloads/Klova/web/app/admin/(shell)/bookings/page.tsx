@@ -11,6 +11,8 @@ import {
 
 /* ── Types ─────────────────────────────────────────────────── */
 
+type TransportStatus = "pending_quote" | "awaiting_payment" | "paid" | "waived" | "not_required";
+
 type Booking = {
   id: string;
   bedrooms: string;
@@ -22,6 +24,14 @@ type Booking = {
   status: BookingStatus;
   paystack_reference: string | null;
   refunded_at: string | null;
+  // transport
+  transport_fare: number | null;
+  transport_status: TransportStatus;
+  transport_payment_ref: string | null;
+  transport_paid_at: string | null;
+  transport_awaiting_since: string | null;
+  dispatched_at: string | null;
+  cancellation_reason: string | null;
   created_at: string;
   updated_at: string;
   customer: {
@@ -40,6 +50,7 @@ type Booking = {
     nin_verified: boolean;
     rating: number | null;
     total_jobs: number;
+    home_area: string | null;
   } | null;
   zone: { id: string; name: string; slug: string };
   service: { id: string; name: string; slug: string };
@@ -464,9 +475,11 @@ function BookingDetail({
   const [cancelMsg, setCancelMsg]   = useState<string | null>(null);
   const [cancelIsError, setCancelIsError] = useState(false);
 
+  // For matched/paid: legacy manual confirm (flips status via old route).
+  // For confirmed: the transport-gated dispatch lives in TransportSection.
   const canConfirmDispatch =
     b.cleaner !== null &&
-    ["matched", "paid", "confirmed"].includes(b.status);
+    ["matched", "paid"].includes(b.status);
 
   const canReassign = !["completed", "cancelled"].includes(b.status);
   const canCancel   = !["completed", "cancelled"].includes(b.status);
@@ -867,6 +880,11 @@ function BookingDetail({
           </dl>
         </Section>
 
+        {/* Transport — only relevant once clean payment is confirmed */}
+        {b.status === "confirmed" && (
+          <TransportSection booking={b} onUpdated={onUpdated} />
+        )}
+
         {/* Refund */}
         {b.refunded_at && (
           <Section label="Refund">
@@ -893,6 +911,416 @@ function BookingDetail({
         </Section>
       </div>
     </div>
+  );
+}
+
+/* ── Transport section ──────────────────────────────────────── */
+
+const TRANSPORT_GATE_ALLOWED = new Set<TransportStatus>(["paid", "waived", "not_required"]);
+
+const TRANSPORT_STATUS_CONFIG: Record<
+  TransportStatus,
+  { label: string; cls: string }
+> = {
+  pending_quote:    { label: "Pending quote",    cls: "badge-ghost" },
+  awaiting_payment: { label: "Awaiting payment", cls: "badge-warning badge-soft" },
+  paid:             { label: "Paid",             cls: "badge-success badge-soft" },
+  waived:           { label: "Waived",           cls: "badge-info badge-soft" },
+  not_required:     { label: "Not required",     cls: "badge-neutral badge-soft" },
+};
+
+function TransportStatusBadge({ status }: { status: TransportStatus }) {
+  const { label, cls } =
+    TRANSPORT_STATUS_CONFIG[status] ?? { label: status, cls: "badge-ghost" };
+  return <span className={`badge badge-sm ${cls}`}>{label}</span>;
+}
+
+function hoursWaiting(since: string): string {
+  const h = (Date.now() - new Date(since).getTime()) / (1000 * 60 * 60);
+  return h < 1 ? "<1h" : `${Math.floor(h)}h`;
+}
+
+function formatNGNraw(n: number) {
+  return `₦${n.toLocaleString("en-NG")}`;
+}
+
+function TransportSection({
+  booking: b,
+  onUpdated,
+}: {
+  booking: Booking;
+  onUpdated: (id: string) => Promise<void>;
+}) {
+  const ts = b.transport_status ?? "pending_quote";
+
+  const [fareInput, setFareInput] = useState("");
+  const [suggestion, setSuggestion] = useState<number | null>(null);
+  const [working, setWorking]       = useState(false);
+  const [fareMsg, setFareMsg]       = useState<string | null>(null);
+  const [fareErr, setFareErr]       = useState(false);
+
+  const [resending, setResending]   = useState(false);
+  const [resendMsg, setResendMsg]   = useState<string | null>(null);
+  const [resendErr, setResendErr]   = useState(false);
+
+  const [dispatching, setDispatching]   = useState(false);
+  const [dispatchMsg, setDispatchMsg]   = useState<string | null>(null);
+  const [dispatchErr, setDispatchErr]   = useState(false);
+
+  const dispatchAllowed = TRANSPORT_GATE_ALLOWED.has(ts);
+  const dispatchTooltip =
+    ts === "pending_quote"
+      ? "Quote, waive, or mark transport as not required first"
+      : ts === "awaiting_payment"
+      ? "Waiting for customer to pay the transport invoice"
+      : null;
+
+  // Fetch fare suggestion when in pending_quote with a keeper that has a home_area
+  useEffect(() => {
+    if (ts !== "pending_quote" || !b.cleaner?.home_area) return;
+    fetch(`/api/admin/bookings/${b.id}/transport-suggestion`)
+      .then((r) => r.json())
+      .then((d) => setSuggestion(typeof d.suggestion === "number" ? d.suggestion : null))
+      .catch(() => {});
+  }, [b.id, ts, b.cleaner?.home_area]);
+
+  async function postFare(body: Record<string, unknown>, successMsg: string) {
+    setWorking(true);
+    setFareMsg(null);
+    setFareErr(false);
+    try {
+      const r = await fetch(`/api/admin/bookings/${b.id}/transport-fare`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error?.message ?? d.error ?? "Request failed");
+      setFareMsg(successMsg);
+      await onUpdated(b.id);
+    } catch (err) {
+      setFareErr(true);
+      setFareMsg(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  async function handleSetFareAndInvoice() {
+    const amount = parseFloat(fareInput);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setFareErr(true);
+      setFareMsg("Enter a valid amount.");
+      return;
+    }
+    setWorking(true);
+    setFareMsg("Setting fare…");
+    setFareErr(false);
+    try {
+      // 1. Record the fare
+      const fareRes = await fetch(`/api/admin/bookings/${b.id}/transport-fare`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount }),
+      });
+      const fareData = await fareRes.json().catch(() => ({}));
+      if (!fareRes.ok)
+        throw new Error(fareData.error?.message ?? fareData.error ?? "Failed to set fare");
+
+      setFareMsg("Sending invoice…");
+
+      // 2. Create & send Paystack invoice
+      const invRes = await fetch(`/api/admin/bookings/${b.id}/transport-invoice`, {
+        method: "POST",
+      });
+      const invData = await invRes.json().catch(() => ({}));
+      if (!invRes.ok)
+        throw new Error(invData.error?.message ?? invData.error ?? "Failed to send invoice");
+
+      setFareErr(false);
+      setFareMsg("Invoice sent via Paystack ✓");
+      setFareInput("");
+      await onUpdated(b.id);
+    } catch (err) {
+      setFareErr(true);
+      setFareMsg(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  async function handleWaive() {
+    if (
+      !window.confirm(
+        "Waive transport fare for this booking?\n\nThe Keeper won't receive transport reimbursement.",
+      )
+    )
+      return;
+    await postFare({ waive: true }, "Transport fare waived.");
+  }
+
+  async function handleNotRequired() {
+    if (
+      !window.confirm(
+        "Mark transport as not required?\n\nUse this for Keepers who live nearby and don't need reimbursement.",
+      )
+    )
+      return;
+    await postFare({ not_required: true }, "Transport marked as not required.");
+  }
+
+  async function handleResend() {
+    setResending(true);
+    setResendMsg(null);
+    setResendErr(false);
+    try {
+      const r = await fetch(
+        `/api/admin/bookings/${b.id}/transport-invoice/resend`,
+        { method: "POST" },
+      );
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error?.message ?? d.error ?? "Failed to resend");
+      setResendMsg("Invoice resent via Paystack ✓");
+    } catch (err) {
+      setResendErr(true);
+      setResendMsg(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setResending(false);
+    }
+  }
+
+  async function handleDispatch() {
+    if (
+      !window.confirm(
+        `Confirm dispatch for ${b.customer.first_name} ${b.customer.last_name}'s booking on ${formatDate(b.booking_date)}?\n\nThis sends the customer a "you're all set" SMS and tells the Keeper to head out.`,
+      )
+    )
+      return;
+    setDispatching(true);
+    setDispatchMsg(null);
+    setDispatchErr(false);
+    try {
+      const r = await fetch(`/api/admin/bookings/${b.id}/dispatch`, {
+        method: "POST",
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error?.message ?? d.error ?? "Dispatch failed");
+      setDispatchMsg("Dispatched — customer and Keeper notified ✓");
+      await onUpdated(b.id);
+    } catch (err) {
+      setDispatchErr(true);
+      setDispatchMsg(
+        err instanceof Error ? err.message : "Something went wrong.",
+      );
+    } finally {
+      setDispatching(false);
+    }
+  }
+
+  return (
+    <Section label="Transport">
+      <div className="space-y-3">
+
+        {/* Status row */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <TransportStatusBadge status={ts} />
+          {ts === "awaiting_payment" && b.transport_awaiting_since && (
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+              {hoursWaiting(b.transport_awaiting_since)} waiting
+            </span>
+          )}
+        </div>
+
+        {/* ── pending_quote: input + actions ─────────────────── */}
+        {ts === "pending_quote" && (
+          <div className="space-y-2">
+            <div className="flex gap-2 items-center">
+              <div className="relative flex-1">
+                <span
+                  className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm pointer-events-none"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  ₦
+                </span>
+                <input
+                  type="number"
+                  min="1"
+                  max="5000"
+                  step="50"
+                  placeholder="0"
+                  value={fareInput}
+                  onChange={(e) => setFareInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleSetFareAndInvoice()}
+                  className="input input-sm w-full pl-6"
+                  disabled={working}
+                  style={{ appearance: "textfield" }}
+                />
+              </div>
+              <button
+                className="btn btn-sm btn-primary whitespace-nowrap"
+                onClick={handleSetFareAndInvoice}
+                disabled={!fareInput || working}
+              >
+                {working ? <Spinner size="xs" /> : "Send invoice"}
+              </button>
+            </div>
+            {suggestion != null && (
+              <p className="text-xs" style={{ color: "var(--text-subtle)" }}>
+                Suggested: {formatNGNraw(suggestion)}
+              </p>
+            )}
+            <div className="flex gap-2 pt-0.5">
+              <button
+                className="btn btn-xs btn-ghost"
+                onClick={handleWaive}
+                disabled={working}
+              >
+                Waive
+              </button>
+              <button
+                className="btn btn-xs btn-ghost"
+                onClick={handleNotRequired}
+                disabled={working}
+              >
+                Not required
+              </button>
+            </div>
+            {fareMsg && (
+              <p className={`text-xs ${fareErr ? "text-error" : "text-success"}`}>
+                {fareMsg}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* ── awaiting_payment: details + resend ──────────────── */}
+        {ts === "awaiting_payment" && (
+          <div className="space-y-2">
+            <dl className="space-y-1.5">
+              {b.transport_fare != null && (
+                <Row label="Fare">
+                  <span className="font-semibold" style={{ color: "var(--text-strong)" }}>
+                    {formatNGNraw(b.transport_fare)}
+                  </span>
+                </Row>
+              )}
+              {b.transport_payment_ref && (
+                <Row label="Invoice ref">
+                  <span
+                    className="font-mono text-xs break-all"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    {b.transport_payment_ref}
+                  </span>
+                </Row>
+              )}
+              {b.transport_awaiting_since && (
+                <Row label="Sent">
+                  <span style={{ color: "var(--text-body)" }}>
+                    {formatDateTime(b.transport_awaiting_since)}
+                  </span>
+                </Row>
+              )}
+            </dl>
+            <button
+              className="btn btn-sm btn-outline w-full"
+              onClick={handleResend}
+              disabled={resending}
+            >
+              {resending ? <Spinner size="xs" /> : "Resend invoice"}
+            </button>
+            {resendMsg && (
+              <p className={`text-xs ${resendErr ? "text-error" : "text-success"}`}>
+                {resendMsg}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* ── paid: receipt ──────────────────────────────────── */}
+        {ts === "paid" && (
+          <dl className="space-y-1.5">
+            {b.transport_fare != null && (
+              <Row label="Paid">
+                <span className="font-semibold text-success">
+                  {formatNGNraw(b.transport_fare)}
+                </span>
+              </Row>
+            )}
+            {b.transport_payment_ref && (
+              <Row label="Ref">
+                <span
+                  className="font-mono text-xs break-all"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  {b.transport_payment_ref}
+                </span>
+              </Row>
+            )}
+            {b.transport_paid_at && (
+              <Row label="Paid at">
+                <span style={{ color: "var(--text-body)" }}>
+                  {formatDateTime(b.transport_paid_at)}
+                </span>
+              </Row>
+            )}
+          </dl>
+        )}
+
+        {/* ── waived / not_required: nothing extra needed ─────── */}
+
+        {/* ── Dispatch gate ──────────────────────────────────── */}
+        <div className="pt-3 border-t border-base-200">
+          {b.dispatched_at ? (
+            <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+              Dispatched {formatDateTime(b.dispatched_at)}
+            </p>
+          ) : (
+            <>
+              <div
+                className="relative group"
+                title={dispatchTooltip ?? undefined}
+              >
+                <button
+                  className={[
+                    "btn btn-sm w-full",
+                    dispatchAllowed
+                      ? "btn-primary"
+                      : "btn-disabled opacity-50 cursor-not-allowed",
+                  ].join(" ")}
+                  onClick={dispatchAllowed ? handleDispatch : undefined}
+                  disabled={!dispatchAllowed || dispatching}
+                  aria-disabled={!dispatchAllowed}
+                >
+                  {dispatching ? <Spinner size="xs" /> : "Confirm dispatch"}
+                </button>
+                {!dispatchAllowed && dispatchTooltip && (
+                  <div
+                    className="absolute bottom-full left-0 right-0 mb-2 px-3 py-2 rounded-lg text-xs text-center pointer-events-none
+                      opacity-0 group-hover:opacity-100 transition-opacity z-20"
+                    style={{
+                      background: "var(--surface-section)",
+                      color: "var(--text-body)",
+                      boxShadow: "var(--shadow-md)",
+                    }}
+                  >
+                    {dispatchTooltip}
+                  </div>
+                )}
+              </div>
+              {dispatchMsg && (
+                <p
+                  className={`text-xs mt-1.5 ${dispatchErr ? "text-error" : "text-success"}`}
+                >
+                  {dispatchMsg}
+                </p>
+              )}
+            </>
+          )}
+        </div>
+
+      </div>
+    </Section>
   );
 }
 
