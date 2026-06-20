@@ -28,11 +28,9 @@ export function TransportNote({ className = "" }: { className?: string }) {
       </span>
 
       <div className="flex-1 text-sm leading-relaxed">
-        <p className="font-semibold mb-0.5">One more thing — your transport fare</p>
+        <p className="font-semibold mb-0.5">One more thing</p>
         <p>
-          We&apos;ll work out a small fare to get your Keeper to your home and send you a
-          secure Paystack payment link shortly. It&apos;s separate from your clean and always
-          shown upfront — never a hidden charge. No action needed right now.
+          Expect a Paystack payment link shortly for a small transport fare to get your Keeper to your home.
         </p>
       </div>
     </div>
