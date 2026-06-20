@@ -9,6 +9,7 @@ import {
 import { handleTransferWebhook } from '../services/payoutService';
 import { adjustEarningForRefund } from '../services/earningsService';
 import { issueRefund } from '../services/refundService';
+import { handleTransportInvoicePaid } from '../services/transportInvoiceService';
 
 // ─── Signature verification ───────────────────────────────────────────────────
 
@@ -51,6 +52,16 @@ interface PaystackRefundEvent {
     amount: number;               // refund amount in kobo
     transaction_reference: string; // original charge reference
     status: string;
+  };
+}
+
+interface PaystackInvoicePaidEvent {
+  event: 'invoice.payment_successful';
+  data: {
+    request_code: string;  // PRQ_xxxx — matches transport_payment_ref
+    paid: boolean;
+    paid_at: string;
+    amount: number;        // kobo
   };
 }
 
@@ -113,6 +124,22 @@ export async function postPaystackWebhook(req: Request, res: Response): Promise<
       console.error('[webhook] Refund event error:', err);
       res.sendStatus(500);
     }
+    return;
+  }
+
+  if (payload.event === 'invoice.payment_successful') {
+    const event = payload as unknown as PaystackInvoicePaidEvent;
+    const { request_code } = event.data;
+    if (request_code) {
+      try {
+        await handleTransportInvoicePaid(request_code);
+      } catch (err) {
+        console.error('[webhook] invoice.payment_successful error:', err);
+        res.sendStatus(500);
+        return;
+      }
+    }
+    res.sendStatus(200);
     return;
   }
 
