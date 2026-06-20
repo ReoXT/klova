@@ -8,6 +8,12 @@ vi.mock('../lib/supabase', () => ({
   supabase: { from: vi.fn() },
 }));
 
+// adjustEarningForRefund is called at the end of issueRefund; isolate it here
+// so the refund tests don't need to mock the full cleaner_earnings chain.
+vi.mock('../services/earningsService', () => ({
+  adjustEarningForRefund: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { supabase } from '../lib/supabase';
 import { issueRefund } from '../services/refundService';
 
@@ -78,13 +84,19 @@ describe('issueRefund — guard: never paid', () => {
 });
 
 // ─── Guard: double-refund ─────────────────────────────────────────────────────
+//
+// The guard fires when refund_kobo >= total_amount_kobo (a full refund was
+// already recorded). This protects against double-refunds if the webhook fires
+// twice or the admin triggers a second refund.
 
 describe('issueRefund — guard: already refunded', () => {
-  it('skips without calling Paystack if refunded_at is already set', async () => {
+  it('skips without calling Paystack when refund_kobo equals total_amount_kobo', async () => {
     setupBookingMock({
       id: BOOKING_ID,
       paystack_reference: REFERENCE,
       refunded_at: '2026-06-18T10:00:00.000Z',
+      total_amount_kobo: 500_000,
+      refund_kobo: 500_000, // already fully refunded
     });
     mockFetch(true, { status: true, message: 'Refund queued' });
 
@@ -109,8 +121,14 @@ describe('issueRefund — guard: booking not found', () => {
 // ─── Happy path ───────────────────────────────────────────────────────────────
 
 describe('issueRefund — success', () => {
-  it('calls Paystack refund API with the correct reference and sets refunded_at', async () => {
-    setupBookingMock({ id: BOOKING_ID, paystack_reference: REFERENCE, refunded_at: null });
+  it('calls Paystack refund API with the correct reference and records the refund', async () => {
+    setupBookingMock({
+      id: BOOKING_ID,
+      paystack_reference: REFERENCE,
+      refunded_at: null,
+      total_amount_kobo: 500_000,
+      refund_kobo: 0,
+    });
     mockFetch(true, { status: true, message: 'Refund queued' });
 
     await issueRefund(BOOKING_ID, REFERENCE);
@@ -120,7 +138,8 @@ describe('issueRefund — success', () => {
     expect(url).toBe('https://api.paystack.co/refund');
     expect(JSON.parse(opts.body as string)).toEqual({ transaction: REFERENCE });
 
-    // Two supabase.from() calls: SELECT (guard check) + UPDATE (set refunded_at)
+    // Two supabase.from() calls: SELECT (guard check) + UPDATE (set refunded_at + refund_kobo).
+    // adjustEarningForRefund is mocked so it does not add a third call.
     expect(vi.mocked(supabase.from)).toHaveBeenCalledTimes(2);
   });
 });
