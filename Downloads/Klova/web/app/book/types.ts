@@ -83,7 +83,7 @@ export interface ApiCleaner {
   first_name: string;
   last_name: string;
   photo_url: string | null;
-  rating: number;
+  rating: number | null;
   total_jobs: number;
 }
 

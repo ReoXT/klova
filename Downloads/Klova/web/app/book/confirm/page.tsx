@@ -6,6 +6,7 @@ import { SERVICES, formatNGN } from "../data";
 import type { ApiCleaner, ServiceSlug } from "../types";
 import { SUPPORT_PHONE } from "@/lib/contact";
 import { Button } from "@/components/ui/Button";
+import { KeeperCard } from "@/components/ui/KeeperCard";
 import { ConfirmNextSteps } from "../ConfirmNextSteps";
 import { Section, SoftCard, Field, Pill } from "../confirmUI";
 
@@ -20,7 +21,7 @@ interface BookingSummary {
   phone: string;
   email: string;
   serverTotal: number | null;
-  cleaner: ApiCleaner | null;
+  cleaners: ApiCleaner[];
 }
 
 export default function BookConfirmPage() {
@@ -48,6 +49,7 @@ export default function BookConfirmPage() {
   }
 
   const service = SERVICES.find((s) => s.slug === summary?.service);
+  const keepers = summary?.cleaners ?? [];
 
   const bookingDate = summary?.bookingDate
     ? new Date(summary.bookingDate + "T00:00:00").toLocaleDateString("en-NG", {
@@ -107,38 +109,19 @@ export default function BookConfirmPage() {
           </Section>
         )}
 
-        {summary?.cleaner && (
-          <Section title="Your keeper">
-            <SoftCard>
-              <div className="flex items-center gap-4">
-                {summary.cleaner.photo_url ? (
-                  <img
-                    src={summary.cleaner.photo_url}
-                    alt={summary.cleaner.first_name}
-                    className="w-14 h-14 rounded-full object-cover shrink-0"
-                  />
-                ) : (
-                  <div
-                    className="w-14 h-14 rounded-full flex items-center justify-center font-semibold text-lg shrink-0"
-                    style={{ background: "var(--klova-primary-soft)", color: "var(--klova-primary)" }}
-                  >
-                    {summary.cleaner.first_name[0]}{summary.cleaner.last_name[0]}
-                  </div>
-                )}
-                <div className="min-w-0">
-                  <p className="text-[15px] font-semibold" style={{ color: "var(--text-strong)" }}>
-                    {summary.cleaner.first_name} {summary.cleaner.last_name}
-                  </p>
-                  <div className="flex items-center gap-1.5 mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
-                    <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="currentColor"
-                      style={{ color: "var(--klova-accent)" }}>
-                      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                    </svg>
-                    <span>{summary.cleaner.rating.toFixed(1)} · {summary.cleaner.total_jobs} jobs · Verified</span>
-                  </div>
-                </div>
-              </div>
-            </SoftCard>
+        {keepers.length > 0 && (
+          <Section title={keepers.length === 1 ? "Your keeper" : "Your keepers"}>
+            <div className={keepers.length === 2 ? "grid grid-cols-1 sm:grid-cols-2 gap-3" : undefined}>
+              {keepers.map((c) => (
+                <KeeperCard
+                  key={c.id}
+                  firstName={c.first_name}
+                  photoUrl={c.photo_url}
+                  rating={c.rating}
+                  totalJobs={c.total_jobs}
+                />
+              ))}
+            </div>
           </Section>
         )}
 

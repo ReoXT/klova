@@ -21,6 +21,7 @@ import Step10Checkout from "./steps/Step10Checkout";
 import Step11Matching from "./steps/Step11Matching";
 import Step12Confirmation from "./steps/Step12Confirmation";
 import StepNoMatch from "./steps/StepNoMatch";
+import StepPartialAvailability from "./steps/StepPartialAvailability";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
@@ -69,7 +70,7 @@ export default function BookPage() {
 
   // ─── Booking submission state ────────────────────────────────────────────
   const [bookingId, setBookingId] = useState<string | null>(null);
-  const [matchedCleaner, setMatchedCleaner] = useState<ApiCleaner | null>(null);
+  const [matchedCleaners, setMatchedCleaners] = useState<ApiCleaner[]>([]);
   const [serverTotal, setServerTotal] = useState<number | null>(null);
 
   type SubmitStatus = "idle" | "submitting" | "paying" | "redirecting";
@@ -78,7 +79,12 @@ export default function BookPage() {
 
   // null = not in no-match mode; [] = no-match but no alternatives; [...] = alternatives ready
   const [noMatchDates, setNoMatchDates] = useState<string[] | null>(null);
-  // Tracks whether we pushed a no-match history entry so the success path
+  // Non-null when a 2-keeper booking found only 1 available keeper (partial availability)
+  const [partialAvailData, setPartialAvailData] = useState<{
+    singleKeeperTotal: number;
+    alternativeDates: string[];
+  } | null>(null);
+  // Tracks whether we pushed an overlay history entry so the success path
   // can replaceState instead of pushState (avoids orphaned history entries).
   const noMatchActiveRef = useRef(false);
 
@@ -93,10 +99,11 @@ export default function BookPage() {
 
     function onPopState(e: PopStateEvent) {
       const state = e.state as { step?: number } | null;
-      // Clear any in-flight no-match state — if we're navigating back we want
+      // Clear any in-flight overlay state — if we're navigating back we want
       // the target step, not the overlay.
       noMatchActiveRef.current = false;
       setNoMatchDates(null);
+      setPartialAvailData(null);
       setSubmitError(null);
       setStep(state?.step ?? 1);
       setAnimKey((k) => k + 1);
@@ -123,14 +130,18 @@ export default function BookPage() {
   // ─── POST /bookings ──────────────────────────────────────────────────────
   // dateOverride: when retrying from the no-match screen, pass the new date
   // directly so we don't rely on data.bookingDate being updated yet in state.
-  const handleSubmitBooking = useCallback(async (dateOverride?: string) => {
+  // keeperCountOverride: when proceeding with 1 keeper from the partial
+  // availability screen, pass 1 so we don't wait for state to flush.
+  const handleSubmitBooking = useCallback(async (dateOverride?: string, keeperCountOverride?: number) => {
     setSubmitStatus("submitting");
     setSubmitError(null);
 
     const effectiveDate = dateOverride ?? data.bookingDate;
-    const payload = buildBookingPayload(
-      dateOverride ? { ...data, bookingDate: dateOverride } : data,
-    );
+    const payload = buildBookingPayload({
+      ...data,
+      ...(dateOverride        && { bookingDate: dateOverride }),
+      ...(keeperCountOverride && { keeperCount: keeperCountOverride }),
+    });
 
     try {
       const res = await fetch(`${API_URL}/bookings`, {
@@ -145,10 +156,27 @@ export default function BookPage() {
         const msg = json?.error?.message;
 
         if (res.status === 409) {
-          // Persist the tried date into state so the no-match screen displays it
+          // Persist the tried date into state so overlay screens display it
           if (dateOverride) patch({ bookingDate: dateOverride });
 
-          // Fetch nearby alternatives and surface them as one-tap options
+          if (json?.error?.outcome === "partial_availability") {
+            // 2-keeper booking; only 1 keeper free on this date.
+            // The API already provides alternative dates — no extra fetch needed.
+            if (!noMatchActiveRef.current) {
+              history.pushState({ step: 10 }, "");
+              noMatchActiveRef.current = true;
+            }
+            setPartialAvailData({
+              singleKeeperTotal: json.error.single_keeper_option.total_amount as number,
+              alternativeDates: (json.error.alternative_dates ?? []) as string[],
+            });
+            setNoMatchDates(null);
+            setAnimKey((k) => k + 1);
+            setSubmitStatus("idle");
+            return;
+          }
+
+          // Full no-match — fetch nearby alternatives from the availability endpoint
           try {
             const altRes = await fetch(
               `${API_URL}/availability/alternatives?zone_slug=lekki-ajah&date=${effectiveDate}`,
@@ -163,12 +191,14 @@ export default function BookPage() {
               history.pushState({ step: 10 }, "");
               noMatchActiveRef.current = true;
             }
+            setPartialAvailData(null);
             setNoMatchDates(alternatives);
           } catch {
             if (!noMatchActiveRef.current) {
               history.pushState({ step: 10 }, "");
               noMatchActiveRef.current = true;
             }
+            setPartialAvailData(null);
             setNoMatchDates([]);
           }
           setAnimKey((k) => k + 1);
@@ -186,20 +216,22 @@ export default function BookPage() {
         return;
       }
 
-      // Success — exit no-match mode and advance to keeper reveal
-      if (dateOverride) patch({ bookingDate: dateOverride });
-      const { booking_id, total_amount, cleaner } = json.data;
+      // Success — exit any overlay and advance to keeper reveal
+      if (dateOverride)        patch({ bookingDate: dateOverride });
+      if (keeperCountOverride) patch({ keeperCount: keeperCountOverride });
+      const { booking_id, total_amount, cleaners } = json.data;
       setBookingId(booking_id);
-      setMatchedCleaner(cleaner);
+      setMatchedCleaners(cleaners as ApiCleaner[]);
       setServerTotal(total_amount);
       sessionStorage.setItem("klova_booking_id", booking_id);
       setNoMatchDates(null);
+      setPartialAvailData(null);
       setSubmitStatus("idle");
 
       setStep((s) => {
         const n = nextStep(s, data);
-        // If we came through the no-match overlay, replace its history entry
-        // so pressing back from step 11 returns to checkout, not the overlay.
+        // If we came through an overlay, replace its history entry so pressing
+        // back from step 11 returns to checkout, not the overlay.
         if (noMatchActiveRef.current) {
           history.replaceState({ step: n }, "");
           noMatchActiveRef.current = false;
@@ -215,19 +247,26 @@ export default function BookPage() {
     }
   }, [data, patch]);
 
-  // Retry from the no-match screen with a specific date
+  // Retry from an overlay screen with a specific date
   const handleRetryWithDate = useCallback(
     (date: string) => { handleSubmitBooking(date); },
     [handleSubmitBooking],
   );
 
+  // Proceed with 1 keeper from the partial availability screen (re-submit with keeper_count=1)
+  const handleProceedWith1Keeper = useCallback(
+    () => { handleSubmitBooking(undefined, 1); },
+    [handleSubmitBooking],
+  );
+
   // Return the user to the date picker so they can choose manually.
-  // Replace the current no-match history entry with step 4 so pressing back
-  // from the date picker returns to checkout, not the no-match overlay.
+  // Replace the current overlay history entry with step 4 so pressing back
+  // from the date picker returns to checkout, not the overlay.
   const handleChangeDateManually = useCallback(() => {
     noMatchActiveRef.current = false;
     history.replaceState({ step: 4 }, "");
     setNoMatchDates(null);
+    setPartialAvailData(null);
     setSubmitError(null);
     setStep(4);
     setAnimKey((k) => k + 1);
@@ -271,7 +310,7 @@ export default function BookPage() {
           phone:       data.phone,
           email:       data.email,
           serverTotal,
-          cleaner:     matchedCleaner,
+          cleaners:    matchedCleaners,
         })
       );
 
@@ -281,7 +320,7 @@ export default function BookPage() {
       setSubmitError("Network error — please check your connection and try again.");
       setSubmitStatus("idle");
     }
-  }, [bookingId, data, serverTotal, matchedCleaner]);
+  }, [bookingId, data, serverTotal, matchedCleaners]);
 
   // ─── Price (live from API when available, hardcoded fallback) ───────────
   const price = livePricing
@@ -296,7 +335,7 @@ export default function BookPage() {
   // Scroll to top on step change so mobile users start at the top of each step
   useEffect(() => {
     window.scrollTo(0, 0);
-  }, [step, noMatchDates]);
+  }, [step, noMatchDates, partialAvailData]);
 
   return (
     <div className="flex flex-col min-h-[calc(100vh-3.5rem)]">
@@ -318,14 +357,27 @@ export default function BookPage() {
 
       {/* Screen-reader step announcement */}
       <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
-        {noMatchDates !== null
+        {partialAvailData !== null
+          ? "Only 1 keeper available — choose to continue or pick another date"
+          : noMatchDates !== null
           ? "No availability — please choose another date"
           : `Step ${stepIndex + 1} of ${totalSteps}`}
       </div>
 
       {/* Step content */}
       <div key={animKey} className="fade-in flex-1 pb-40">
-        {noMatchDates !== null ? (
+        {partialAvailData !== null ? (
+          <StepPartialAvailability
+            date={data.bookingDate}
+            singleKeeperTotal={partialAvailData.singleKeeperTotal}
+            alternativeDates={partialAvailData.alternativeDates}
+            submitting={submitStatus === "submitting"}
+            submitError={submitError}
+            onProceedWith1={handleProceedWith1Keeper}
+            onRetryWithDate={handleRetryWithDate}
+            onChangeDateManually={handleChangeDateManually}
+          />
+        ) : noMatchDates !== null ? (
           <StepNoMatch
             data={data}
             alternatives={noMatchDates}
@@ -358,7 +410,7 @@ export default function BookPage() {
             )}
             {step === 11 && (
               <Step11Matching
-                cleaner={matchedCleaner}
+                cleaners={matchedCleaners}
                 serverTotal={serverTotal}
                 payStatus={submitStatus === "paying" || submitStatus === "redirecting" ? submitStatus : "idle"}
                 payError={submitError}
