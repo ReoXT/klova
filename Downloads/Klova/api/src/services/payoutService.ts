@@ -71,8 +71,16 @@ interface BulkTransferResultItem {
 
 /**
  * Initiates Paystack bulk transfers for a list of cleaners.
- * Each cleaner gets a single transfer for the sum of their unpaid earnings.
- * Inserts cleaner_payouts rows and marks earnings as 'scheduled'.
+ *
+ * Each cleaner gets a single transfer for:
+ *   unpaid cleaning earnings  (cleaner_earnings WHERE status='unpaid')
+ * + settled transport fares   (booking_cleaners WHERE paid_out=false
+ *                              AND transport_payout_id IS NULL
+ *                              AND transport_fare_kobo > 0
+ *                              AND booking.transport_status='paid')
+ *
+ * After creating the payout row, marks earnings as 'scheduled' and links
+ * booking_cleaners rows via transport_payout_id so failures can be reversed.
  *
  * If Paystack Transfers is not yet activated on your dashboard, Paystack will
  * return an error — the cleaner_payouts rows will NOT be created.
@@ -85,7 +93,7 @@ export async function initiateBulkPayout(
 
   for (const cleanerId of cleanerIds) {
     try {
-      // 1. Gather unpaid earnings
+      // 1. Gather unpaid cleaning earnings
       const { data: earnings, error: eErr } = await supabase
         .from('cleaner_earnings')
         .select('id, earning_kobo')
@@ -93,12 +101,46 @@ export async function initiateBulkPayout(
         .eq('status', 'unpaid');
 
       if (eErr) throw eErr;
-      if (!earnings || earnings.length === 0) continue;
 
-      const totalKobo = (earnings as { id: string; earning_kobo: number }[])
+      const earningsKobo = ((earnings ?? []) as { id: string; earning_kobo: number }[])
         .reduce((sum, e) => sum + e.earning_kobo, 0);
 
-      // 2. Get primary bank account
+      // 2. Gather eligible transport reimbursements for this keeper
+      const { data: transportRows, error: trErr } = await supabase
+        .from('booking_cleaners')
+        .select('id, transport_fare_kobo, booking_id')
+        .eq('cleaner_id', cleanerId)
+        .eq('paid_out', false)
+        .is('transport_payout_id', null)
+        .gt('transport_fare_kobo', 0);
+
+      if (trErr) throw trErr;
+
+      let transportKobo = 0;
+      const eligibleTransportIds: string[] = [];
+
+      if (transportRows && transportRows.length > 0) {
+        const bookingIds = transportRows.map((r) => r.booking_id as string);
+        const { data: paidBookings, error: pbErr } = await supabase
+          .from('bookings')
+          .select('id')
+          .in('id', bookingIds)
+          .eq('transport_status', 'paid');
+
+        if (pbErr) throw pbErr;
+
+        const paidIds = new Set((paidBookings ?? []).map((b) => b.id as string));
+        for (const row of transportRows) {
+          if (!paidIds.has(row.booking_id as string)) continue;
+          transportKobo += row.transport_fare_kobo as number;
+          eligibleTransportIds.push(row.id as string);
+        }
+      }
+
+      const totalKobo = earningsKobo + transportKobo;
+      if (totalKobo === 0) continue; // nothing to pay
+
+      // 3. Get primary bank account
       const { data: ba, error: baErr } = await supabase
         .from('cleaner_bank_accounts')
         .select('id')
@@ -108,13 +150,13 @@ export async function initiateBulkPayout(
 
       if (baErr || !ba) throw new Error('No primary bank account on file');
 
-      // 3. Ensure Paystack recipient exists
+      // 4. Ensure Paystack recipient exists
       const recipientCode = await ensurePaystackRecipient(ba.id as string);
 
-      // 4. Generate reference
+      // 5. Generate reference
       const reference = `klova-payout-${cleanerId.slice(0, 8)}-${Date.now()}`;
 
-      // 5. Create cleaner_payouts row (pending)
+      // 6. Create cleaner_payouts row (pending)
       const { data: payout, error: pErr } = await supabase
         .from('cleaner_payouts')
         .insert({
@@ -131,7 +173,7 @@ export async function initiateBulkPayout(
 
       if (pErr || !payout) throw pErr ?? new Error('Failed to create payout row');
 
-      // 6. Send Paystack single transfer (use bulk endpoint so it can be batched later)
+      // 7. Send Paystack single transfer (bulk endpoint for future batching)
       const transfers: BulkTransferItem[] = [{
         amount:    totalKobo,
         reference,
@@ -147,7 +189,7 @@ export async function initiateBulkPayout(
 
       const tr = transferResults[0];
 
-      // 7. Update payout to processing
+      // 8. Update payout to processing
       await supabase
         .from('cleaner_payouts')
         .update({
@@ -156,12 +198,22 @@ export async function initiateBulkPayout(
         })
         .eq('id', payout.id);
 
-      // 8. Mark earnings as scheduled
-      await supabase
-        .from('cleaner_earnings')
-        .update({ status: 'scheduled', payout_id: payout.id })
-        .eq('cleaner_id', cleanerId)
-        .eq('status', 'unpaid');
+      // 9. Mark cleaning earnings as scheduled
+      if ((earnings ?? []).length > 0) {
+        await supabase
+          .from('cleaner_earnings')
+          .update({ status: 'scheduled', payout_id: payout.id })
+          .eq('cleaner_id', cleanerId)
+          .eq('status', 'unpaid');
+      }
+
+      // 10. Link transport rows to this payout (in-flight; revertible on failure)
+      if (eligibleTransportIds.length > 0) {
+        await supabase
+          .from('booking_cleaners')
+          .update({ transport_payout_id: payout.id })
+          .in('id', eligibleTransportIds);
+      }
 
       results.success.push(cleanerId);
     } catch (err) {
@@ -178,10 +230,15 @@ export async function initiateBulkPayout(
 // ─── Manual fallback ──────────────────────────────────────────────────────────
 
 /**
- * Marks a cleaner's unpaid earnings as paid without going through Paystack.
+ * Marks a cleaner's unpaid earnings and settled transport fares as paid
+ * without going through Paystack.
  * Admin has manually transferred via their bank — this keeps the ledger accurate.
  */
-export async function markPaidManually(cleanerId: string, bankAccountId: string): Promise<{ payout_id: string; total_kobo: number }> {
+export async function markPaidManually(
+  cleanerId: string,
+  bankAccountId: string,
+): Promise<{ payout_id: string; total_kobo: number }> {
+  // 1. Gather unpaid cleaning earnings
   const { data: earnings, error: eErr } = await supabase
     .from('cleaner_earnings')
     .select('id, earning_kobo')
@@ -189,15 +246,48 @@ export async function markPaidManually(cleanerId: string, bankAccountId: string)
     .eq('status', 'unpaid');
 
   if (eErr) throw eErr;
-  if (!earnings || earnings.length === 0) {
-    throw new Error('No unpaid earnings for this cleaner');
+
+  const earningsKobo = ((earnings ?? []) as { id: string; earning_kobo: number }[])
+    .reduce((sum, e) => sum + e.earning_kobo, 0);
+
+  // 2. Gather eligible transport reimbursements
+  const { data: transportRows, error: trErr } = await supabase
+    .from('booking_cleaners')
+    .select('id, transport_fare_kobo, booking_id')
+    .eq('cleaner_id', cleanerId)
+    .eq('paid_out', false)
+    .is('transport_payout_id', null)
+    .gt('transport_fare_kobo', 0);
+
+  if (trErr) throw trErr;
+
+  let transportKobo = 0;
+  const eligibleTransportIds: string[] = [];
+
+  if (transportRows && transportRows.length > 0) {
+    const bookingIds = transportRows.map((r) => r.booking_id as string);
+    const { data: paidBookings, error: pbErr } = await supabase
+      .from('bookings')
+      .select('id')
+      .in('id', bookingIds)
+      .eq('transport_status', 'paid');
+
+    if (pbErr) throw pbErr;
+
+    const paidIds = new Set((paidBookings ?? []).map((b) => b.id as string));
+    for (const row of transportRows) {
+      if (!paidIds.has(row.booking_id as string)) continue;
+      transportKobo += row.transport_fare_kobo as number;
+      eligibleTransportIds.push(row.id as string);
+    }
   }
 
-  const totalKobo = (earnings as { id: string; earning_kobo: number }[])
-    .reduce((sum, e) => sum + e.earning_kobo, 0);
+  const totalKobo = earningsKobo + transportKobo;
+  if (totalKobo === 0) throw new Error('No unpaid earnings or transport fares for this cleaner');
 
   const now = new Date().toISOString();
 
+  // 3. Create payout row (already success — no Paystack in the loop)
   const { data: payout, error: pErr } = await supabase
     .from('cleaner_payouts')
     .insert({
@@ -214,11 +304,22 @@ export async function markPaidManually(cleanerId: string, bankAccountId: string)
 
   if (pErr || !payout) throw pErr ?? new Error('Failed to create payout row');
 
-  await supabase
-    .from('cleaner_earnings')
-    .update({ status: 'paid', payout_id: payout.id })
-    .eq('cleaner_id', cleanerId)
-    .eq('status', 'unpaid');
+  // 4. Settle cleaning earnings
+  if ((earnings ?? []).length > 0) {
+    await supabase
+      .from('cleaner_earnings')
+      .update({ status: 'paid', payout_id: payout.id })
+      .eq('cleaner_id', cleanerId)
+      .eq('status', 'unpaid');
+  }
+
+  // 5. Settle transport reimbursements
+  if (eligibleTransportIds.length > 0) {
+    await supabase
+      .from('booking_cleaners')
+      .update({ paid_out: true, transport_payout_id: payout.id })
+      .in('id', eligibleTransportIds);
+  }
 
   return { payout_id: payout.id as string, total_kobo: totalKobo };
 }
@@ -257,10 +358,17 @@ export async function handleTransferWebhook(
       .update({ status: 'success', completed_at: new Date().toISOString() })
       .eq('id', payoutId);
 
+    // Finalize cleaning earnings
     await supabase
       .from('cleaner_earnings')
       .update({ status: 'paid' })
       .eq('payout_id', payoutId);
+
+    // Finalize transport reimbursements linked to this payout
+    await supabase
+      .from('booking_cleaners')
+      .update({ paid_out: true })
+      .eq('transport_payout_id', payoutId);
 
   } else {
     const newStatus = event === 'transfer.reversed' ? 'reversed' : 'failed';
@@ -269,11 +377,18 @@ export async function handleTransferWebhook(
       .update({ status: newStatus, failure_reason: data.reason ?? event })
       .eq('id', payoutId);
 
+    // Revert cleaning earnings so they are re-queued next payout run
     await supabase
       .from('cleaner_earnings')
       .update({ status: 'failed' })
       .eq('payout_id', payoutId)
       .eq('status', 'scheduled');
+
+    // Revert transport links so they are re-queued next payout run
+    await supabase
+      .from('booking_cleaners')
+      .update({ transport_payout_id: null })
+      .eq('transport_payout_id', payoutId);
 
     console.warn(`[payout] Transfer ${event} for reference ${reference}: ${data.reason ?? '—'}`);
   }

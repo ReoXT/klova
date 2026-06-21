@@ -212,12 +212,26 @@ describe('recordTransportFare — transport already recorded', () => {
 });
 
 // ─── recordTransportFare — happy paths ───────────────────────────────────────
+//
+// recordTransportFare now makes 4 DB calls for a 1-keeper booking:
+//   1. bookings fetch (guard)          — .single()
+//   2. booking_cleaners fetch          — direct await (array)
+//   3. bookings update                 — .single()
+//   4. booking_cleaners update × n keepers (1 per keeper)
 
-describe('recordTransportFare — happy path quote', () => {
+const BOOKING_ID_HAPPY   = 'b-happy-1';
+const BOOKING_ID_WAIVE   = 'b-waive-1';
+const BOOKING_ID_NOTREQ  = 'b-notreq-1';
+
+// Keeper row returned by booking_cleaners fetch (1-keeper helper)
+function oneKeeperChain(keeperId: string = 'bc-row-1') {
+  return chain({ data: [{ id: keeperId, cleaner_id: 'cleaner-abc' }], error: null });
+}
+
+describe('recordTransportFare — happy path quote (1 keeper)', () => {
   it('stores the fare and sets transport_status to awaiting_payment', async () => {
-    const BOOKING_ID = 'b-happy-1';
     const updatedRow = {
-      id: BOOKING_ID,
+      id: BOOKING_ID_HAPPY,
       status: 'confirmed',
       cleaner_id: 'cleaner-abc',
       booking_date: '2026-06-25',
@@ -228,30 +242,31 @@ describe('recordTransportFare — happy path quote', () => {
       transport_status: 'awaiting_payment',
       transport_payment_ref: null,
       transport_paid_at: null,
+      transport_awaiting_since: null,
     };
 
-    // First call: fetch guard  /  Second call: update
     vi.mocked(supabase.from)
-      .mockReturnValueOnce(
+      .mockReturnValueOnce(                        // 1. guard fetch
         chain({
-          data: { id: BOOKING_ID, status: 'confirmed', cleaner_id: 'cleaner-abc', transport_status: 'pending_quote' },
+          data: { id: BOOKING_ID_HAPPY, status: 'confirmed', cleaner_id: 'cleaner-abc', transport_status: 'pending_quote' },
           error: null,
         }) as any,
       )
-      .mockReturnValueOnce(chain({ data: updatedRow, error: null }) as any);
+      .mockReturnValueOnce(oneKeeperChain() as any) // 2. booking_cleaners fetch
+      .mockReturnValueOnce(chain({ data: updatedRow, error: null }) as any) // 3. bookings update
+      .mockReturnValueOnce(chain({ data: null, error: null }) as any);      // 4. bc update
 
-    const result = await recordTransportFare(BOOKING_ID, { action: 'quote', amount_ngn: 2000 });
+    const result = await recordTransportFare(BOOKING_ID_HAPPY, { action: 'quote', amount_ngn: 2000 });
 
     expect(result.transport_fare).toBe(2000);
     expect(result.transport_status).toBe('awaiting_payment');
   });
 });
 
-describe('recordTransportFare — happy path waive', () => {
+describe('recordTransportFare — happy path waive (1 keeper)', () => {
   it('sets transport_fare to 0 and transport_status to waived', async () => {
-    const BOOKING_ID = 'b-waive-1';
     const updatedRow = {
-      id: BOOKING_ID,
+      id: BOOKING_ID_WAIVE,
       status: 'confirmed',
       cleaner_id: 'cleaner-xyz',
       booking_date: '2026-06-26',
@@ -262,29 +277,31 @@ describe('recordTransportFare — happy path waive', () => {
       transport_status: 'waived',
       transport_payment_ref: null,
       transport_paid_at: null,
+      transport_awaiting_since: null,
     };
 
     vi.mocked(supabase.from)
       .mockReturnValueOnce(
         chain({
-          data: { id: BOOKING_ID, status: 'confirmed', cleaner_id: 'cleaner-xyz', transport_status: 'pending_quote' },
+          data: { id: BOOKING_ID_WAIVE, status: 'confirmed', cleaner_id: 'cleaner-xyz', transport_status: 'pending_quote' },
           error: null,
         }) as any,
       )
-      .mockReturnValueOnce(chain({ data: updatedRow, error: null }) as any);
+      .mockReturnValueOnce(oneKeeperChain('bc-waive-1') as any)
+      .mockReturnValueOnce(chain({ data: updatedRow, error: null }) as any)
+      .mockReturnValueOnce(chain({ data: null, error: null }) as any);
 
-    const result = await recordTransportFare(BOOKING_ID, { action: 'waive' });
+    const result = await recordTransportFare(BOOKING_ID_WAIVE, { action: 'waive' });
 
     expect(result.transport_fare).toBe(0);
     expect(result.transport_status).toBe('waived');
   });
 });
 
-describe('recordTransportFare — happy path not_required', () => {
+describe('recordTransportFare — happy path not_required (1 keeper)', () => {
   it('sets transport_fare to null and transport_status to not_required', async () => {
-    const BOOKING_ID = 'b-notreq-1';
     const updatedRow = {
-      id: BOOKING_ID,
+      id: BOOKING_ID_NOTREQ,
       status: 'confirmed',
       cleaner_id: 'cleaner-local',
       booking_date: '2026-06-27',
@@ -295,20 +312,163 @@ describe('recordTransportFare — happy path not_required', () => {
       transport_status: 'not_required',
       transport_payment_ref: null,
       transport_paid_at: null,
+      transport_awaiting_since: null,
     };
 
     vi.mocked(supabase.from)
       .mockReturnValueOnce(
         chain({
-          data: { id: BOOKING_ID, status: 'confirmed', cleaner_id: 'cleaner-local', transport_status: 'pending_quote' },
+          data: { id: BOOKING_ID_NOTREQ, status: 'confirmed', cleaner_id: 'cleaner-local', transport_status: 'pending_quote' },
           error: null,
         }) as any,
       )
-      .mockReturnValueOnce(chain({ data: updatedRow, error: null }) as any);
+      .mockReturnValueOnce(oneKeeperChain('bc-notreq-1') as any)
+      .mockReturnValueOnce(chain({ data: updatedRow, error: null }) as any)
+      .mockReturnValueOnce(chain({ data: null, error: null }) as any);
 
-    const result = await recordTransportFare(BOOKING_ID, { action: 'not_required' });
+    const result = await recordTransportFare(BOOKING_ID_NOTREQ, { action: 'not_required' });
 
     expect(result.transport_fare).toBeNull();
     expect(result.transport_status).toBe('not_required');
+  });
+});
+
+// ─── 2-keeper fare entry ──────────────────────────────────────────────────────
+//
+// The key assertions:
+//  a) booking.transport_fare (the customer invoice) = SUM of both fares
+//  b) booking_cleaners are updated with individual amounts (one per keeper)
+//  c) Single amount for a 2-keeper booking is rejected with 400
+
+describe('recordTransportFare — 2-keeper booking: keeper_amounts sets booking.transport_fare to the sum', () => {
+  it('invoices the customer for the combined fare and records each keeper amount separately', async () => {
+    const BOOKING_ID = 'b-two-keeper-1';
+    const LEAD_BC    = 'bc-lead-01';
+    const SECOND_BC  = 'bc-second-01';
+
+    const updatedRow = {
+      id: BOOKING_ID,
+      status: 'confirmed',
+      cleaner_id: 'cleaner-lead',
+      booking_date: '2026-07-10',
+      address: '44 Lekki Phase 1',
+      total_amount_kobo: 1_900_000,
+      commission_kobo:   418_000,
+      transport_fare: 3_500,            // ₦2,000 + ₦1,500 — the combined customer invoice
+      transport_status: 'awaiting_payment',
+      transport_payment_ref: null,
+      transport_paid_at: null,
+      transport_awaiting_since: new Date().toISOString(),
+    };
+
+    // Two booking_cleaners rows (lead + second)
+    const keepersChain = chain({
+      data: [
+        { id: LEAD_BC,   cleaner_id: 'cleaner-lead'   },
+        { id: SECOND_BC, cleaner_id: 'cleaner-second' },
+      ],
+      error: null,
+    });
+    const bcUpdateLead   = chain({ data: null, error: null });
+    const bcUpdateSecond = chain({ data: null, error: null });
+
+    vi.mocked(supabase.from)
+      .mockReturnValueOnce(                                       // 1. booking guard
+        chain({
+          data: { id: BOOKING_ID, status: 'confirmed', cleaner_id: 'cleaner-lead', transport_status: 'pending_quote' },
+          error: null,
+        }) as any,
+      )
+      .mockReturnValueOnce(keepersChain as any)                   // 2. booking_cleaners fetch
+      .mockReturnValueOnce(chain({ data: updatedRow, error: null }) as any) // 3. bookings update
+      .mockReturnValueOnce(bcUpdateLead as any)                   // 4a. lead bc update
+      .mockReturnValueOnce(bcUpdateSecond as any);                // 4b. second bc update
+
+    const result = await recordTransportFare(BOOKING_ID, {
+      action: 'quote',
+      amount_ngn: 3_500,                 // sum pre-computed by validateTransportFareInput
+      keeper_amounts_ngn: [2_000, 1_500],
+    });
+
+    // Customer is invoiced for the combined total
+    expect(result.transport_fare).toBe(3_500);
+    expect(result.transport_status).toBe('awaiting_payment');
+
+    // Lead keeper: 2,000 NGN → 200,000 kobo
+    const leadUpdate = bcUpdateLead.update.mock.calls[0][0] as Record<string, unknown>;
+    expect(leadUpdate.transport_fare_kobo).toBe(200_000);
+
+    // Second keeper: 1,500 NGN → 150,000 kobo
+    const secondUpdate = bcUpdateSecond.update.mock.calls[0][0] as Record<string, unknown>;
+    expect(secondUpdate.transport_fare_kobo).toBe(150_000);
+  });
+
+  it('rejects a single amount for a 2-keeper booking with 400', async () => {
+    const BOOKING_ID = 'b-two-keeper-reject';
+
+    vi.mocked(supabase.from)
+      .mockReturnValueOnce(
+        chain({
+          data: { id: BOOKING_ID, status: 'confirmed', cleaner_id: 'cleaner-lead', transport_status: 'pending_quote' },
+          error: null,
+        }) as any,
+      )
+      .mockReturnValueOnce(
+        chain({
+          data: [
+            { id: 'bc-lead',   cleaner_id: 'cleaner-lead'   },
+            { id: 'bc-second', cleaner_id: 'cleaner-second' },
+          ],
+          error: null,
+        }) as any,
+      );
+
+    // Single amount — no keeper_amounts_ngn — must be rejected
+    await expect(
+      recordTransportFare(BOOKING_ID, { action: 'quote', amount_ngn: 3_500 }),
+    ).rejects.toMatchObject({ status: 400, message: expect.stringContaining('keeper_amounts') });
+  });
+});
+
+describe('validateTransportFareInput — keeper_amounts', () => {
+  it('accepts two amounts and returns total as amount_ngn', () => {
+    const result = validateTransportFareInput({ keeper_amounts: [2000, 1500] });
+    expect(result).toEqual({ action: 'quote', amount_ngn: 3500, keeper_amounts_ngn: [2000, 1500] });
+  });
+
+  it('accepts a single-element keeper_amounts array', () => {
+    const result = validateTransportFareInput({ keeper_amounts: [2000] });
+    expect(result).toEqual({ action: 'quote', amount_ngn: 2000, keeper_amounts_ngn: [2000] });
+  });
+
+  it('rejects when both amount and keeper_amounts are provided', () => {
+    expect(() =>
+      validateTransportFareInput({ amount: 2000, keeper_amounts: [1000, 1000] }),
+    ).toThrow(TransportFareError);
+  });
+
+  it('rejects a keeper_amounts array longer than 2', () => {
+    expect(() =>
+      validateTransportFareInput({ keeper_amounts: [1000, 1000, 500] }),
+    ).toThrow(TransportFareError);
+  });
+
+  it('rejects a negative amount inside keeper_amounts', () => {
+    try {
+      validateTransportFareInput({ keeper_amounts: [2000, -100] });
+      expect.fail('should have thrown');
+    } catch (err) {
+      expect((err as TransportFareError).status).toBe(422);
+    }
+  });
+
+  it('rejects a keeper amount above the ceiling', () => {
+    try {
+      validateTransportFareInput({ keeper_amounts: [5001, 1000] });
+      expect.fail('should have thrown');
+    } catch (err) {
+      expect((err as TransportFareError).status).toBe(422);
+      expect((err as TransportFareError).message).toMatch(/exceeds/i);
+    }
   });
 });

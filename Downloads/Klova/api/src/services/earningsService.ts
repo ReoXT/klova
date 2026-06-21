@@ -7,6 +7,7 @@ export interface EarningSummary {
   photo_url: string | null;
   unpaid_jobs: number;
   unpaid_kobo: number;
+  pending_transport_kobo: number; // settled transport not yet paid out to this keeper
   has_bank_account: boolean;
   bank_account_id: string | null;
   bank_name: string | null;
@@ -167,27 +168,71 @@ export async function adjustEarningForRefund(
 }
 
 /**
- * Returns per-cleaner aggregates of unpaid earnings for the admin payout screen.
+ * Returns per-cleaner aggregates of unpaid earnings + unsettled transport
+ * reimbursements for the admin payout screen.
+ *
+ * unpaid_kobo          — cleaning-fee earnings not yet paid (from cleaner_earnings)
+ * pending_transport_kobo — per-keeper transport owed where the booking's
+ *                          transport_status is 'paid' and paid_out is still false
+ *                          and no payout is already in flight (transport_payout_id IS NULL)
+ *
+ * The two are kept separate so the admin can see the breakdown; the payout
+ * functions sum them when initiating a transfer.
+ *
  * Excludes earnings with status 'refunded'.
  */
 export async function getPendingPayoutSummary(): Promise<EarningSummary[]> {
+  // ── Cleaning earnings ─────────────────────────────────────────────────────
   const { data: earnings, error: eErr } = await supabase
     .from('cleaner_earnings')
     .select('cleaner_id, earning_kobo')
     .eq('status', 'unpaid');
 
   if (eErr) throw eErr;
-  if (!earnings || earnings.length === 0) return [];
 
   const grouped: Record<string, { jobs: number; kobo: number }> = {};
-  for (const e of earnings) {
+  for (const e of earnings ?? []) {
     const cid = e.cleaner_id as string;
     if (!grouped[cid]) grouped[cid] = { jobs: 0, kobo: 0 };
     grouped[cid].jobs++;
     grouped[cid].kobo += e.earning_kobo as number;
   }
 
-  const cleanerIds = Object.keys(grouped);
+  // ── Per-keeper transport reimbursements ───────────────────────────────────
+  // Eligible: not yet paid out, not already in-flight, a positive fare exists.
+  const { data: transportRows, error: tErr } = await supabase
+    .from('booking_cleaners')
+    .select('cleaner_id, transport_fare_kobo, booking_id')
+    .eq('paid_out', false)
+    .is('transport_payout_id', null)
+    .gt('transport_fare_kobo', 0);
+
+  if (tErr) throw tErr;
+
+  const transportMap: Record<string, number> = {};
+
+  if (transportRows && transportRows.length > 0) {
+    // Only include fares where the booking transport has actually been paid
+    const bookingIds = [...new Set(transportRows.map((r) => r.booking_id as string))];
+    const { data: paidBookings, error: pbErr } = await supabase
+      .from('bookings')
+      .select('id')
+      .in('id', bookingIds)
+      .eq('transport_status', 'paid');
+
+    if (pbErr) throw pbErr;
+
+    const paidIds = new Set((paidBookings ?? []).map((b) => b.id as string));
+    for (const row of transportRows) {
+      if (!paidIds.has(row.booking_id as string)) continue;
+      const cid = row.cleaner_id as string;
+      transportMap[cid] = (transportMap[cid] ?? 0) + (row.transport_fare_kobo as number);
+    }
+  }
+
+  // ── Merge and fetch profiles ──────────────────────────────────────────────
+  const cleanerIds = [...new Set([...Object.keys(grouped), ...Object.keys(transportMap)])];
+  if (cleanerIds.length === 0) return [];
 
   const { data: cleaners, error: cErr } = await supabase
     .from('cleaners')
@@ -204,7 +249,7 @@ export async function getPendingPayoutSummary(): Promise<EarningSummary[]> {
 
   if (aErr) throw aErr;
 
-  const accountMap: Record<string, typeof accounts[0]> = {};
+  const accountMap: Record<string, (typeof accounts)[0]> = {};
   for (const a of accounts ?? []) {
     accountMap[a.cleaner_id as string] = a;
   }
@@ -212,20 +257,24 @@ export async function getPendingPayoutSummary(): Promise<EarningSummary[]> {
   return (cleaners ?? []).map((c) => {
     const g  = grouped[c.id as string];
     const ba = accountMap[c.id as string];
+    const transportKobo = transportMap[c.id as string] ?? 0;
     return {
-      cleaner_id:       c.id as string,
-      first_name:       c.first_name as string,
-      last_name:        c.last_name as string,
-      photo_url:        (c.photo_url as string | null) ?? null,
-      unpaid_jobs:      g.jobs,
-      unpaid_kobo:      g.kobo,
-      has_bank_account: !!ba,
-      bank_account_id:  ba ? (ba.id as string) : null,
-      bank_name:        ba ? (ba.bank_name as string) : null,
-      account_number:   ba ? (ba.account_number as string) : null,
-      account_name:     ba ? (ba.account_name as string) : null,
+      cleaner_id:             c.id as string,
+      first_name:             c.first_name as string,
+      last_name:              c.last_name as string,
+      photo_url:              (c.photo_url as string | null) ?? null,
+      unpaid_jobs:            g?.jobs ?? 0,
+      unpaid_kobo:            g?.kobo ?? 0,
+      pending_transport_kobo: transportKobo,
+      has_bank_account:       !!ba,
+      bank_account_id:        ba ? (ba.id as string) : null,
+      bank_name:              ba ? (ba.bank_name as string) : null,
+      account_number:         ba ? (ba.account_number as string) : null,
+      account_name:           ba ? (ba.account_name as string) : null,
     };
-  }).sort((a, b) => b.unpaid_kobo - a.unpaid_kobo);
+  }).sort((a, b) =>
+    (b.unpaid_kobo + b.pending_transport_kobo) - (a.unpaid_kobo + a.pending_transport_kobo),
+  );
 }
 
 /**

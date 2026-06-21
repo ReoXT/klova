@@ -31,7 +31,7 @@ function chain(result: { data: unknown; error: unknown }) {
   b.catch = (fn: (v: any) => any) => Promise.resolve(result).catch(fn);
   b.single = vi.fn().mockResolvedValue(result);
   b.maybeSingle = vi.fn().mockResolvedValue(result);
-  for (const m of ['select', 'eq', 'update', 'upsert', 'insert', 'in', 'order']) {
+  for (const m of ['select', 'eq', 'update', 'upsert', 'insert', 'in', 'order', 'is', 'gt', 'not']) {
     b[m] = vi.fn().mockReturnValue(b);
   }
   return b;
@@ -306,29 +306,29 @@ describe('keeperWeeklyTotal — payout formula (Payout)', () => {
 // This is the guard that makes "mark as paid out" idempotent from the caller's view.
 
 describe('markPaidManually — idempotency guard (Payout)', () => {
-  it('throws "No unpaid earnings" when called after all earnings are already paid', async () => {
-    // After the first payout, cleaner_earnings rows for this cleaner are status='paid'.
-    // Second call queries and gets an empty result → must throw, not insert a ₦0 payout.
-    vi.mocked(supabase.from).mockReturnValueOnce(
-      chain({ data: [], error: null }) as any,
-    );
+  it('throws when all earnings and transport are already paid (totalKobo === 0)', async () => {
+    // markPaidManually now queries BOTH cleaner_earnings and booking_cleaners transport
+    // before checking the total. The guard fires when both return zero.
+    vi.mocked(supabase.from)
+      .mockReturnValueOnce(chain({ data: [], error: null }) as any)   // earnings: empty
+      .mockReturnValueOnce(chain({ data: [], error: null }) as any);  // transport: empty
 
     await expect(markPaidManually('cleaner-done', 'ba-001')).rejects.toThrow(
-      'No unpaid earnings',
+      'No unpaid earnings or transport fares',
     );
 
-    // Exactly 1 DB call (SELECT only) — no payout row should have been inserted
-    expect(vi.mocked(supabase.from)).toHaveBeenCalledTimes(1);
+    // 2 SELECT calls (earnings + transport) — no payout row inserted
+    expect(vi.mocked(supabase.from)).toHaveBeenCalledTimes(2);
   });
 
-  it('throws "No unpaid earnings" when cleaner has no earnings at all', async () => {
-    vi.mocked(supabase.from).mockReturnValueOnce(
-      chain({ data: null, error: null }) as any,
-    );
+  it('throws when cleaner has no earnings and no transport at all', async () => {
+    vi.mocked(supabase.from)
+      .mockReturnValueOnce(chain({ data: null, error: null }) as any)  // earnings: null
+      .mockReturnValueOnce(chain({ data: null, error: null }) as any); // transport: null
 
     await expect(markPaidManually('cleaner-new', 'ba-002')).rejects.toThrow(
-      'No unpaid earnings',
+      'No unpaid earnings or transport fares',
     );
-    expect(vi.mocked(supabase.from)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(supabase.from)).toHaveBeenCalledTimes(2);
   });
 });
