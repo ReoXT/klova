@@ -224,6 +224,7 @@ export async function createBooking(input: BookingInput): Promise<BookingResult>
       commission_kobo:      commissionKobo,
       requested_cleaner_id: input.requested_cleaner_id ?? null,
       status:               'pending_payment',
+      keeper_count:         input.keeper_count ?? 1,
     })
     .select('id')
     .single();
@@ -258,28 +259,41 @@ export async function createBooking(input: BookingInput): Promise<BookingResult>
 
   console.log(`[booking] ${booking.id}: matched ${assignment.cleanerIds.length} keeper(s) — ${assignment.cleanerIds.join(', ')}`);
 
-  // 7. Fetch all assigned keeper profiles to return to the frontend
+  // 7. Read the authoritative keeper list from booking_cleaners (role ASC = lead first)
+  //    and fetch each keeper's public profile in a single IN query.
+  const { data: bcRows, error: bcErr } = await supabase
+    .from('booking_cleaners')
+    .select('cleaner_id, role')
+    .eq('booking_id', booking.id)
+    .order('role', { ascending: true }); // 'lead' < 'second' alphabetically
+
+  if (bcErr) throw bcErr;
+
+  const assignedIds = (bcRows ?? []).map((r) => r.cleaner_id as string);
+  if (assignedIds.length === 0) {
+    throw new Error(`No keepers written to booking_cleaners for booking ${booking.id}.`);
+  }
+
   const { data: cleanerRows, error: cleanerErr } = await supabase
     .from('cleaners')
     .select('id, first_name, last_name, photo_url, rating, total_jobs')
-    .in('id', assignment.cleanerIds);
+    .in('id', assignedIds);
 
   if (cleanerErr) throw cleanerErr;
 
-  // Preserve assignment order (lead first, second second)
   const cleanerMap = new Map(
     (cleanerRows ?? []).map((c) => [c.id as string, c]),
   );
 
-  const cleaners: CleanerProfile[] = assignment.cleanerIds.map((cid) => {
+  const cleaners: CleanerProfile[] = assignedIds.map((cid) => {
     const c = cleanerMap.get(cid);
     if (!c) throw new Error(`Failed to load profile for keeper ${cid}.`);
     return {
-      id: c.id as string,
+      id:         c.id as string,
       first_name: c.first_name as string,
-      last_name: c.last_name as string,
-      photo_url: (c.photo_url as string | null) ?? null,
-      rating: (c.rating as number | null) ?? null,
+      last_name:  c.last_name as string,
+      photo_url:  (c.photo_url as string | null) ?? null,
+      rating:     (c.rating as number | null) ?? null,
       total_jobs: c.total_jobs as number,
     };
   });
