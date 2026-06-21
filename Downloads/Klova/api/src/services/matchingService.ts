@@ -10,6 +10,7 @@ export interface BookingForMatch {
   customer_id: string;
   booking_date: string; // YYYY-MM-DD
   requested_cleaner_id: string | null;
+  keeper_count?: number;
 }
 
 interface Candidate {

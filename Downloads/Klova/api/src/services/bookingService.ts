@@ -55,7 +55,7 @@ export interface BookingResult {
   total_amount: number;      // NGN
   commission_amount: number; // NGN
   commission_rate: number;
-  cleaner: CleanerProfile;
+  cleaners: CleanerProfile[];
 }
 
 // ─── Validation ──────────────────────────────────────────────────────────────
@@ -242,12 +242,13 @@ export async function createBooking(input: BookingInput): Promise<BookingResult>
 
   console.log(`[booking] ${booking.id}: row created — assigning cleaner`);
 
-  // 6. Assign cleaner immediately — customer sees who's coming before paying
+  // 6. Assign cleaner(s) immediately — customer sees who's coming before paying
   const assignment = await assignCleaner(booking.id, {
     zone_id: zone.id,
     customer_id: customer.id,
     booking_date: input.booking_date,
     requested_cleaner_id: input.requested_cleaner_id ?? null,
+    keeper_count: input.keeper_count ?? 1,
   });
 
   if (assignment.outcome === 'no_match') {
@@ -255,31 +256,39 @@ export async function createBooking(input: BookingInput): Promise<BookingResult>
     throw new NoAvailabilityError(input.zone_slug, input.booking_date);
   }
 
-  console.log(`[booking] ${booking.id}: matched cleaner ${assignment.cleanerId}`);
+  console.log(`[booking] ${booking.id}: matched ${assignment.cleanerIds.length} keeper(s) — ${assignment.cleanerIds.join(', ')}`);
 
-  // 7. Fetch cleaner profile to return to the frontend
-  const { data: cleaner, error: cleanerErr } = await supabase
+  // 7. Fetch all assigned keeper profiles to return to the frontend
+  const { data: cleanerRows, error: cleanerErr } = await supabase
     .from('cleaners')
     .select('id, first_name, last_name, photo_url, rating, total_jobs')
-    .eq('id', assignment.cleanerId)
-    .single();
+    .in('id', assignment.cleanerIds);
 
-  if (cleanerErr || !cleaner) {
-    throw cleanerErr ?? new Error('Failed to load cleaner profile.');
-  }
+  if (cleanerErr) throw cleanerErr;
+
+  // Preserve assignment order (lead first, second second)
+  const cleanerMap = new Map(
+    (cleanerRows ?? []).map((c) => [c.id as string, c]),
+  );
+
+  const cleaners: CleanerProfile[] = assignment.cleanerIds.map((cid) => {
+    const c = cleanerMap.get(cid);
+    if (!c) throw new Error(`Failed to load profile for keeper ${cid}.`);
+    return {
+      id: c.id as string,
+      first_name: c.first_name as string,
+      last_name: c.last_name as string,
+      photo_url: (c.photo_url as string | null) ?? null,
+      rating: (c.rating as number | null) ?? null,
+      total_jobs: c.total_jobs as number,
+    };
+  });
 
   return {
     booking_id: booking.id,
     total_amount: breakdown.total_amount,
     commission_amount: breakdown.commission_amount,
     commission_rate: breakdown.commission_rate,
-    cleaner: {
-      id: cleaner.id,
-      first_name: cleaner.first_name,
-      last_name: cleaner.last_name,
-      photo_url: cleaner.photo_url ?? null,
-      rating: cleaner.rating ?? null,
-      total_jobs: cleaner.total_jobs,
-    },
+    cleaners,
   };
 }

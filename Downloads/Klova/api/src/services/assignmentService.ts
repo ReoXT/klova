@@ -2,7 +2,7 @@ import { supabase } from '../lib/supabase';
 import { matchCleaner, NO_MATCH, type BookingForMatch } from './matchingService';
 
 export type AssignResult =
-  | { outcome: 'matched'; cleanerId: string }
+  | { outcome: 'matched'; cleanerIds: string[] }
   | { outcome: 'no_match' };
 
 /**
@@ -21,6 +21,7 @@ export async function assignCleaner(
   booking: BookingForMatch,
 ): Promise<AssignResult> {
   const candidates = await matchCleaner(booking);
+  const keeperCount = booking.keeper_count ?? 1;
 
   if (candidates === NO_MATCH) {
     const { error } = await supabase
@@ -35,13 +36,15 @@ export async function assignCleaner(
     p_booking_id: bookingId,
     p_candidate_ids: candidates,
     p_booking_date: booking.booking_date,
+    p_keeper_count: keeperCount,
   });
 
   if (error) throw error;
 
   const raw = data as string;
   if (raw.startsWith('matched:')) {
-    return { outcome: 'matched', cleanerId: raw.slice('matched:'.length) };
+    const cleanerIds = raw.slice('matched:'.length).split(',');
+    return { outcome: 'matched', cleanerIds };
   }
 
   return { outcome: 'no_match' };

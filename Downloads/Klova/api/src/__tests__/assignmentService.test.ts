@@ -66,17 +66,33 @@ describe('assignCleaner — when matchCleaner finds no candidates', () => {
 // ─── Postgres RPC paths ───────────────────────────────────────────────────────
 
 describe('assignCleaner — RPC outcomes', () => {
-  it('returns { outcome: matched, cleanerId } when the Postgres function claims a slot', async () => {
+  it('returns { outcome: matched, cleanerIds: [c1] } when one keeper is assigned', async () => {
     mockMatchCleaner().mockResolvedValueOnce(['c1', 'c2']);
     mockRpc().mockResolvedValueOnce({ data: 'matched:c1', error: null } as any);
 
     const result = await assignCleaner(BOOKING_ID, bookingCtx);
 
-    expect(result).toEqual({ outcome: 'matched', cleanerId: 'c1' });
+    expect(result).toEqual({ outcome: 'matched', cleanerIds: ['c1'] });
     expect(mockRpc()).toHaveBeenCalledWith('assign_cleaner', {
-      p_booking_id: BOOKING_ID,
+      p_booking_id:    BOOKING_ID,
       p_candidate_ids: ['c1', 'c2'],
-      p_booking_date: DATE,
+      p_booking_date:  DATE,
+      p_keeper_count:  1,
+    });
+  });
+
+  it('returns { outcome: matched, cleanerIds: [c1, c2] } when two keepers are assigned', async () => {
+    mockMatchCleaner().mockResolvedValueOnce(['c1', 'c2', 'c3']);
+    mockRpc().mockResolvedValueOnce({ data: 'matched:c1,c2', error: null } as any);
+
+    const result = await assignCleaner(BOOKING_ID, { ...bookingCtx, keeper_count: 2 });
+
+    expect(result).toEqual({ outcome: 'matched', cleanerIds: ['c1', 'c2'] });
+    expect(mockRpc()).toHaveBeenCalledWith('assign_cleaner', {
+      p_booking_id:    BOOKING_ID,
+      p_candidate_ids: ['c1', 'c2', 'c3'],
+      p_booking_date:  DATE,
+      p_keeper_count:  2,
     });
   });
 
