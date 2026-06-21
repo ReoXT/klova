@@ -104,7 +104,6 @@ export async function createTransportInvoice(bookingId: string): Promise<Transpo
 
   const fareNgn = Number(booking.transport_fare);
   const fareKobo = Math.round(fareNgn * 100);
-  // Use first 8 chars of booking UUID as a short human-readable reference
   const shortRef = (bookingId as string).slice(0, 8).toUpperCase();
 
   const payload = await paystackPost('/paymentrequest', {
@@ -117,7 +116,6 @@ export async function createTransportInvoice(bookingId: string): Promise<Transpo
         quantity: 1,
       },
     ],
-    // send_notification defaults to true — Paystack emails the customer automatically
     send_notification: true,
     metadata: {
       booking_id: bookingId,
@@ -129,7 +127,9 @@ export async function createTransportInvoice(bookingId: string): Promise<Transpo
 
   const { request_code, offline_reference } = payload.data;
 
-  // Persist the reference so the webhook can tie the payment back to the booking
+  // Persist the reference so the webhook can tie the payment back to the booking.
+  // If this DB write fails, the PRQ already exists on Paystack. Log the PRQ code
+  // prominently so it can be manually linked or cancelled if the retry duplicates it.
   const { data: updated, error: updateErr } = await supabase
     .from('bookings')
     .update({ transport_payment_ref: request_code })
@@ -138,6 +138,11 @@ export async function createTransportInvoice(bookingId: string): Promise<Transpo
     .single();
 
   if (updateErr || !updated) {
+    console.error(
+      `[transport-invoice] ORPHANED PRQ — Paystack created ${request_code} for booking ${bookingId} ` +
+      `but DB update failed. Manual action may be needed: link PRQ ${request_code} to the booking ` +
+      `or cancel it at https://dashboard.paystack.com. Error: ${updateErr?.message ?? 'unknown'}`,
+    );
     throw updateErr ?? new Error('Failed to store transport_payment_ref on booking.');
   }
 
@@ -188,8 +193,13 @@ export async function resendTransportInvoice(bookingId: string): Promise<{ messa
 // ─── Webhook: invoice.payment_successful ─────────────────────────────────────
 // Called from webhookController when Paystack fires invoice.payment_successful.
 // Idempotent: safe to call more than once for the same request_code.
+// transactionRef: the Paystack transaction reference from the webhook's transactions
+// array — stored so a cancellation can issue a refund later if needed.
 
-export async function handleTransportInvoicePaid(requestCode: string): Promise<void> {
+export async function handleTransportInvoicePaid(
+  requestCode: string,
+  transactionRef: string | null = null,
+): Promise<void> {
   const { data: booking, error: fetchErr } = await supabase
     .from('bookings')
     .select('id, transport_status')
@@ -211,12 +221,175 @@ export async function handleTransportInvoicePaid(requestCode: string): Promise<v
     .update({
       transport_status: 'paid',
       transport_paid_at: new Date().toISOString(),
+      ...(transactionRef ? { transport_transaction_ref: transactionRef } : {}),
     })
     .eq('id', booking.id as string);
 
-  console.log(`[transport-invoice] PRQ ${requestCode} paid — booking ${booking.id as string} transport_status → paid`);
+  if (!transactionRef) {
+    // Without the transaction ref we cannot issue an automated refund later.
+    // This should not happen with a correctly shaped Paystack webhook, but log
+    // it clearly so any discrepancy is visible in Railway logs.
+    console.warn(
+      `[transport-invoice] PRQ ${requestCode} paid (booking ${booking.id as string}) — ` +
+      `no transaction reference in webhook payload. If this booking is later cancelled, ` +
+      `the transport refund must be issued manually via the Paystack dashboard.`,
+    );
+  } else {
+    console.log(
+      `[transport-invoice] PRQ ${requestCode} paid — booking ${booking.id as string} ` +
+      `transport_status → paid (tx: ${transactionRef})`,
+    );
+  }
 
-  // Notify admin: transport settled, booking ready to dispatch.
-  // notifyAdminTransportPaid uses safeSend internally — never throws.
   await notifyAdminTransportPaid(booking.id as string);
+}
+
+// ─── Issue transport refund ───────────────────────────────────────────────────
+// Called when a confirmed booking is cancelled after transport has been paid.
+// transactionRef must come from transport_transaction_ref on the booking row.
+
+export async function issueTransportRefund(
+  bookingId: string,
+  transactionRef: string,
+): Promise<void> {
+  if (!config.paystackSecretKey) {
+    throw new TransportFareError('Paystack is not configured — transport refund cannot be issued.', 503);
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15_000);
+  let response: globalThis.Response;
+  try {
+    response = await fetch('https://api.paystack.co/refund', {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        Authorization: `Bearer ${config.paystackSecretKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ transaction: transactionRef }),
+    });
+  } catch (err: unknown) {
+    if ((err as { name?: string }).name === 'AbortError') {
+      throw new TransportFareError(
+        `Transport refund timed out for booking ${bookingId}. Issue manually via Paystack dashboard (tx: ${transactionRef}).`,
+        504,
+      );
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+
+  const body = await response.json().catch(() => ({})) as { status?: boolean; message?: string };
+  if (!response.ok || !body.status) {
+    const msg = body.message ?? `HTTP ${response.status}`;
+    console.error(
+      `[transport-refund] Paystack refund FAILED for booking ${bookingId} (tx: ${transactionRef}): ${msg}. ` +
+      `Issue manually via Paystack dashboard.`,
+    );
+    throw new TransportFareError(`Transport refund failed: ${msg}`, 502);
+  }
+
+  // Flip transport_status to 'refunded'. If this DB write fails the Paystack refund
+  // was still issued — log clearly so the discrepancy can be reconciled manually.
+  const { error: updateErr } = await supabase
+    .from('bookings')
+    .update({ transport_status: 'refunded' })
+    .eq('id', bookingId);
+
+  if (updateErr) {
+    console.error(
+      `[transport-refund] Refund issued on Paystack for booking ${bookingId} (tx: ${transactionRef}) ` +
+      `but transport_status DB update failed: ${updateErr.message}. Manual reconciliation needed.`,
+    );
+  } else {
+    console.log(`[transport-refund] Transport refund issued for booking ${bookingId} (tx: ${transactionRef})`);
+  }
+}
+
+// ─── Reset transport fare ─────────────────────────────────────────────────────
+// Cancels an existing Paystack Payment Request (if one was sent) and resets the
+// booking back to pending_quote so the admin can re-quote with a corrected fare.
+// Only valid when transport_status is 'awaiting_payment' — not after it is paid.
+
+export interface ResetTransportFareResult {
+  booking_id: string;
+  prq_cancelled: boolean;
+  transport_status: string;
+}
+
+export async function resetTransportFare(bookingId: string): Promise<ResetTransportFareResult> {
+  const { data: booking, error: fetchErr } = await supabase
+    .from('bookings')
+    .select('id, status, transport_status, transport_payment_ref')
+    .eq('id', bookingId)
+    .single();
+
+  if (fetchErr || !booking) {
+    throw new TransportFareError(`Booking ${bookingId} not found.`, 404);
+  }
+  if (booking.status !== 'confirmed') {
+    throw new TransportFareError(
+      `Can only reset transport fare on a confirmed booking. This booking is "${booking.status as string}".`,
+      409,
+    );
+  }
+  if (booking.transport_status === 'paid') {
+    throw new TransportFareError(
+      'Cannot reset a fare that has already been paid. Cancel the booking to issue a refund.',
+      409,
+    );
+  }
+  if (booking.transport_status !== 'awaiting_payment') {
+    throw new TransportFareError(
+      `Transport fare can only be reset when status is "awaiting_payment". Current: "${booking.transport_status as string}".`,
+      409,
+    );
+  }
+
+  // Cancel the existing Payment Request on Paystack if one was already sent.
+  // Non-fatal: the PRQ may have already expired or been cancelled; log and continue.
+  let prq_cancelled = false;
+  const prqCode = booking.transport_payment_ref as string | null;
+  if (prqCode) {
+    try {
+      await paystackPost(`/paymentrequest/cancel/${prqCode}`);
+      prq_cancelled = true;
+      console.log(`[transport-reset] Cancelled PRQ ${prqCode} on Paystack for booking ${bookingId}`);
+    } catch (err) {
+      console.warn(
+        `[transport-reset] Could not cancel PRQ ${prqCode} on Paystack for booking ${bookingId} ` +
+        `(may already be cancelled/expired): ${(err as Error).message}`,
+      );
+    }
+  }
+
+  // Reset all fare fields so the admin can start a fresh quote.
+  const { data: updated, error: updateErr } = await supabase
+    .from('bookings')
+    .update({
+      transport_status:        'pending_quote',
+      transport_fare:          null,
+      transport_payment_ref:   null,
+      transport_awaiting_since: null,
+    })
+    .eq('id', bookingId)
+    .select('id, transport_status')
+    .single();
+
+  if (updateErr || !updated) {
+    throw updateErr ?? new Error('Failed to reset transport fare fields.');
+  }
+
+  console.log(
+    `[transport-reset] Booking ${bookingId} reset to pending_quote ` +
+    `(PRQ cancelled on Paystack: ${prq_cancelled})`,
+  );
+
+  return {
+    booking_id:       bookingId,
+    prq_cancelled,
+    transport_status: updated.transport_status as string,
+  };
 }

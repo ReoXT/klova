@@ -12,10 +12,21 @@ vi.mock('../services/notificationService', () => ({
   notifyKeeperJobCancelled: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock('../services/refundService', () => ({
+  issueRefund: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('../services/transportInvoiceService', () => ({
+  issueTransportRefund: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { supabase } from '../lib/supabase';
 import { notifyKeeperJobCancelled } from '../services/notificationService';
+import { issueRefund } from '../services/refundService';
+import { issueTransportRefund } from '../services/transportInvoiceService';
 import {
   cancelTransportOverdue,
+  cancelConfirmedBooking,
   getAwaitingTransportBookings,
   TransportCancellationError,
 } from '../services/transportCancellationService';
@@ -310,5 +321,184 @@ describe('getAwaitingTransportBookings — overdue detection', () => {
     const [booking] = await getAwaitingTransportBookings();
     expect(booking!.is_soft_overdue).toBe(true);
     expect(booking!.is_overdue).toBe(true);
+  });
+});
+
+// ─── cancelConfirmedBooking ───────────────────────────────────────────────────
+
+function confirmedBooking(overrides: object = {}) {
+  return {
+    id: 'b-cancel-confirmed-001',
+    status: 'confirmed',
+    cleaner_id: 'cleaner-xyz',
+    booking_date: '2099-12-31',
+    paystack_reference: 'txn_clean_pay_001',
+    dispatched_at: null,
+    transport_status: 'paid',
+    transport_fare: 2000,
+    transport_payment_ref: 'PRQ_001',
+    transport_transaction_ref: 'txn_transport_001',
+    ...overrides,
+  };
+}
+
+describe('cancelConfirmedBooking — guards', () => {
+  it('throws 404 when booking does not exist', async () => {
+    vi.mocked(supabase.from).mockReturnValueOnce(
+      chain({ data: null, error: { message: 'not found' } }) as any,
+    );
+    await expect(cancelConfirmedBooking('missing')).rejects.toMatchObject({ status: 404 });
+  });
+
+  it('throws 409 when booking is already cancelled', async () => {
+    vi.mocked(supabase.from).mockReturnValueOnce(
+      chain({ data: confirmedBooking({ status: 'cancelled' }), error: null }) as any,
+    );
+    await expect(cancelConfirmedBooking('b1')).rejects.toMatchObject({
+      status: 409,
+      message: expect.stringContaining('already cancelled'),
+    });
+    expect(vi.mocked(issueRefund)).not.toHaveBeenCalled();
+  });
+
+  it('throws 409 when booking is not confirmed (e.g. matched)', async () => {
+    vi.mocked(supabase.from).mockReturnValueOnce(
+      chain({ data: confirmedBooking({ status: 'matched' }), error: null }) as any,
+    );
+    await expect(cancelConfirmedBooking('b2')).rejects.toMatchObject({
+      status: 409,
+      message: expect.stringContaining('"matched"'),
+    });
+  });
+
+  it('throws 409 when booking has already been dispatched', async () => {
+    vi.mocked(supabase.from).mockReturnValueOnce(
+      chain({ data: confirmedBooking({ dispatched_at: '2026-06-21T08:00:00Z' }), error: null }) as any,
+    );
+    await expect(cancelConfirmedBooking('b3')).rejects.toMatchObject({
+      status: 409,
+      message: expect.stringContaining('dispatched'),
+    });
+    expect(vi.mocked(issueRefund)).not.toHaveBeenCalled();
+  });
+});
+
+describe('cancelConfirmedBooking — transport paid with transaction ref', () => {
+  it('cancels, refunds clean, refunds transport, frees slot, notifies keeper', async () => {
+    const BOOKING_ID = 'b-full-refund';
+    const cancelledRow = { id: BOOKING_ID, status: 'cancelled', cancellation_reason: 'admin_cancelled' };
+
+    vi.mocked(supabase.from)
+      .mockReturnValueOnce(chain({ data: confirmedBooking({ id: BOOKING_ID }), error: null }) as any)
+      .mockReturnValueOnce(chain({ data: cancelledRow, error: null }) as any)   // cancel update
+      .mockReturnValueOnce(chain({ data: null, error: null }) as any);           // availability free
+
+    const result = await cancelConfirmedBooking(BOOKING_ID);
+
+    expect(result.status).toBe('cancelled');
+    expect(result.clean_refund).toBe('issued');
+    expect(result.transport_refund).toBe('issued');
+
+    expect(vi.mocked(issueRefund)).toHaveBeenCalledOnce();
+    expect(vi.mocked(issueRefund)).toHaveBeenCalledWith(BOOKING_ID, 'txn_clean_pay_001');
+
+    expect(vi.mocked(issueTransportRefund)).toHaveBeenCalledOnce();
+    expect(vi.mocked(issueTransportRefund)).toHaveBeenCalledWith(BOOKING_ID, 'txn_transport_001');
+
+    expect(vi.mocked(notifyKeeperJobCancelled)).toHaveBeenCalledOnce();
+    expect(vi.mocked(notifyKeeperJobCancelled)).toHaveBeenCalledWith(BOOKING_ID);
+  });
+});
+
+describe('cancelConfirmedBooking — transport paid but no transaction ref', () => {
+  it('cancels and refunds clean but returns skipped_no_tx_ref for transport', async () => {
+    const BOOKING_ID = 'b-no-txref';
+    const cancelledRow = { id: BOOKING_ID, status: 'cancelled', cancellation_reason: 'admin_cancelled' };
+
+    vi.mocked(supabase.from)
+      .mockReturnValueOnce(
+        chain({ data: confirmedBooking({ id: BOOKING_ID, transport_transaction_ref: null }), error: null }) as any,
+      )
+      .mockReturnValueOnce(chain({ data: cancelledRow, error: null }) as any)
+      .mockReturnValueOnce(chain({ data: null, error: null }) as any);
+
+    const result = await cancelConfirmedBooking(BOOKING_ID);
+
+    expect(result.clean_refund).toBe('issued');
+    expect(result.transport_refund).toBe('skipped_no_tx_ref');
+
+    expect(vi.mocked(issueRefund)).toHaveBeenCalledOnce();
+    // Transport refund must NOT be attempted — no tx ref available
+    expect(vi.mocked(issueTransportRefund)).not.toHaveBeenCalled();
+    expect(vi.mocked(notifyKeeperJobCancelled)).toHaveBeenCalledOnce();
+  });
+});
+
+describe('cancelConfirmedBooking — transport not paid (awaiting_payment)', () => {
+  it('cancels and refunds clean; transport_refund is skipped_not_paid', async () => {
+    const BOOKING_ID = 'b-transport-unpaid';
+    const cancelledRow = { id: BOOKING_ID, status: 'cancelled', cancellation_reason: 'admin_cancelled' };
+
+    vi.mocked(supabase.from)
+      .mockReturnValueOnce(
+        chain({
+          data: confirmedBooking({
+            id: BOOKING_ID,
+            transport_status: 'awaiting_payment',
+            transport_transaction_ref: null,
+          }),
+          error: null,
+        }) as any,
+      )
+      .mockReturnValueOnce(chain({ data: cancelledRow, error: null }) as any)
+      .mockReturnValueOnce(chain({ data: null, error: null }) as any);
+
+    const result = await cancelConfirmedBooking(BOOKING_ID);
+
+    expect(result.clean_refund).toBe('issued');
+    expect(result.transport_refund).toBe('skipped_not_paid');
+    expect(vi.mocked(issueTransportRefund)).not.toHaveBeenCalled();
+  });
+});
+
+describe('cancelConfirmedBooking — clean refund fails', () => {
+  it('still cancels and returns clean_refund: failed (does not rethrow)', async () => {
+    const BOOKING_ID = 'b-clean-fail';
+    const cancelledRow = { id: BOOKING_ID, status: 'cancelled', cancellation_reason: 'admin_cancelled' };
+
+    vi.mocked(issueRefund).mockRejectedValueOnce(new Error('Paystack timeout'));
+
+    vi.mocked(supabase.from)
+      .mockReturnValueOnce(chain({ data: confirmedBooking({ id: BOOKING_ID }), error: null }) as any)
+      .mockReturnValueOnce(chain({ data: cancelledRow, error: null }) as any)
+      .mockReturnValueOnce(chain({ data: null, error: null }) as any);
+
+    const result = await cancelConfirmedBooking(BOOKING_ID);
+
+    expect(result.status).toBe('cancelled');
+    expect(result.clean_refund).toBe('failed');
+    // Transport was paid and tx ref exists — still attempted
+    expect(result.transport_refund).toBe('issued');
+    expect(vi.mocked(notifyKeeperJobCancelled)).toHaveBeenCalledOnce();
+  });
+});
+
+describe('cancelConfirmedBooking — no paystack_reference on booking', () => {
+  it('returns skipped_no_ref for clean and still processes transport', async () => {
+    const BOOKING_ID = 'b-no-clean-ref';
+    const cancelledRow = { id: BOOKING_ID, status: 'cancelled', cancellation_reason: 'admin_cancelled' };
+
+    vi.mocked(supabase.from)
+      .mockReturnValueOnce(
+        chain({ data: confirmedBooking({ id: BOOKING_ID, paystack_reference: null }), error: null }) as any,
+      )
+      .mockReturnValueOnce(chain({ data: cancelledRow, error: null }) as any)
+      .mockReturnValueOnce(chain({ data: null, error: null }) as any);
+
+    const result = await cancelConfirmedBooking(BOOKING_ID);
+
+    expect(result.clean_refund).toBe('skipped_no_ref');
+    expect(vi.mocked(issueRefund)).not.toHaveBeenCalled();
+    expect(result.transport_refund).toBe('issued');
   });
 });

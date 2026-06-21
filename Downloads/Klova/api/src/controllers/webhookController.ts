@@ -62,6 +62,9 @@ interface PaystackInvoicePaidEvent {
     paid: boolean;
     paid_at: string;
     amount: number;        // kobo
+    // Paystack includes the settled transaction(s) in the webhook payload.
+    // We capture the first reference so we can issue a refund later if needed.
+    transactions?: Array<{ reference: string }>;
   };
 }
 
@@ -129,10 +132,13 @@ export async function postPaystackWebhook(req: Request, res: Response): Promise<
 
   if (payload.event === 'invoice.payment_successful') {
     const event = payload as unknown as PaystackInvoicePaidEvent;
-    const { request_code } = event.data;
+    const { request_code, transactions } = event.data;
+    // Paystack includes the settling transaction(s) in the payload — capture the
+    // first reference so we can issue a refund later if the booking is cancelled.
+    const txRef = transactions?.[0]?.reference ?? null;
     if (request_code) {
       try {
-        await handleTransportInvoicePaid(request_code);
+        await handleTransportInvoicePaid(request_code, txRef);
       } catch (err) {
         console.error('[webhook] invoice.payment_successful error:', err);
         res.sendStatus(500);

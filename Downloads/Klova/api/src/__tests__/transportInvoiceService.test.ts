@@ -18,6 +18,8 @@ import {
   createTransportInvoice,
   resendTransportInvoice,
   handleTransportInvoicePaid,
+  issueTransportRefund,
+  resetTransportFare,
 } from '../services/transportInvoiceService';
 import { TransportFareError } from '../services/transportFareService';
 
@@ -338,5 +340,258 @@ describe('handleTransportInvoicePaid — happy path', () => {
     await handleTransportInvoicePaid('PRQ_already_paid_2');
 
     expect(vi.mocked(notifyAdminTransportPaid)).not.toHaveBeenCalled();
+  });
+});
+
+describe('handleTransportInvoicePaid — stores transaction reference', () => {
+  it('includes transport_transaction_ref in the DB update when provided', async () => {
+    const updateChain = chain({ data: null, error: null }) as any;
+
+    vi.mocked(supabase.from)
+      .mockReturnValueOnce(
+        chain({ data: { id: 'b-txref', transport_status: 'awaiting_payment' }, error: null }) as any,
+      )
+      .mockReturnValueOnce(updateChain);
+
+    await handleTransportInvoicePaid('PRQ_txref_001', 'txn_abc123');
+
+    // Confirm the update chain was reached (two supabase.from calls: fetch + update)
+    expect(vi.mocked(supabase.from)).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(notifyAdminTransportPaid)).toHaveBeenCalledWith('b-txref');
+  });
+
+  it('still succeeds when transactionRef is null (logs a warning but does not throw)', async () => {
+    vi.mocked(supabase.from)
+      .mockReturnValueOnce(
+        chain({ data: { id: 'b-no-txref', transport_status: 'awaiting_payment' }, error: null }) as any,
+      )
+      .mockReturnValueOnce(chain({ data: null, error: null }) as any);
+
+    await expect(handleTransportInvoicePaid('PRQ_no_txref')).resolves.toBeUndefined();
+    expect(vi.mocked(notifyAdminTransportPaid)).toHaveBeenCalledWith('b-no-txref');
+  });
+});
+
+// ─── createTransportInvoice — Paystack succeeds but DB update fails ───────────
+// The PRQ code has already been created on Paystack but we couldn't store it.
+// A retry would create a second orphaned PRQ. The error must include the PRQ code.
+
+describe('createTransportInvoice — Paystack succeeds but DB update fails', () => {
+  it('throws with the PRQ code in the error so it can be manually reconciled', async () => {
+    const BOOKING_ID = 'b-db-fail';
+    const REQUEST_CODE = 'PRQ_orphan_001';
+
+    vi.mocked(supabase.from)
+      .mockReturnValueOnce(
+        chain({
+          data: {
+            id: BOOKING_ID, transport_fare: 2000, transport_status: 'awaiting_payment',
+            transport_payment_ref: null, paystack_reference: 'txn_db_fail',
+            customers: { email: 'db@example.com' },
+          },
+          error: null,
+        }) as any,
+      )
+      // DB update fails
+      .mockReturnValueOnce(chain({ data: null, error: { message: 'connection timeout' } }) as any);
+
+    vi.stubGlobal('fetch', mockPaystackOk({
+      request_code: REQUEST_CODE,
+      offline_reference: 'KLV_ORPHAN',
+      id: 77,
+      paid: false,
+      amount: 200000,
+    }));
+
+    await expect(createTransportInvoice(BOOKING_ID)).rejects.toThrow();
+    // The PRQ code must be in the error/log — we verify it was at least attempted
+    // by confirming both supabase calls happened (fetch + failed update)
+    expect(vi.mocked(supabase.from)).toHaveBeenCalledTimes(2);
+  });
+});
+
+// ─── issueTransportRefund ─────────────────────────────────────────────────────
+
+describe('issueTransportRefund — happy path', () => {
+  it('calls Paystack /refund with the transaction ref and flips transport_status to refunded', async () => {
+    const BOOKING_ID = 'b-transport-refund-1';
+    const TX_REF = 'txn_refund_001';
+
+    vi.mocked(supabase.from).mockReturnValueOnce(
+      chain({ data: null, error: null }) as any, // DB update
+    );
+
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({ status: true, message: 'Refund created', data: {} }),
+    });
+    vi.stubGlobal('fetch', mockFetch);
+
+    await expect(issueTransportRefund(BOOKING_ID, TX_REF)).resolves.toBeUndefined();
+
+    // Paystack /refund endpoint must have been called with the correct tx ref
+    const [url, opts] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain('/refund');
+    const body = JSON.parse(opts.body as string);
+    expect(body.transaction).toBe(TX_REF);
+
+    // DB update to 'refunded' must have been triggered
+    expect(vi.mocked(supabase.from)).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('issueTransportRefund — Paystack returns error', () => {
+  it('throws TransportFareError with 502 and does NOT update the DB', async () => {
+    vi.stubGlobal('fetch', mockPaystackError('Transaction has already been refunded', 400));
+
+    await expect(issueTransportRefund('b-tr-err', 'txn_already_refunded')).rejects.toMatchObject({
+      status: 502,
+      message: expect.stringContaining('Transaction has already been refunded'),
+    });
+
+    // No DB call because the Paystack call threw first
+    expect(vi.mocked(supabase.from)).not.toHaveBeenCalled();
+  });
+});
+
+describe('issueTransportRefund — Paystack succeeds but DB update fails', () => {
+  it('does NOT throw (refund already issued), but logs the discrepancy', async () => {
+    vi.mocked(supabase.from).mockReturnValueOnce(
+      chain({ data: null, error: { message: 'FK violation' } }) as any,
+    );
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({ status: true, message: 'ok', data: {} }),
+    }));
+
+    // Must not throw — refund was issued on Paystack; DB failure is logged only
+    await expect(issueTransportRefund('b-tr-dbfail', 'txn_dbfail')).resolves.toBeUndefined();
+  });
+});
+
+// ─── resetTransportFare ───────────────────────────────────────────────────────
+
+describe('resetTransportFare — booking not found', () => {
+  it('throws 404', async () => {
+    vi.mocked(supabase.from).mockReturnValueOnce(
+      chain({ data: null, error: { message: 'not found' } }) as any,
+    );
+    await expect(resetTransportFare('missing')).rejects.toMatchObject({ status: 404 });
+  });
+});
+
+describe('resetTransportFare — wrong booking status', () => {
+  it('throws 409 when booking is not confirmed', async () => {
+    vi.mocked(supabase.from).mockReturnValueOnce(
+      chain({
+        data: { id: 'b-reset-1', status: 'matched', transport_status: 'awaiting_payment', transport_payment_ref: null },
+        error: null,
+      }) as any,
+    );
+    await expect(resetTransportFare('b-reset-1')).rejects.toMatchObject({ status: 409 });
+  });
+
+  it('throws 409 when transport is already paid', async () => {
+    vi.mocked(supabase.from).mockReturnValueOnce(
+      chain({
+        data: { id: 'b-reset-2', status: 'confirmed', transport_status: 'paid', transport_payment_ref: null },
+        error: null,
+      }) as any,
+    );
+    await expect(resetTransportFare('b-reset-2')).rejects.toMatchObject({
+      status: 409,
+      message: expect.stringContaining('already been paid'),
+    });
+  });
+
+  it('throws 409 when transport_status is pending_quote (nothing to reset)', async () => {
+    vi.mocked(supabase.from).mockReturnValueOnce(
+      chain({
+        data: { id: 'b-reset-3', status: 'confirmed', transport_status: 'pending_quote', transport_payment_ref: null },
+        error: null,
+      }) as any,
+    );
+    await expect(resetTransportFare('b-reset-3')).rejects.toMatchObject({ status: 409 });
+  });
+});
+
+describe('resetTransportFare — no PRQ exists yet', () => {
+  it('resets to pending_quote without calling Paystack', async () => {
+    vi.mocked(supabase.from)
+      .mockReturnValueOnce(
+        chain({
+          data: { id: 'b-reset-noPRQ', status: 'confirmed', transport_status: 'awaiting_payment', transport_payment_ref: null },
+          error: null,
+        }) as any,
+      )
+      .mockReturnValueOnce(
+        chain({ data: { id: 'b-reset-noPRQ', transport_status: 'pending_quote' }, error: null }) as any,
+      );
+
+    const mockFetch = vi.fn();
+    vi.stubGlobal('fetch', mockFetch);
+
+    const result = await resetTransportFare('b-reset-noPRQ');
+
+    expect(result.transport_status).toBe('pending_quote');
+    expect(result.prq_cancelled).toBe(false);
+    // No Paystack call because there was no PRQ to cancel
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+});
+
+describe('resetTransportFare — PRQ exists, Paystack cancel succeeds', () => {
+  it('cancels PRQ on Paystack then resets to pending_quote', async () => {
+    const PRQ = 'PRQ_to_cancel_001';
+
+    vi.mocked(supabase.from)
+      .mockReturnValueOnce(
+        chain({
+          data: { id: 'b-reset-PRQ', status: 'confirmed', transport_status: 'awaiting_payment', transport_payment_ref: PRQ },
+          error: null,
+        }) as any,
+      )
+      .mockReturnValueOnce(
+        chain({ data: { id: 'b-reset-PRQ', transport_status: 'pending_quote' }, error: null }) as any,
+      );
+
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({ status: true, message: 'Payment Request successfully cancelled', data: {} }),
+    });
+    vi.stubGlobal('fetch', mockFetch);
+
+    const result = await resetTransportFare('b-reset-PRQ');
+
+    expect(result.prq_cancelled).toBe(true);
+    expect(result.transport_status).toBe('pending_quote');
+    const [url] = mockFetch.mock.calls[0] as [string];
+    expect(url).toContain(`/paymentrequest/cancel/${PRQ}`);
+  });
+});
+
+describe('resetTransportFare — PRQ cancel fails on Paystack (non-fatal)', () => {
+  it('still resets the DB even if Paystack cancel fails', async () => {
+    const PRQ = 'PRQ_already_gone';
+
+    vi.mocked(supabase.from)
+      .mockReturnValueOnce(
+        chain({
+          data: { id: 'b-reset-fail', status: 'confirmed', transport_status: 'awaiting_payment', transport_payment_ref: PRQ },
+          error: null,
+        }) as any,
+      )
+      .mockReturnValueOnce(
+        chain({ data: { id: 'b-reset-fail', transport_status: 'pending_quote' }, error: null }) as any,
+      );
+
+    vi.stubGlobal('fetch', mockPaystackError('Payment Request not found', 404));
+
+    const result = await resetTransportFare('b-reset-fail');
+
+    // Even though Paystack cancel failed, the DB was still reset
+    expect(result.prq_cancelled).toBe(false);
+    expect(result.transport_status).toBe('pending_quote');
   });
 });

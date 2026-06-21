@@ -266,7 +266,31 @@ describe('postPaystackWebhook — invoice.payment_successful', () => {
 
     expect(res.sendStatus).toHaveBeenCalledWith(200);
     expect(vi.mocked(handleTransportInvoicePaid)).toHaveBeenCalledOnce();
-    expect(vi.mocked(handleTransportInvoicePaid)).toHaveBeenCalledWith(REQ_CODE);
+    // Second arg is null because this test payload has no transactions array
+    expect(vi.mocked(handleTransportInvoicePaid)).toHaveBeenCalledWith(REQ_CODE, null);
+  });
+
+  it('passes the transaction reference when the payload includes a transactions array', async () => {
+    const REQ_CODE = 'PRQ_transport_with_txref';
+    const TX_REF = 'txn_settled_001';
+
+    const res = mockRes();
+    await postPaystackWebhook(
+      signedReq({
+        event: 'invoice.payment_successful',
+        data: {
+          request_code: REQ_CODE,
+          paid: true,
+          paid_at: new Date().toISOString(),
+          amount: 200000,
+          transactions: [{ reference: TX_REF }],
+        },
+      }) as any,
+      res,
+    );
+
+    expect(res.sendStatus).toHaveBeenCalledWith(200);
+    expect(vi.mocked(handleTransportInvoicePaid)).toHaveBeenCalledWith(REQ_CODE, TX_REF);
   });
 
   it('is idempotent — a duplicate delivery calls handleTransportInvoicePaid again and still returns 200', async () => {

@@ -1,10 +1,15 @@
 import { Request, Response, NextFunction } from 'express';
 import { validateTransportFareInput, recordTransportFare } from '../services/transportFareService';
-import { createTransportInvoice, resendTransportInvoice } from '../services/transportInvoiceService';
+import {
+  createTransportInvoice,
+  resendTransportInvoice,
+  resetTransportFare,
+} from '../services/transportInvoiceService';
 import { confirmDispatch } from '../services/dispatchService';
 import {
   getAwaitingTransportBookings,
   cancelTransportOverdue,
+  cancelConfirmedBooking,
 } from '../services/transportCancellationService';
 
 export async function postTransportFare(
@@ -85,6 +90,34 @@ export async function postResendTransportInvoice(
   try {
     const id = req.params.id as string;
     const result = await resendTransportInvoice(id);
+    res.status(200).json({ ok: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function postResetTransportFare(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const id = req.params.id as string;
+    const result = await resetTransportFare(id);
+    res.status(200).json({ ok: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function postCancelConfirmedBooking(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const id = req.params.id as string;
+    const result = await cancelConfirmedBooking(id);
     res.status(200).json({ ok: true, data: result });
   } catch (err) {
     next(err);
