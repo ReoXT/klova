@@ -127,3 +127,61 @@ describe('getAlternativeDates — multiple results', () => {
     expect(dates).toEqual(['2026-07-03', '2026-07-05']);
   });
 });
+
+// ─── minCleaners=2 (two-keeper alternative dates) ────────────────────────────
+//
+// When a 2-keeper booking fails partial-availability detection, the frontend
+// needs alternative dates where AT LEAST 2 distinct cleaners are free.
+// Dates with only 1 free cleaner must be excluded.
+
+describe('getAlternativeDates — minCleaners=2', () => {
+  it('excludes dates where only 1 cleaner is free', async () => {
+    // 07-03: only c1 free (1 slot) → excluded
+    // 07-05: c1 + c2 free (2 slots) → included
+    mockThreeCalls(
+      { id: ZONE_ID },
+      [{ id: 'c1' }, { id: 'c2' }, { id: 'c3' }],
+      [
+        { available_date: '2026-07-03' }, // c1 only
+        { available_date: '2026-07-05' }, // c1
+        { available_date: '2026-07-05' }, // c2
+      ],
+    );
+
+    const dates = await getAlternativeDates(ZONE_SLUG, REQUESTED_DATE, 14, 2);
+
+    expect(dates).toEqual(['2026-07-05']);
+  });
+
+  it('returns [] when no date in the window has 2+ cleaners free', async () => {
+    // c1 free 07-03, c2 free 07-05 — never two on the same day
+    mockThreeCalls(
+      { id: ZONE_ID },
+      [{ id: 'c1' }, { id: 'c2' }],
+      [
+        { available_date: '2026-07-03' },
+        { available_date: '2026-07-05' },
+      ],
+    );
+
+    const dates = await getAlternativeDates(ZONE_SLUG, REQUESTED_DATE, 14, 2);
+
+    expect(dates).toEqual([]);
+  });
+
+  it('returns a date where 3 cleaners are all free', async () => {
+    mockThreeCalls(
+      { id: ZONE_ID },
+      [{ id: 'c1' }, { id: 'c2' }, { id: 'c3' }],
+      [
+        { available_date: '2026-07-08' }, // c1
+        { available_date: '2026-07-08' }, // c2
+        { available_date: '2026-07-08' }, // c3 — 3 cleaners on one day, still qualifies
+      ],
+    );
+
+    const dates = await getAlternativeDates(ZONE_SLUG, REQUESTED_DATE, 14, 2);
+
+    expect(dates).toEqual(['2026-07-08']);
+  });
+});

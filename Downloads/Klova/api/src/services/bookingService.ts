@@ -1,6 +1,8 @@
 import { supabase } from '../lib/supabase';
 import { computePrice, ValidationError } from './pricingService';
 import { assignCleaner } from './assignmentService';
+import { matchCleaner, NO_MATCH } from './matchingService';
+import { getAlternativeDates } from './availabilityService';
 
 // ─── Error types ─────────────────────────────────────────────────────────────
 
@@ -19,6 +21,28 @@ export class NoAvailabilityError extends Error {
   constructor(zoneSlug: string, date: string) {
     super(`No cleaners available in ${zoneSlug} on ${date}. Try a different date.`);
     this.name = 'NoAvailabilityError';
+  }
+}
+
+/**
+ * Thrown when a 2-keeper booking is requested but the zone only has 1 free
+ * cleaner on that date.  Carries two recovery options so the frontend can act:
+ *   single_keeper_option — server-recomputed price at keeper_count=1
+ *   alternative_dates    — nearby dates where ≥2 cleaners are free
+ */
+export class PartialAvailabilityError extends Error {
+  readonly status = 409;
+  readonly outcome = 'partial_availability' as const;
+  constructor(
+    public readonly single_keeper_price: {
+      total_amount: number;
+      commission_amount: number;
+      commission_rate: number;
+    },
+    public readonly alternative_dates: string[],
+  ) {
+    super('Only 1 keeper is available on this date. Choose 1 keeper or pick a different date.');
+    this.name = 'PartialAvailabilityError';
   }
 }
 
@@ -200,6 +224,39 @@ export async function createBooking(input: BookingInput): Promise<BookingResult>
     throw customerErr ?? new Error('Failed to create customer record.');
   }
 
+  // 3b. Pre-flight: 2-keeper bookings need at least 2 free cleaners on this date.
+  //     Run matchCleaner here (before the booking INSERT) so we never create an
+  //     orphaned pending_payment row just to immediately mark it no_match.
+  const keeperCount = input.keeper_count ?? 1;
+  if (keeperCount === 2) {
+    const preCandidates = await matchCleaner({
+      zone_id: zone.id,
+      customer_id: customer.id,
+      booking_date: input.booking_date,
+      requested_cleaner_id: input.requested_cleaner_id ?? null,
+      keeper_count: 2,
+    });
+
+    if (preCandidates !== NO_MATCH && preCandidates.length < 2) {
+      // Zone has cleaners but only 1 is free on this date — offer two exits.
+      const [singlePrice, altDates] = await Promise.all([
+        computePrice(input.service_slug, input.bedrooms, input.addon_slugs, {
+          keeperCount: 1,
+          wantsInsurance: input.wants_insurance,
+        }),
+        getAlternativeDates(input.zone_slug, input.booking_date, 14, 2),
+      ]);
+      throw new PartialAvailabilityError(
+        {
+          total_amount:      singlePrice.total_amount,
+          commission_amount: singlePrice.commission_amount,
+          commission_rate:   singlePrice.commission_rate,
+        },
+        altDates,
+      );
+    }
+  }
+
   // 4. Insert booking row at pending_payment — assignment runs next
   const baseKobo         = Math.round(breakdown.base_amount * 100);
   const addonsKobo       = Math.round(breakdown.addons_amount * 100);
@@ -224,7 +281,7 @@ export async function createBooking(input: BookingInput): Promise<BookingResult>
       commission_kobo:      commissionKobo,
       requested_cleaner_id: input.requested_cleaner_id ?? null,
       status:               'pending_payment',
-      keeper_count:         input.keeper_count ?? 1,
+      keeper_count:         keeperCount,
     })
     .select('id')
     .single();
@@ -249,7 +306,7 @@ export async function createBooking(input: BookingInput): Promise<BookingResult>
     customer_id: customer.id,
     booking_date: input.booking_date,
     requested_cleaner_id: input.requested_cleaner_id ?? null,
-    keeper_count: input.keeper_count ?? 1,
+    keeper_count: keeperCount,
   });
 
   if (assignment.outcome === 'no_match') {

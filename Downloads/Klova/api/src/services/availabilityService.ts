@@ -4,15 +4,19 @@ import { supabase } from '../lib/supabase';
  * Returns the next available booking dates in a zone after a given date.
  * Used to offer alternatives when a requested date has no available cleaners.
  *
- * @param zoneSlug  - e.g. 'lekki-ajah'
+ * @param zoneSlug      - e.g. 'lekki-ajah'
  * @param requestedDate - YYYY-MM-DD; the date that had no availability
- * @param days      - how many days ahead to search (default 14)
- * @returns ordered, deduplicated list of YYYY-MM-DD strings with free slots
+ * @param days          - how many days ahead to search (default 14)
+ * @param minCleaners   - minimum distinct free cleaners required for a date
+ *                        to appear in the result (default 1 = current behaviour;
+ *                        pass 2 for two-keeper alternative-date suggestions)
+ * @returns ordered list of YYYY-MM-DD strings satisfying the minCleaners threshold
  */
 export async function getAlternativeDates(
   zoneSlug: string,
   requestedDate: string,
   days = 14,
+  minCleaners = 1,
 ): Promise<string[]> {
   // 1. Resolve zone
   const { data: zone } = await supabase
@@ -51,9 +55,16 @@ export async function getAlternativeDates(
 
   if (slotsErr) throw slotsErr;
 
-  // Deduplicate — multiple cleaners may be free on the same day
-  const seen = new Set<string>();
-  return (slots ?? [])
-    .map((s: { available_date: string }) => s.available_date)
-    .filter((d: string) => (seen.has(d) ? false : (seen.add(d), true)));
+  // Count distinct free cleaners per date (each row = one cleaner's free slot,
+  // guaranteed unique per cleaner+date by the schema UNIQUE constraint).
+  // minCleaners=1 is equivalent to the previous deduplicate-only logic.
+  const dateCount = new Map<string, number>();
+  for (const slot of slots ?? []) {
+    const d = slot.available_date as string;
+    dateCount.set(d, (dateCount.get(d) ?? 0) + 1);
+  }
+  return [...dateCount.entries()]
+    .filter(([, n]) => n >= minCleaners)
+    .map(([d]) => d)
+    .sort();
 }
