@@ -245,19 +245,31 @@ export interface CancelledConfirmedBooking {
  * cleaner earnings. Transport refund does NOT touch commission (transport is
  * pass-through — it was never included in revenue).
  */
+interface ConfirmedBookingRow {
+  id: string;
+  status: string;
+  cleaner_id: string | null;
+  booking_date: string;
+  paystack_reference: string | null;
+  dispatched_at: string | null;
+  transport_status: string;
+  transport_fare: number | null;
+  transport_payment_ref: string | null;
+  transport_transaction_ref: string | null;
+}
+
 export async function cancelConfirmedBooking(bookingId: string): Promise<CancelledConfirmedBooking> {
-  const { data: booking, error: fetchErr } = await supabase
+  const { data: raw, error: fetchErr } = await supabase
     .from('bookings')
-    .select(
-      'id, status, cleaner_id, booking_date, paystack_reference, dispatched_at, ' +
-      'transport_status, transport_fare, transport_payment_ref, transport_transaction_ref',
-    )
+    .select('id, status, cleaner_id, booking_date, paystack_reference, dispatched_at, transport_status, transport_fare, transport_payment_ref, transport_transaction_ref')
     .eq('id', bookingId)
     .single();
 
-  if (fetchErr || !booking) {
+  if (fetchErr || !raw) {
     throw new TransportCancellationError(`Booking ${bookingId} not found.`, 404);
   }
+
+  const booking = raw as unknown as ConfirmedBookingRow;
 
   if (booking.status === 'cancelled') {
     throw new TransportCancellationError('This booking is already cancelled.', 409);
@@ -265,7 +277,7 @@ export async function cancelConfirmedBooking(bookingId: string): Promise<Cancell
 
   if (booking.status !== 'confirmed') {
     throw new TransportCancellationError(
-      `Only confirmed bookings can be cancelled here. This booking is "${booking.status as string}".`,
+      `Only confirmed bookings can be cancelled here. This booking is "${booking.status}".`,
       409,
     );
   }
@@ -297,17 +309,17 @@ export async function cancelConfirmedBooking(bookingId: string): Promise<Cancell
     const { error: availErr } = await supabase
       .from('cleaner_availability')
       .update({ is_booked: false })
-      .eq('cleaner_id', booking.cleaner_id as string)
-      .eq('available_date', booking.booking_date as string);
+      .eq('cleaner_id', booking.cleaner_id)
+      .eq('available_date', booking.booking_date);
 
     if (availErr) {
       console.error(
-        `[cancel-booking] Failed to free slot for cleaner ${booking.cleaner_id as string} ` +
-        `on ${booking.booking_date as string}: ${availErr.message}`,
+        `[cancel-booking] Failed to free slot for cleaner ${booking.cleaner_id} ` +
+        `on ${booking.booking_date}: ${availErr.message}`,
       );
     } else {
       console.log(
-        `[cancel-booking] Freed slot: cleaner ${booking.cleaner_id as string} on ${booking.booking_date as string}`,
+        `[cancel-booking] Freed slot: cleaner ${booking.cleaner_id} on ${booking.booking_date}`,
       );
     }
   }
@@ -316,12 +328,12 @@ export async function cancelConfirmedBooking(bookingId: string): Promise<Cancell
   let clean_refund: CleanRefundOutcome = 'skipped_no_ref';
   if (booking.paystack_reference) {
     try {
-      await issueRefund(bookingId, booking.paystack_reference as string);
+      await issueRefund(bookingId, booking.paystack_reference);
       clean_refund = 'issued';
     } catch (err) {
       console.error(
         `[cancel-booking] Clean refund FAILED for booking ${bookingId}: ${(err as Error).message}. ` +
-        `Issue manually via Paystack dashboard (ref: ${booking.paystack_reference as string}).`,
+        `Issue manually via Paystack dashboard (ref: ${booking.paystack_reference}).`,
       );
       clean_refund = 'failed';
     }
@@ -331,10 +343,9 @@ export async function cancelConfirmedBooking(bookingId: string): Promise<Cancell
 
   // ── 4. Refund transport if paid ────────────────────────────────────────────
   let transport_refund: TransportRefundOutcome = 'skipped_not_paid';
-  const ts = booking.transport_status as string;
 
-  if (ts === 'paid') {
-    const txRef = booking.transport_transaction_ref as string | null;
+  if (booking.transport_status === 'paid') {
+    const txRef = booking.transport_transaction_ref;
     if (txRef) {
       try {
         await issueTransportRefund(bookingId, txRef);
@@ -347,11 +358,11 @@ export async function cancelConfirmedBooking(bookingId: string): Promise<Cancell
         transport_refund = 'failed';
       }
     } else {
-      // Transport was paid but we never captured the transaction reference.
+      // Transport was paid but the transaction reference was never captured.
       // This can happen for bookings paid before the 2026-06-21 webhook update.
       console.error(
         `[cancel-booking] MANUAL ACTION REQUIRED — Booking ${bookingId} has paid transport ` +
-        `(PRQ: ${booking.transport_payment_ref as string ?? 'unknown'}, ` +
+        `(PRQ: ${booking.transport_payment_ref ?? 'unknown'}, ` +
         `₦${Number(booking.transport_fare ?? 0).toLocaleString('en-NG')}) ` +
         `but transport_transaction_ref is null. Refund this amount manually via the Paystack dashboard.`,
       );
