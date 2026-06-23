@@ -53,7 +53,16 @@ function Row({ tone, title, children }: { tone: Tone; title: string; children: R
   );
 }
 
-export function ConfirmNextSteps({ email, className = "" }: { email?: string; className?: string }) {
+export function ConfirmNextSteps({
+  email,
+  keeperCount = 1,
+  className = "",
+}: {
+  email?: string;
+  keeperCount?: number;
+  className?: string;
+}) {
+  const two = keeperCount >= 2;
   return (
     <Section title="What's next" className={className}>
       <SoftCard>
@@ -61,14 +70,18 @@ export function ConfirmNextSteps({ email, className = "" }: { email?: string; cl
           <Row tone="confirmed" title="Booking confirmed">
             Order updates and your full receipt will be sent to{" "}
             <strong style={{ color: "var(--text-body)" }}>{email || "your email"}</strong>.
-            Your keeper will be in touch before arrival.
+            {two
+              ? " Your keepers will be in touch before arrival."
+              : " Your keeper will be in touch before arrival."}
           </Row>
           <Row tone="transport" title="One more thing">
-            Expect a Paystack payment link shortly for a small transport fare to get your keeper to your home.
+            {two
+              ? "Expect a Paystack payment link shortly for a combined transport fare to get your two keepers to your home. Your keepers will be dispatched once that payment is cleared."
+              : "Expect a Paystack payment link shortly for a small transport fare to get your keeper to your home. Your keeper will be dispatched once that payment is cleared."}
           </Row>
-          <Row tone="prepare" title="Before your keeper arrives">
+          <Row tone="prepare" title={two ? "Before your keepers arrive" : "Before your keeper arrives"}>
             Please have a broom, mop, bin liners, cleaning sprays, gloves and other cleaning equipment ready at home.
-            Your keeper brings none of their own.
+            {two ? " Your keepers bring" : " Your keeper brings"} none of their own.
           </Row>
         </div>
       </SoftCard>

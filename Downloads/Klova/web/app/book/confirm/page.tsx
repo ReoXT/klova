@@ -83,7 +83,7 @@ export default function BookConfirmPage() {
       </div>
 
       <div className="space-y-7">
-        <ConfirmNextSteps email={summary?.email} />
+        <ConfirmNextSteps email={summary?.email} keeperCount={keepers.length || 1} />
 
         {summary && (
           <Section title="Booking details">
@@ -95,6 +95,11 @@ export default function BookConfirmPage() {
                     <Pill>
                       {summary.bedrooms} bedroom{summary.bedrooms === "1" ? "" : "s"}
                     </Pill>
+                  </Field>
+                )}
+                {keepers.length === 2 && (
+                  <Field label="Keepers">
+                    <Pill>2 keepers · base price doubled, add-ons shared</Pill>
                   </Field>
                 )}
                 {summary.address && <Field label="Address">{summary.address}</Field>}

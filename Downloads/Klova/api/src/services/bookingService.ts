@@ -363,3 +363,116 @@ export async function createBooking(input: BookingInput): Promise<BookingResult>
     cleaners,
   };
 }
+
+// ─── Public booking status (for customer status page) ─────────────────────────
+
+export interface BookingStatusResult {
+  id: string;
+  status: string;
+  keeper_count: number;
+  transport_status: string;
+  transport_fare: number | null;        // NGN
+  transport_payment_ref: string | null; // PRQ_xxxxx — use to build pay link
+  service_name: string | null;
+  booking_date: string | null;
+  address: string | null;
+  first_name: string | null;
+  total_amount: number | null;          // NGN, null if not yet confirmed
+  cleaners: CleanerProfile[];           // populated once transport is cleared
+}
+
+/**
+ * Returns the data needed by the customer booking-status page.
+ * No auth needed — booking IDs are UUIDs (unguessable).
+ * Returns null when the booking doesn't exist.
+ *
+ * Cleaners are only returned when transport_status is 'paid', 'waived', or
+ * 'not_required' (i.e., dispatch is cleared). Before that, the customer knows
+ * the keeper is assigned but full details wait until transport is settled.
+ */
+interface BkStatusRow {
+  id: string;
+  status: string;
+  keeper_count: number | null;
+  transport_status: string;
+  transport_fare: number | string | null;
+  transport_payment_ref: string | null;
+  booking_date: string | null;
+  address: string | null;
+  total_amount_kobo: number | null;
+  services: { name: string } | null;
+  customers: { first_name: string } | null;
+}
+
+export async function getBookingStatus(bookingId: string): Promise<BookingStatusResult | null> {
+  const { data: rawBooking, error } = await supabase
+    .from('bookings')
+    .select(
+      'id, status, keeper_count, transport_status, transport_fare, transport_payment_ref, ' +
+      'booking_date, address, total_amount_kobo, ' +
+      'services(name), customers(first_name)',
+    )
+    .eq('id', bookingId)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!rawBooking) return null;
+
+  const booking = rawBooking as unknown as BkStatusRow;
+
+  const dispatchCleared = ['paid', 'waived', 'not_required'].includes(
+    booking.transport_status,
+  );
+
+  let cleaners: CleanerProfile[] = [];
+
+  if (dispatchCleared) {
+    const { data: bcRows } = await supabase
+      .from('booking_cleaners')
+      .select('cleaner_id, role')
+      .eq('booking_id', bookingId)
+      .order('role', { ascending: true });
+
+    const assignedIds = (bcRows ?? []).map((r) => r.cleaner_id as string);
+
+    if (assignedIds.length > 0) {
+      const { data: cleanerRows } = await supabase
+        .from('cleaners')
+        .select('id, first_name, last_name, photo_url, rating, total_jobs')
+        .in('id', assignedIds);
+
+      const cleanerMap = new Map((cleanerRows ?? []).map((c) => [c.id as string, c]));
+
+      cleaners = assignedIds.map((cid) => {
+        const c = cleanerMap.get(cid);
+        return {
+          id:         cid,
+          first_name: (c?.first_name as string | undefined) ?? 'Keeper',
+          last_name:  (c?.last_name  as string | undefined) ?? '',
+          photo_url:  (c?.photo_url  as string | null | undefined) ?? null,
+          rating:     (c?.rating     as number | null | undefined) ?? null,
+          total_jobs: (c?.total_jobs as number | undefined) ?? 0,
+        };
+      });
+    }
+  }
+
+  const svc = booking.services;
+  const cust = booking.customers;
+  const totalKobo = booking.total_amount_kobo;
+
+  return {
+    id:                    booking.id as string,
+    status:                booking.status as string,
+    keeper_count:          (booking.keeper_count as number | null) ?? 1,
+    transport_status:      booking.transport_status as string,
+    transport_fare:        booking.transport_fare != null ? Number(booking.transport_fare) : null,
+    transport_payment_ref: (booking.transport_payment_ref as string | null) ?? null,
+    service_name:          svc?.name ?? null,
+    booking_date:          (booking.booking_date as string | null) ?? null,
+    address:               (booking.address as string | null) ?? null,
+    first_name:            cust?.first_name ?? null,
+    total_amount:          totalKobo != null ? totalKobo / 100 : null,
+    cleaners,
+  };
+}

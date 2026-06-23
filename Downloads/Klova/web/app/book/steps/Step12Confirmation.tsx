@@ -56,12 +56,15 @@ export default function Step12Confirmation({ data, price }: Props) {
       </div>
 
       <div className="space-y-7">
-        <ConfirmNextSteps email={data.email} />
+        <ConfirmNextSteps email={data.email} keeperCount={data.keeperCount} />
 
         <Section title="Booking details">
           <SoftCard>
             <div className="space-y-5">
               <Field label="Service">{service?.name}</Field>
+              {data.keeperCount >= 2 && (
+                <Field label="Keepers">2 keepers · base price doubled, add-ons shared</Field>
+              )}
               <Field label="Address">{data.address}</Field>
               <div className="grid grid-cols-2 gap-4">
                 <Field label="Date">{bookingDate}</Field>
@@ -71,25 +74,48 @@ export default function Step12Confirmation({ data, price }: Props) {
           </SoftCard>
         </Section>
 
-        <Section title="Your keeper">
+        <Section title={data.keeperCount >= 2 ? "Your keepers" : "Your keeper"}>
           <SoftCard>
-            <div className="flex items-center gap-4">
-              <div
-                className="w-14 h-14 rounded-full flex items-center justify-center shrink-0"
-                style={{ background: "var(--klova-primary-soft)" }}
-              >
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}
-                  style={{ color: "var(--klova-primary)" }}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
+            {data.keeperCount >= 2 ? (
+              <div className="flex items-center gap-4">
+                {[0, 1].map((i) => (
+                  <div
+                    key={i}
+                    className="w-14 h-14 rounded-full flex items-center justify-center shrink-0"
+                    style={{ background: "var(--klova-primary-soft)" }}
+                  >
+                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}
+                      style={{ color: "var(--klova-primary)" }}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                  </div>
+                ))}
+                <div className="min-w-0">
+                  <p className="text-[15px] font-semibold" style={{ color: "var(--text-strong)" }}>2 Verified Keepers</p>
+                  <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
+                    Full details sent to {data.email || "your email"}
+                  </p>
+                </div>
               </div>
-              <div className="min-w-0">
-                <p className="text-[15px] font-semibold" style={{ color: "var(--text-strong)" }}>Verified Keeper</p>
-                <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
-                  Full details sent to {data.email || "your email"}
-                </p>
+            ) : (
+              <div className="flex items-center gap-4">
+                <div
+                  className="w-14 h-14 rounded-full flex items-center justify-center shrink-0"
+                  style={{ background: "var(--klova-primary-soft)" }}
+                >
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}
+                    style={{ color: "var(--klova-primary)" }}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[15px] font-semibold" style={{ color: "var(--text-strong)" }}>Verified Keeper</p>
+                  <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
+                    Full details sent to {data.email || "your email"}
+                  </p>
+                </div>
               </div>
-            </div>
+            )}
           </SoftCard>
         </Section>
 

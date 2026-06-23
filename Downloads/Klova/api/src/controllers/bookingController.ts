@@ -3,7 +3,26 @@ import {
   validateBookingInput,
   createBooking,
   PartialAvailabilityError,
+  getBookingStatus,
 } from '../services/bookingService';
+
+export async function getBookingStatusHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const id = req.params['id'] as string;
+    const result = await getBookingStatus(id);
+    if (!result) {
+      res.status(404).json({ ok: false, error: { message: 'Booking not found.' } });
+      return;
+    }
+    res.json({ ok: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+}
 
 export async function postBooking(
   req: Request,
