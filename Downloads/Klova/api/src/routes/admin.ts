@@ -9,12 +9,14 @@ import {
   getAwaitingTransport,
   postCancelTransportOverdue,
   postCancelConfirmedBooking,
+  postReassignKeeper,
 } from '../controllers/adminController';
 
 const router = Router();
 
 router.use(requireAdminKey);
 
+router.post('/bookings/:id/reassign-keeper', postReassignKeeper);
 router.post('/bookings/:id/transport-fare', postTransportFare);
 router.post('/bookings/:id/transport-fare/reset', postResetTransportFare);
 router.post('/bookings/:id/transport-invoice', postTransportInvoice);

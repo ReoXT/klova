@@ -11,6 +11,7 @@ import {
   cancelTransportOverdue,
   cancelConfirmedBooking,
 } from '../services/transportCancellationService';
+import { reassignKeeper, ReassignError } from '../services/reassignService';
 
 export async function postTransportFare(
   req: Request,
@@ -120,6 +121,37 @@ export async function postCancelConfirmedBooking(
     const result = await cancelConfirmedBooking(id);
     res.status(200).json({ ok: true, data: result });
   } catch (err) {
+    next(err);
+  }
+}
+
+export async function postReassignKeeper(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const id = req.params['id'] as string;
+    const body = req.body as Record<string, unknown>;
+    const role = (body.role as string | undefined) ?? 'lead';
+    const newCleanerId = body.new_cleaner_id as string | undefined;
+
+    if (!newCleanerId) {
+      res.status(400).json({ ok: false, error: 'new_cleaner_id is required.' });
+      return;
+    }
+    if (role !== 'lead' && role !== 'second') {
+      res.status(400).json({ ok: false, error: "role must be 'lead' or 'second'." });
+      return;
+    }
+
+    const result = await reassignKeeper(id, role, newCleanerId);
+    res.status(200).json({ ok: true, data: result });
+  } catch (err) {
+    if (err instanceof ReassignError) {
+      res.status(err.status).json({ ok: false, error: err.message });
+      return;
+    }
     next(err);
   }
 }

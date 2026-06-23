@@ -13,6 +13,26 @@ import {
 
 type TransportStatus = "pending_quote" | "awaiting_payment" | "paid" | "waived" | "not_required";
 
+type KeeperProfile = {
+  id: string;
+  first_name: string;
+  last_name: string;
+  phone: string;
+  photo_url: string | null;
+  nin_verified: boolean;
+  rating: number | null;
+  total_jobs: number;
+  home_area: string | null;
+};
+
+type BookingCleaner = {
+  id: string;                       // booking_cleaners PK
+  role: "lead" | "second";
+  paid_out: boolean;
+  transport_fare_kobo: number | null;
+  cleaner: KeeperProfile | null;
+};
+
 type Booking = {
   id: string;
   bedrooms: string;
@@ -21,6 +41,7 @@ type Booking = {
   address: string;
   total_amount_kobo: number;
   commission_kobo: number;
+  keeper_count: number;
   status: BookingStatus;
   paystack_reference: string | null;
   refunded_at: string | null;
@@ -41,22 +62,15 @@ type Booking = {
     phone: string;
     email: string | null;
   };
-  cleaner: {
-    id: string;
-    first_name: string;
-    last_name: string;
-    phone: string;
-    photo_url: string | null;
-    nin_verified: boolean;
-    rating: number | null;
-    total_jobs: number;
-    home_area: string | null;
-  } | null;
+  // backward-compat single cleaner (lead)
+  cleaner: KeeperProfile | null;
   zone: { id: string; name: string; slug: string };
   service: { id: string; name: string; slug: string };
   booking_addons: Array<{
     addon: { id: string; name: string; slug: string; amount_kobo: number };
   }>;
+  // all assigned keepers from booking_cleaners
+  booking_cleaners: BookingCleaner[];
 };
 
 type Zone = { id: string; name: string; slug: string; is_active: boolean };
@@ -193,6 +207,14 @@ export default function AdminBookingsPage() {
     setSelected((prev) => (prev?.id === b.id ? null : b));
   }
 
+  // Summary cleaner label for the table (lead keeper or "—")
+  function tableCleanerLabel(b: Booking) {
+    const lead = b.booking_cleaners?.find((bc) => bc.role === "lead")?.cleaner ?? b.cleaner;
+    if (!lead) return "—";
+    const suffix = (b.keeper_count ?? 1) >= 2 ? " +1" : "";
+    return `${lead.first_name} ${lead.last_name[0]}.${suffix}`;
+  }
+
   return (
     <div className="flex gap-6 items-start">
       {/* ── Main column ──────────────────────────────────────── */}
@@ -289,7 +311,7 @@ export default function AdminBookingsPage() {
                       "Date",
                       "Zone",
                       "Address",
-                      "Cleaner",
+                      "Keepers",
                       "Amount",
                     ].map((h) => (
                       <th
@@ -375,17 +397,8 @@ export default function AdminBookingsPage() {
                         >
                           {b.address}
                         </td>
-                        <td
-                          className="text-sm"
-                          style={{
-                            color: b.cleaner
-                              ? "var(--text-body)"
-                              : "var(--text-subtle)",
-                          }}
-                        >
-                          {b.cleaner
-                            ? `${b.cleaner.first_name} ${b.cleaner.last_name[0]}.`
-                            : "—"}
+                        <td className="text-sm" style={{ color: "var(--text-body)" }}>
+                          {tableCleanerLabel(b)}
                         </td>
                         <td
                           className="text-sm font-medium whitespace-nowrap"
@@ -431,7 +444,7 @@ export default function AdminBookingsPage() {
       {/* ── Detail panel ─────────────────────────────────────── */}
       {selected && (
         <div
-          className="w-[360px] shrink-0 rounded-2xl overflow-y-auto sticky top-8"
+          className="w-[380px] shrink-0 rounded-2xl overflow-y-auto sticky top-8"
           style={{
             background: "var(--surface-card)",
             boxShadow: "var(--shadow-md)",
@@ -466,30 +479,37 @@ function BookingDetail({
 
   const [availableCleaners, setAvailableCleaners] = useState<AvailableCleaner[]>([]);
   const [loadingCleaners, setLoadingCleaners] = useState(false);
-  const [selectedNewCleaner, setSelectedNewCleaner] = useState("");
-  const [reassigning, setReassigning] = useState(false);
-  const [reassignMsg, setReassignMsg] = useState<string | null>(null);
-  const [reassignIsError, setReassignIsError] = useState(false);
+  // Per-role reassign state: keyed by "lead" | "second"
+  const [selectedNewCleaner, setSelectedNewCleaner] = useState<Record<string, string>>({});
+  const [reassigning, setReassigning] = useState<Record<string, boolean>>({});
+  const [reassignMsg, setReassignMsg] = useState<Record<string, string | null>>({});
+  const [reassignIsError, setReassignIsError] = useState<Record<string, boolean>>({});
 
   const [cancelling, setCancelling] = useState(false);
   const [cancelMsg, setCancelMsg]   = useState<string | null>(null);
   const [cancelIsError, setCancelIsError] = useState(false);
 
-  // For matched/paid: legacy manual confirm (flips status via old route).
-  // For confirmed: the transport-gated dispatch lives in TransportSection.
+  // Derive keeper list — prefer booking_cleaners, fall back to legacy cleaner field
+  const keepers: BookingCleaner[] = (b.booking_cleaners ?? []).length > 0
+    ? [...b.booking_cleaners].sort((a, x) =>
+        a.role === "lead" ? -1 : x.role === "lead" ? 1 : 0,
+      )
+    : b.cleaner
+    ? [{ id: "legacy", role: "lead", paid_out: false, transport_fare_kobo: null, cleaner: b.cleaner }]
+    : [];
+
   const canConfirmDispatch =
-    b.cleaner !== null &&
+    keepers.length > 0 &&
     ["matched", "paid"].includes(b.status);
 
   const canReassign = !["completed", "cancelled"].includes(b.status);
   const canCancel   = !["completed", "cancelled"].includes(b.status);
 
-  // Fetch available cleaners whenever this booking is shown and reassign is relevant
   useEffect(() => {
     if (!canReassign) return;
     setLoadingCleaners(true);
     setAvailableCleaners([]);
-    setSelectedNewCleaner("");
+    setSelectedNewCleaner({});
     fetch(`/api/admin/bookings/${b.id}/available-cleaners`)
       .then((r) => r.json())
       .then((d) => setAvailableCleaners(d.cleaners ?? []))
@@ -527,8 +547,8 @@ function BookingDetail({
   async function handleCancel() {
     const isPaid = ["paid", "confirmed"].includes(b.status);
     const msg = isPaid
-      ? `Cancel this booking?\n\nPayment was already made (${b.paystack_reference ?? "ref unknown"}). You will need to issue a manual refund via Paystack — this does not do it automatically.\n\nThe cleaner's slot will be freed.`
-      : `Cancel this booking?\n\nThe cleaner's slot will be freed and the booking marked as cancelled.`;
+      ? `Cancel this booking?\n\nPayment was already made (${b.paystack_reference ?? "ref unknown"}). You will need to issue a manual refund via Paystack — this does not do it automatically.\n\nAll cleaners' slots will be freed.`
+      : `Cancel this booking?\n\nAll cleaners' slots will be freed and the booking marked as cancelled.`;
     if (!window.confirm(msg)) return;
 
     setCancelling(true);
@@ -541,7 +561,7 @@ function BookingDetail({
       setCancelMsg(
         d.refundRequired
           ? "Cancelled. Remember to issue the refund manually in Paystack."
-          : "Booking cancelled and slot freed.",
+          : "Booking cancelled and slot(s) freed.",
       );
       await onUpdated(b.id);
     } catch (err) {
@@ -552,43 +572,49 @@ function BookingDetail({
     }
   }
 
-  async function handleReassign() {
-    if (!selectedNewCleaner) return;
-    const newCleaner = availableCleaners.find((c) => c.id === selectedNewCleaner);
+  async function handleReassign(role: "lead" | "second") {
+    const newCleanerId = selectedNewCleaner[role];
+    if (!newCleanerId) return;
+    const newCleaner = availableCleaners.find((c) => c.id === newCleanerId);
     if (!newCleaner) return;
 
-    const prev = b.cleaner
-      ? `${b.cleaner.first_name} ${b.cleaner.last_name}`
+    const currentCleaner = keepers.find((k) => k.role === role)?.cleaner;
+    const prev = currentCleaner
+      ? `${currentCleaner.first_name} ${currentCleaner.last_name}`
       : "no one";
+    const roleLabel = role === "lead" ? "Lead keeper" : "Second keeper";
 
     if (
       !window.confirm(
-        `Reassign from ${prev} → ${newCleaner.first_name} ${newCleaner.last_name}?\n\nThe current cleaner's availability slot will be freed and the new cleaner's slot will be booked.`,
+        `Reassign ${roleLabel}: ${prev} → ${newCleaner.first_name} ${newCleaner.last_name}?\n\nThe current keeper's availability slot will be freed and the new keeper's slot will be booked.`,
       )
-    )
-      return;
+    ) return;
 
-    setReassigning(true);
-    setReassignMsg(null);
+    setReassigning((r) => ({ ...r, [role]: true }));
+    setReassignMsg((m) => ({ ...m, [role]: null }));
     try {
       const r = await fetch(`/api/admin/bookings/${b.id}/reassign`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ new_cleaner_id: selectedNewCleaner }),
+        body: JSON.stringify({ new_cleaner_id: newCleanerId, role }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error ?? "Failed");
-      setReassignIsError(false);
-      setReassignMsg(
-        `Reassigned to ${newCleaner.first_name} ${newCleaner.last_name}.`,
-      );
-      setSelectedNewCleaner("");
+      setReassignIsError((e) => ({ ...e, [role]: false }));
+      setReassignMsg((m) => ({
+        ...m,
+        [role]: `Reassigned to ${newCleaner.first_name} ${newCleaner.last_name}.`,
+      }));
+      setSelectedNewCleaner((s) => ({ ...s, [role]: "" }));
       await onUpdated(b.id);
     } catch (err) {
-      setReassignIsError(true);
-      setReassignMsg(err instanceof Error ? err.message : "Something went wrong.");
+      setReassignIsError((e) => ({ ...e, [role]: true }));
+      setReassignMsg((m) => ({
+        ...m,
+        [role]: err instanceof Error ? err.message : "Something went wrong.",
+      }));
     } finally {
-      setReassigning(false);
+      setReassigning((r) => ({ ...r, [role]: false }));
     }
   }
 
@@ -604,6 +630,9 @@ function BookingDetail({
             #{b.id}
           </p>
           <BookingStatusBadge status={b.status} />
+          {(b.keeper_count ?? 1) >= 2 && (
+            <span className="badge badge-xs badge-info badge-soft ml-2">2 keepers</span>
+          )}
         </div>
         <button
           onClick={onClose}
@@ -634,31 +663,23 @@ function BookingDetail({
                       : "Confirm dispatch"}
                   </Button>
                   {confirmMsg && (
-                    <p
-                      className={`text-xs ${confirmIsError ? "text-error" : "text-success"}`}
-                    >
+                    <p className={`text-xs ${confirmIsError ? "text-error" : "text-success"}`}>
                       {confirmMsg}
                     </p>
                   )}
                 </div>
               )}
 
-              {/* Reassign cleaner */}
+              {/* Reassign keepers */}
               {canReassign && (
-                <div className="space-y-2">
-                  <p
-                    className="text-xs font-medium"
-                    style={{ color: "var(--text-muted)" }}
-                  >
-                    Reassign cleaner
+                <div className="space-y-3">
+                  <p className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>
+                    Reassign keeper{keepers.length >= 2 ? "s" : ""}
                   </p>
                   {loadingCleaners ? (
                     <div className="flex items-center gap-2">
                       <Spinner size="xs" />
-                      <span
-                        className="text-xs"
-                        style={{ color: "var(--text-muted)" }}
-                      >
+                      <span className="text-xs" style={{ color: "var(--text-muted)" }}>
                         Finding available cleaners…
                       </span>
                     </div>
@@ -668,44 +689,61 @@ function BookingDetail({
                       {formatDate(b.booking_date)} in {b.zone.name}.
                     </p>
                   ) : (
-                    <>
-                      <select
-                        value={selectedNewCleaner}
-                        onChange={(e) => setSelectedNewCleaner(e.target.value)}
-                        className="select select-sm w-full"
-                      >
-                        <option value="">Select cleaner…</option>
-                        {availableCleaners.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.first_name} {c.last_name}
-                            {c.rating != null
-                              ? ` · ★ ${Number(c.rating).toFixed(1)}`
-                              : ""}
-                            {` · ${c.total_jobs} jobs`}
-                          </option>
-                        ))}
-                      </select>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        wide
-                        loading={reassigning}
-                        disabled={!selectedNewCleaner}
-                        onClick={handleReassign}
-                      >
-                        Reassign
-                      </Button>
-                    </>
-                  )}
-                  {reassignMsg && (
-                    <p
-                      className={`text-xs ${reassignIsError ? "text-error" : "text-success"}`}
-                    >
-                      {reassignMsg}
-                    </p>
+                    <div className="space-y-3">
+                      {(keepers.length >= 2 ? ["lead", "second"] as const : ["lead"] as const).map((role) => {
+                        const current = keepers.find((k) => k.role === role)?.cleaner;
+                        const roleLabel = role === "lead" ? "Lead" : "Second";
+                        return (
+                          <div key={role} className="space-y-1.5">
+                            {keepers.length >= 2 && (
+                              <p className="text-xs font-semibold" style={{ color: "var(--text-subtle)" }}>
+                                {roleLabel}
+                                {current && (
+                                  <span className="font-normal ml-1">
+                                    — currently {current.first_name} {current.last_name}
+                                  </span>
+                                )}
+                              </p>
+                            )}
+                            <select
+                              value={selectedNewCleaner[role] ?? ""}
+                              onChange={(e) =>
+                                setSelectedNewCleaner((s) => ({ ...s, [role]: e.target.value }))
+                              }
+                              className="select select-sm w-full"
+                            >
+                              <option value="">Select cleaner…</option>
+                              {availableCleaners.map((c) => (
+                                <option key={c.id} value={c.id}>
+                                  {c.first_name} {c.last_name}
+                                  {c.rating != null ? ` · ★ ${Number(c.rating).toFixed(1)}` : ""}
+                                  {` · ${c.total_jobs} jobs`}
+                                </option>
+                              ))}
+                            </select>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              wide
+                              loading={reassigning[role] ?? false}
+                              disabled={!selectedNewCleaner[role]}
+                              onClick={() => handleReassign(role)}
+                            >
+                              {keepers.length >= 2 ? `Reassign ${roleLabel}` : "Reassign"}
+                            </Button>
+                            {reassignMsg[role] && (
+                              <p className={`text-xs ${reassignIsError[role] ? "text-error" : "text-success"}`}>
+                                {reassignMsg[role]}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
               )}
+
               {/* Cancel booking */}
               {canCancel && (
                 <div className="space-y-2 pt-2 border-t border-base-200">
@@ -732,10 +770,7 @@ function BookingDetail({
 
         {/* Customer */}
         <Section label="Customer">
-          <p
-            className="text-sm font-medium"
-            style={{ color: "var(--text-strong)" }}
-          >
+          <p className="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
             {b.customer.first_name} {b.customer.last_name}
           </p>
           <p className="text-sm mt-0.5" style={{ color: "var(--text-body)" }}>
@@ -750,10 +785,7 @@ function BookingDetail({
 
         {/* Service */}
         <Section label="Service">
-          <p
-            className="text-sm font-medium"
-            style={{ color: "var(--text-strong)" }}
-          >
+          <p className="text-sm font-medium" style={{ color: "var(--text-strong)" }}>
             {b.service.name} · {formatBedrooms(b.bedrooms)}
           </p>
           <p className="text-sm mt-0.5" style={{ color: "var(--text-body)" }}>
@@ -795,54 +827,66 @@ function BookingDetail({
           </Section>
         )}
 
-        {/* Cleaner */}
-        <Section label="Cleaner">
-          {b.cleaner ? (
-            <div className="flex items-center gap-3">
-              <div
-                className="w-10 h-10 rounded-full shrink-0 overflow-hidden flex items-center justify-center text-sm font-semibold"
-                style={{
-                  background: "var(--surface-section)",
-                  color: "var(--text-muted)",
-                }}
-              >
-                {b.cleaner.photo_url ? (
-                  <img
-                    src={b.cleaner.photo_url}
-                    alt=""
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  `${b.cleaner.first_name[0]}${b.cleaner.last_name[0]}`
-                )}
-              </div>
-              <div>
-                <p
-                  className="text-sm font-medium flex items-center gap-1.5"
-                  style={{ color: "var(--text-strong)" }}
-                >
-                  {b.cleaner.first_name} {b.cleaner.last_name}
-                  {b.cleaner.nin_verified && (
-                    <span className="badge badge-xs badge-success badge-soft">
-                      ✓ Verified
-                    </span>
-                  )}
-                </p>
-                <p
-                  className="text-xs mt-0.5"
-                  style={{ color: "var(--text-muted)" }}
-                >
-                  {b.cleaner.phone}
-                  {b.cleaner.rating != null &&
-                    ` · ★ ${Number(b.cleaner.rating).toFixed(1)}`}
-                  {` · ${b.cleaner.total_jobs} jobs`}
-                </p>
-              </div>
-            </div>
-          ) : (
+        {/* Keepers — replaces old "Cleaner" section; handles 1 or 2 */}
+        <Section label={keepers.length >= 2 ? "Keepers" : "Keeper"}>
+          {keepers.length === 0 ? (
             <p className="text-sm" style={{ color: "var(--text-subtle)" }}>
               Not assigned
             </p>
+          ) : (
+            <div className="space-y-3">
+              {keepers.map((bc) => {
+                const c = bc.cleaner;
+                if (!c) return null;
+                return (
+                  <div key={bc.id} className="flex items-start gap-3">
+                    <div
+                      className="w-10 h-10 rounded-full shrink-0 overflow-hidden flex items-center justify-center text-sm font-semibold"
+                      style={{ background: "var(--surface-section)", color: "var(--text-muted)" }}
+                    >
+                      {c.photo_url ? (
+                        <img src={c.photo_url} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        `${c.first_name[0]}${c.last_name[0]}`
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p
+                        className="text-sm font-medium flex items-center flex-wrap gap-1.5"
+                        style={{ color: "var(--text-strong)" }}
+                      >
+                        {c.first_name} {c.last_name}
+                        {c.nin_verified && (
+                          <span className="badge badge-xs badge-success badge-soft">✓ Verified</span>
+                        )}
+                        {keepers.length >= 2 && (
+                          <span className="badge badge-xs badge-ghost">
+                            {bc.role === "lead" ? "Lead" : "2nd"}
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
+                        {c.phone}
+                        {c.rating != null && ` · ★ ${Number(c.rating).toFixed(1)}`}
+                        {` · ${c.total_jobs} jobs`}
+                      </p>
+                      <div className="flex items-center gap-2 mt-1 flex-wrap">
+                        {bc.transport_fare_kobo != null && (
+                          <span className="text-xs" style={{ color: "var(--text-subtle)" }}>
+                            Transport: {formatNGN(bc.transport_fare_kobo)}
+                          </span>
+                        )}
+                        <span
+                          className={`badge badge-xs ${bc.paid_out ? "badge-success badge-soft" : "badge-ghost"}`}
+                        >
+                          {bc.paid_out ? "Paid out" : "Unpaid"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           )}
         </Section>
 
@@ -851,38 +895,49 @@ function BookingDetail({
           <dl className="space-y-1.5">
             {b.paystack_reference && (
               <Row label="Reference">
-                <span
-                  className="font-mono text-xs break-all"
-                  style={{ color: "var(--text-body)" }}
-                >
+                <span className="font-mono text-xs break-all" style={{ color: "var(--text-body)" }}>
                   {b.paystack_reference}
                 </span>
               </Row>
             )}
             <Row label="Total">
-              <span
-                className="font-semibold"
-                style={{ color: "var(--text-strong)" }}
-              >
+              <span className="font-semibold" style={{ color: "var(--text-strong)" }}>
                 {formatNGN(b.total_amount_kobo)}
               </span>
             </Row>
             <Row label="Commission (22%)">
-              <span style={{ color: "var(--text-body)" }}>
-                {formatNGN(b.commission_kobo)}
-              </span>
+              <span style={{ color: "var(--text-body)" }}>{formatNGN(b.commission_kobo)}</span>
             </Row>
-            <Row label="Cleaner payout">
-              <span style={{ color: "var(--text-body)" }}>
-                {formatNGN(b.total_amount_kobo - b.commission_kobo)}
-              </span>
-            </Row>
+            {keepers.length >= 2 ? (
+              // For 2-keeper bookings, show per-keeper payout split
+              <>
+                {keepers.map((bc) => {
+                  const c = bc.cleaner;
+                  const perKeeperPayout = Math.floor(
+                    (b.total_amount_kobo - b.commission_kobo) / keepers.length,
+                  );
+                  return (
+                    <Row key={bc.id} label={`${c?.first_name ?? "Keeper"} payout`}>
+                      <span style={{ color: "var(--text-body)" }}>
+                        {formatNGN(perKeeperPayout)}
+                      </span>
+                    </Row>
+                  );
+                })}
+              </>
+            ) : (
+              <Row label="Cleaner payout">
+                <span style={{ color: "var(--text-body)" }}>
+                  {formatNGN(b.total_amount_kobo - b.commission_kobo)}
+                </span>
+              </Row>
+            )}
           </dl>
         </Section>
 
         {/* Transport — only relevant once clean payment is confirmed */}
         {b.status === "confirmed" && (
-          <TransportSection booking={b} onUpdated={onUpdated} />
+          <TransportSection booking={b} keepers={keepers} onUpdated={onUpdated} />
         )}
 
         {/* Refund */}
@@ -898,14 +953,10 @@ function BookingDetail({
         <Section label="Timestamps">
           <dl className="space-y-1">
             <Row label="Created">
-              <span style={{ color: "var(--text-body)" }}>
-                {formatDateTime(b.created_at)}
-              </span>
+              <span style={{ color: "var(--text-body)" }}>{formatDateTime(b.created_at)}</span>
             </Row>
             <Row label="Updated">
-              <span style={{ color: "var(--text-body)" }}>
-                {formatDateTime(b.updated_at)}
-              </span>
+              <span style={{ color: "var(--text-body)" }}>{formatDateTime(b.updated_at)}</span>
             </Row>
           </dl>
         </Section>
@@ -946,14 +997,18 @@ function formatNGNraw(n: number) {
 
 function TransportSection({
   booking: b,
+  keepers,
   onUpdated,
 }: {
   booking: Booking;
+  keepers: BookingCleaner[];
   onUpdated: (id: string) => Promise<void>;
 }) {
   const ts = b.transport_status ?? "pending_quote";
+  const twoKeepers = keepers.length >= 2;
 
-  const [fareInput, setFareInput] = useState("");
+  // Per-keeper fare inputs (indexed 0=lead, 1=second)
+  const [fareInputs, setFareInputs] = useState<string[]>(["", ""]);
   const [suggestion, setSuggestion] = useState<number | null>(null);
   const [working, setWorking]       = useState(false);
   const [fareMsg, setFareMsg]       = useState<string | null>(null);
@@ -975,7 +1030,6 @@ function TransportSection({
       ? "Waiting for customer to pay the transport invoice"
       : null;
 
-  // Fetch fare suggestion when in pending_quote with a keeper that has a home_area
   useEffect(() => {
     if (ts !== "pending_quote" || !b.cleaner?.home_area) return;
     fetch(`/api/admin/bookings/${b.id}/transport-suggestion`)
@@ -1007,21 +1061,36 @@ function TransportSection({
   }
 
   async function handleSetFareAndInvoice() {
-    const amount = parseFloat(fareInput);
-    if (!Number.isFinite(amount) || amount <= 0) {
-      setFareErr(true);
-      setFareMsg("Enter a valid amount.");
-      return;
+    // Build the request body depending on 1 or 2 keepers
+    let body: Record<string, unknown>;
+
+    if (twoKeepers) {
+      const amt0 = parseFloat(fareInputs[0]);
+      const amt1 = parseFloat(fareInputs[1]);
+      if (!Number.isFinite(amt0) || amt0 <= 0 || !Number.isFinite(amt1) || amt1 <= 0) {
+        setFareErr(true);
+        setFareMsg("Enter a valid fare for each keeper.");
+        return;
+      }
+      body = { keeper_amounts: [amt0, amt1] };
+    } else {
+      const amount = parseFloat(fareInputs[0]);
+      if (!Number.isFinite(amount) || amount <= 0) {
+        setFareErr(true);
+        setFareMsg("Enter a valid amount.");
+        return;
+      }
+      body = { amount };
     }
+
     setWorking(true);
     setFareMsg("Setting fare…");
     setFareErr(false);
     try {
-      // 1. Record the fare
       const fareRes = await fetch(`/api/admin/bookings/${b.id}/transport-fare`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount }),
+        body: JSON.stringify(body),
       });
       const fareData = await fareRes.json().catch(() => ({}));
       if (!fareRes.ok)
@@ -1029,7 +1098,6 @@ function TransportSection({
 
       setFareMsg("Sending invoice…");
 
-      // 2. Create & send Paystack invoice
       const invRes = await fetch(`/api/admin/bookings/${b.id}/transport-invoice`, {
         method: "POST",
       });
@@ -1039,7 +1107,7 @@ function TransportSection({
 
       setFareErr(false);
       setFareMsg("Invoice sent via Paystack ✓");
-      setFareInput("");
+      setFareInputs(["", ""]);
       await onUpdated(b.id);
     } catch (err) {
       setFareErr(true);
@@ -1052,20 +1120,18 @@ function TransportSection({
   async function handleWaive() {
     if (
       !window.confirm(
-        "Waive transport fare for this booking?\n\nThe Keeper won't receive transport reimbursement.",
+        "Waive transport fare for this booking?\n\nNo keeper will receive transport reimbursement.",
       )
-    )
-      return;
+    ) return;
     await postFare({ waive: true }, "Transport fare waived.");
   }
 
   async function handleNotRequired() {
     if (
       !window.confirm(
-        "Mark transport as not required?\n\nUse this for Keepers who live nearby and don't need reimbursement.",
+        "Mark transport as not required?\n\nUse this for keepers who live nearby and don't need reimbursement.",
       )
-    )
-      return;
+    ) return;
     await postFare({ not_required: true }, "Transport marked as not required.");
   }
 
@@ -1090,37 +1156,80 @@ function TransportSection({
   }
 
   async function handleDispatch() {
+    const keeperLabel = twoKeepers ? "both keepers" : "the keeper";
     if (
       !window.confirm(
-        `Confirm dispatch for ${b.customer.first_name} ${b.customer.last_name}'s booking on ${formatDate(b.booking_date)}?\n\nThis sends the customer a "you're all set" SMS and tells the Keeper to head out.`,
+        `Confirm dispatch for ${b.customer.first_name} ${b.customer.last_name}'s booking on ${formatDate(b.booking_date)}?\n\nThis sends the customer a "you're all set" SMS and tells ${keeperLabel} to head out.`,
       )
-    )
-      return;
+    ) return;
     setDispatching(true);
     setDispatchMsg(null);
     setDispatchErr(false);
     try {
-      const r = await fetch(`/api/admin/bookings/${b.id}/dispatch`, {
-        method: "POST",
-      });
+      const r = await fetch(`/api/admin/bookings/${b.id}/dispatch`, { method: "POST" });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.error?.message ?? d.error ?? "Dispatch failed");
-      setDispatchMsg("Dispatched — customer and Keeper notified ✓");
+      setDispatchMsg("Dispatched — customer and Keeper(s) notified ✓");
       await onUpdated(b.id);
     } catch (err) {
       setDispatchErr(true);
-      setDispatchMsg(
-        err instanceof Error ? err.message : "Something went wrong.",
-      );
+      setDispatchMsg(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
       setDispatching(false);
     }
   }
 
+  // Helper: fare input for one keeper slot
+  function FareInput({
+    index,
+    label,
+  }: {
+    index: number;
+    label?: string;
+  }) {
+    return (
+      <div>
+        {label && (
+          <p className="text-xs mb-1" style={{ color: "var(--text-subtle)" }}>{label}</p>
+        )}
+        <div className="relative">
+          <span
+            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm pointer-events-none"
+            style={{ color: "var(--text-muted)" }}
+          >
+            ₦
+          </span>
+          <input
+            type="number"
+            min="1"
+            max="5000"
+            step="50"
+            placeholder="0"
+            value={fareInputs[index]}
+            onChange={(e) =>
+              setFareInputs((prev) => {
+                const next = [...prev];
+                next[index] = e.target.value;
+                return next;
+              })
+            }
+            onKeyDown={(e) => e.key === "Enter" && handleSetFareAndInvoice()}
+            className="input input-sm w-full pl-6"
+            disabled={working}
+            style={{ appearance: "textfield" }}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  const combinedFare = twoKeepers
+    ? (parseFloat(fareInputs[0]) || 0) + (parseFloat(fareInputs[1]) || 0)
+    : 0;
+
   return (
     <Section label="Transport">
       <div className="space-y-3">
-
         {/* Status row */}
         <div className="flex items-center gap-2 flex-wrap">
           <TransportStatusBadge status={ts} />
@@ -1131,85 +1240,96 @@ function TransportSection({
           )}
         </div>
 
-        {/* ── pending_quote: input + actions ─────────────────── */}
+        {/* pending_quote: fare input(s) + actions */}
         {ts === "pending_quote" && (
           <div className="space-y-2">
-            <div className="flex gap-2 items-center">
-              <div className="relative flex-1">
-                <span
-                  className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm pointer-events-none"
-                  style={{ color: "var(--text-muted)" }}
+            {twoKeepers ? (
+              <>
+                <div className="grid grid-cols-2 gap-2">
+                  <FareInput
+                    index={0}
+                    label={`Lead — ${keepers[0]?.cleaner?.first_name ?? "Keeper 1"}`}
+                  />
+                  <FareInput
+                    index={1}
+                    label={`2nd — ${keepers[1]?.cleaner?.first_name ?? "Keeper 2"}`}
+                  />
+                </div>
+                {combinedFare > 0 && (
+                  <p className="text-xs" style={{ color: "var(--text-subtle)" }}>
+                    Combined invoice: {formatNGNraw(combinedFare)}
+                  </p>
+                )}
+              </>
+            ) : (
+              <div className="flex gap-2 items-center">
+                <FareInput index={0} />
+                <button
+                  className="btn btn-sm btn-primary whitespace-nowrap"
+                  onClick={handleSetFareAndInvoice}
+                  disabled={!fareInputs[0] || working}
                 >
-                  ₦
-                </span>
-                <input
-                  type="number"
-                  min="1"
-                  max="5000"
-                  step="50"
-                  placeholder="0"
-                  value={fareInput}
-                  onChange={(e) => setFareInput(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleSetFareAndInvoice()}
-                  className="input input-sm w-full pl-6"
-                  disabled={working}
-                  style={{ appearance: "textfield" }}
-                />
+                  {working ? <Spinner size="xs" /> : "Send invoice"}
+                </button>
               </div>
+            )}
+
+            {twoKeepers && (
               <button
-                className="btn btn-sm btn-primary whitespace-nowrap"
+                className="btn btn-sm btn-primary w-full"
                 onClick={handleSetFareAndInvoice}
-                disabled={!fareInput || working}
+                disabled={!fareInputs[0] || !fareInputs[1] || working}
               >
-                {working ? <Spinner size="xs" /> : "Send invoice"}
+                {working ? <Spinner size="xs" /> : "Send combined invoice"}
               </button>
-            </div>
-            {suggestion != null && (
+            )}
+
+            {suggestion != null && !twoKeepers && (
               <p className="text-xs" style={{ color: "var(--text-subtle)" }}>
                 Suggested: {formatNGNraw(suggestion)}
               </p>
             )}
+
             <div className="flex gap-2 pt-0.5">
-              <button
-                className="btn btn-xs btn-ghost"
-                onClick={handleWaive}
-                disabled={working}
-              >
+              <button className="btn btn-xs btn-ghost" onClick={handleWaive} disabled={working}>
                 Waive
               </button>
-              <button
-                className="btn btn-xs btn-ghost"
-                onClick={handleNotRequired}
-                disabled={working}
-              >
+              <button className="btn btn-xs btn-ghost" onClick={handleNotRequired} disabled={working}>
                 Not required
               </button>
             </div>
+
             {fareMsg && (
-              <p className={`text-xs ${fareErr ? "text-error" : "text-success"}`}>
-                {fareMsg}
-              </p>
+              <p className={`text-xs ${fareErr ? "text-error" : "text-success"}`}>{fareMsg}</p>
             )}
           </div>
         )}
 
-        {/* ── awaiting_payment: details + resend ──────────────── */}
+        {/* awaiting_payment: details + resend */}
         {ts === "awaiting_payment" && (
           <div className="space-y-2">
             <dl className="space-y-1.5">
               {b.transport_fare != null && (
-                <Row label="Fare">
+                <Row label={twoKeepers ? "Combined fare" : "Fare"}>
                   <span className="font-semibold" style={{ color: "var(--text-strong)" }}>
                     {formatNGNraw(b.transport_fare)}
                   </span>
                 </Row>
               )}
+              {twoKeepers && keepers.map((bc, i) => {
+                if (bc.transport_fare_kobo == null) return null;
+                const name = bc.cleaner?.first_name ?? `Keeper ${i + 1}`;
+                return (
+                  <Row key={bc.id} label={`${name} share`}>
+                    <span style={{ color: "var(--text-muted)" }}>
+                      {formatNGN(bc.transport_fare_kobo)}
+                    </span>
+                  </Row>
+                );
+              })}
               {b.transport_payment_ref && (
                 <Row label="Invoice ref">
-                  <span
-                    className="font-mono text-xs break-all"
-                    style={{ color: "var(--text-muted)" }}
-                  >
+                  <span className="font-mono text-xs break-all" style={{ color: "var(--text-muted)" }}>
                     {b.transport_payment_ref}
                   </span>
                 </Row>
@@ -1230,46 +1350,46 @@ function TransportSection({
               {resending ? <Spinner size="xs" /> : "Resend invoice"}
             </button>
             {resendMsg && (
-              <p className={`text-xs ${resendErr ? "text-error" : "text-success"}`}>
-                {resendMsg}
-              </p>
+              <p className={`text-xs ${resendErr ? "text-error" : "text-success"}`}>{resendMsg}</p>
             )}
           </div>
         )}
 
-        {/* ── paid: receipt ──────────────────────────────────── */}
+        {/* paid: receipt */}
         {ts === "paid" && (
           <dl className="space-y-1.5">
             {b.transport_fare != null && (
-              <Row label="Paid">
-                <span className="font-semibold text-success">
-                  {formatNGNraw(b.transport_fare)}
-                </span>
+              <Row label={twoKeepers ? "Combined paid" : "Paid"}>
+                <span className="font-semibold text-success">{formatNGNraw(b.transport_fare)}</span>
               </Row>
             )}
+            {twoKeepers && keepers.map((bc, i) => {
+              if (bc.transport_fare_kobo == null) return null;
+              const name = bc.cleaner?.first_name ?? `Keeper ${i + 1}`;
+              return (
+                <Row key={bc.id} label={`${name} reimb.`}>
+                  <span style={{ color: "var(--text-muted)" }}>
+                    {formatNGN(bc.transport_fare_kobo)}
+                  </span>
+                </Row>
+              );
+            })}
             {b.transport_payment_ref && (
               <Row label="Ref">
-                <span
-                  className="font-mono text-xs break-all"
-                  style={{ color: "var(--text-muted)" }}
-                >
+                <span className="font-mono text-xs break-all" style={{ color: "var(--text-muted)" }}>
                   {b.transport_payment_ref}
                 </span>
               </Row>
             )}
             {b.transport_paid_at && (
               <Row label="Paid at">
-                <span style={{ color: "var(--text-body)" }}>
-                  {formatDateTime(b.transport_paid_at)}
-                </span>
+                <span style={{ color: "var(--text-body)" }}>{formatDateTime(b.transport_paid_at)}</span>
               </Row>
             )}
           </dl>
         )}
 
-        {/* ── waived / not_required: nothing extra needed ─────── */}
-
-        {/* ── Dispatch gate ──────────────────────────────────── */}
+        {/* Dispatch gate */}
         <div className="pt-3 border-t border-base-200">
           {b.dispatched_at ? (
             <p className="text-xs" style={{ color: "var(--text-muted)" }}>
@@ -1277,10 +1397,7 @@ function TransportSection({
             </p>
           ) : (
             <>
-              <div
-                className="relative group"
-                title={dispatchTooltip ?? undefined}
-              >
+              <div className="relative group" title={dispatchTooltip ?? undefined}>
                 <button
                   className={[
                     "btn btn-sm w-full",
@@ -1309,16 +1426,13 @@ function TransportSection({
                 )}
               </div>
               {dispatchMsg && (
-                <p
-                  className={`text-xs mt-1.5 ${dispatchErr ? "text-error" : "text-success"}`}
-                >
+                <p className={`text-xs mt-1.5 ${dispatchErr ? "text-error" : "text-success"}`}>
                   {dispatchMsg}
                 </p>
               )}
             </>
           )}
         </div>
-
       </div>
     </Section>
   );

@@ -22,6 +22,19 @@ export async function GET(
     return Response.json({ error: "Booking not found" }, { status: 404 });
   }
 
+  // Collect ALL currently-assigned cleaner IDs from booking_cleaners.
+  // For 2-keeper bookings this returns both lead and second; for 1-keeper it returns one.
+  const { data: assignedRows } = await admin
+    .from("booking_cleaners")
+    .select("cleaner_id")
+    .eq("booking_id", id);
+
+  const assignedIds = new Set<string>(
+    (assignedRows ?? []).map((r) => r.cleaner_id as string),
+  );
+  // Also include the denormalised cleaner_id column as a safety net
+  if (booking.cleaner_id) assignedIds.add(booking.cleaner_id as string);
+
   // Find availability slots that are free on the booking date
   const { data: slots, error: slotsErr } = await admin
     .from("cleaner_availability")
@@ -35,7 +48,7 @@ export async function GET(
 
   const candidateIds = (slots ?? [])
     .map((s) => s.cleaner_id as string)
-    .filter((cid) => cid !== booking.cleaner_id);
+    .filter((cid) => !assignedIds.has(cid));
 
   if (candidateIds.length === 0) {
     return Response.json({ cleaners: [] });
