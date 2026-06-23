@@ -171,12 +171,26 @@ export async function notifyKeeperDispatched(bookingId: string): Promise<void> {
 
 // Fires when admin confirms dispatch — "you're all set" to the customer.
 // Only ever called through the gated dispatch endpoint (transport must be settled first).
+// For 2-keeper bookings the SMS names both keepers: "Alice and Bob will be with you".
 export async function notifyCustomerDispatchConfirmed(bookingId: string): Promise<void> {
   const ctx = await fetchNotifContext(bookingId);
   if (!ctx) return;
 
+  // Collect all assigned keeper first names from booking_cleaners.
+  const { data: bcRows } = await supabase
+    .from('booking_cleaners')
+    .select('cleaner:cleaners(first_name)')
+    .eq('booking_id', bookingId);
+
+  const keeperNames: string[] =
+    bcRows && bcRows.length > 0
+      ? (bcRows as unknown as Array<{ cleaner: { first_name: string } | null }>)
+          .map((r) => r.cleaner?.first_name)
+          .filter((n): n is string => Boolean(n))
+      : [ctx.cleanerFirstName];
+
   await safeSend(
-    () => sendSms(ctx.customerPhone, customerDispatchConfirmedMsg(ctx)),
+    () => sendSms(ctx.customerPhone, customerDispatchConfirmedMsg(ctx, keeperNames)),
     'customer-dispatch-confirmed',
   );
 }

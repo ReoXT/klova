@@ -139,7 +139,9 @@ describe('cancelTransportOverdue — happy path', () => {
       .mockReturnValueOnce(chain({ data: awaitingBooking({ id: BOOKING_ID }), error: null }) as any)
       // call 2: update bookings → cancel
       .mockReturnValueOnce(chain({ data: cancelledRow, error: null }) as any)
-      // call 3: update cleaner_availability → free slot
+      // call 3: query booking_cleaners for all keeper IDs
+      .mockReturnValueOnce(chain({ data: [{ cleaner_id: 'cleaner-abc' }], error: null }) as any)
+      // call 4: update cleaner_availability → free slot(s)
       .mockReturnValueOnce(chain({ data: null, error: null }) as any);
 
     const result = await cancelTransportOverdue(BOOKING_ID);
@@ -151,8 +153,8 @@ describe('cancelTransportOverdue — happy path', () => {
     expect(vi.mocked(notifyKeeperJobCancelled)).toHaveBeenCalledOnce();
     expect(vi.mocked(notifyKeeperJobCancelled)).toHaveBeenCalledWith(BOOKING_ID);
 
-    // Verify cleaner_availability was touched (third from() call happened)
-    expect(vi.mocked(supabase.from)).toHaveBeenCalledTimes(3);
+    // Verify booking_cleaners + cleaner_availability were both touched
+    expect(vi.mocked(supabase.from)).toHaveBeenCalledTimes(4);
   });
 });
 
@@ -170,13 +172,15 @@ describe('cancelTransportOverdue — no cleaner_id (edge case)', () => {
       .mockReturnValueOnce(
         chain({ data: awaitingBooking({ id: BOOKING_ID, cleaner_id: null }), error: null }) as any,
       )
-      .mockReturnValueOnce(chain({ data: cancelledRow, error: null }) as any);
+      .mockReturnValueOnce(chain({ data: cancelledRow, error: null }) as any)
+      // booking_cleaners returns empty — no slots to free
+      .mockReturnValueOnce(chain({ data: [], error: null }) as any);
 
     const result = await cancelTransportOverdue(BOOKING_ID);
 
     expect(result.status).toBe('cancelled');
-    // Only 2 DB calls (fetch + cancel); availability skip because no cleaner
-    expect(vi.mocked(supabase.from)).toHaveBeenCalledTimes(2);
+    // 3 DB calls: fetch + cancel + booking_cleaners (empty → skip availability)
+    expect(vi.mocked(supabase.from)).toHaveBeenCalledTimes(3);
     expect(vi.mocked(notifyKeeperJobCancelled)).toHaveBeenCalledOnce();
   });
 });
@@ -194,6 +198,8 @@ describe('cancelTransportOverdue — availability update fails silently', () => 
     vi.mocked(supabase.from)
       .mockReturnValueOnce(chain({ data: awaitingBooking({ id: BOOKING_ID }), error: null }) as any)
       .mockReturnValueOnce(chain({ data: cancelledRow, error: null }) as any)
+      // booking_cleaners: one keeper
+      .mockReturnValueOnce(chain({ data: [{ cleaner_id: 'cleaner-abc' }], error: null }) as any)
       // Simulate availability update error — should be non-fatal
       .mockReturnValueOnce(chain({ data: null, error: { message: 'DB error' } }) as any);
 
@@ -201,6 +207,52 @@ describe('cancelTransportOverdue — availability update fails silently', () => 
 
     expect(result.status).toBe('cancelled');
     expect(vi.mocked(notifyKeeperJobCancelled)).toHaveBeenCalledOnce();
+  });
+});
+
+// ─── cancelTransportOverdue — 2-keeper slot freeing ──────────────────────────
+
+describe('cancelTransportOverdue — 2-keeper booking frees both slots', () => {
+  it('frees both cleaner slots using .in() and notifies once', async () => {
+    const BOOKING_ID = 'b-two-keepers-cancel';
+    const LEAD_ID    = 'cleaner-lead-01';
+    const SECOND_ID  = 'cleaner-second-02';
+    const cancelledRow = {
+      id: BOOKING_ID,
+      status: 'cancelled',
+      transport_status: 'awaiting_payment',
+      cancellation_reason: 'transport_payment_overdue',
+    };
+
+    // Capture the availability chain so we can assert which IDs were freed
+    const availChain = chain({ data: null, error: null });
+
+    vi.mocked(supabase.from)
+      .mockReturnValueOnce(
+        chain({ data: awaitingBooking({ id: BOOKING_ID, cleaner_id: LEAD_ID }), error: null }) as any,
+      )
+      .mockReturnValueOnce(chain({ data: cancelledRow, error: null }) as any)
+      // booking_cleaners returns both keepers
+      .mockReturnValueOnce(
+        chain({ data: [{ cleaner_id: LEAD_ID }, { cleaner_id: SECOND_ID }], error: null }) as any,
+      )
+      // availability update chain (captured for assertion)
+      .mockReturnValueOnce(availChain as any);
+
+    const result = await cancelTransportOverdue(BOOKING_ID);
+
+    expect(result.status).toBe('cancelled');
+
+    // cleaner_availability must have been updated with both IDs via .in()
+    expect(availChain.in).toHaveBeenCalledWith(
+      'cleaner_id',
+      expect.arrayContaining([LEAD_ID, SECOND_ID]),
+    );
+    expect((availChain.in as ReturnType<typeof vi.fn>).mock.calls[0][1]).toHaveLength(2);
+
+    // Only one keeper-cancellation notification fires (admin notifies keepers manually in V1)
+    expect(vi.mocked(notifyKeeperJobCancelled)).toHaveBeenCalledOnce();
+    expect(vi.mocked(notifyKeeperJobCancelled)).toHaveBeenCalledWith(BOOKING_ID);
   });
 });
 
@@ -390,8 +442,9 @@ describe('cancelConfirmedBooking — transport paid with transaction ref', () =>
 
     vi.mocked(supabase.from)
       .mockReturnValueOnce(chain({ data: confirmedBooking({ id: BOOKING_ID }), error: null }) as any)
-      .mockReturnValueOnce(chain({ data: cancelledRow, error: null }) as any)   // cancel update
-      .mockReturnValueOnce(chain({ data: null, error: null }) as any);           // availability free
+      .mockReturnValueOnce(chain({ data: cancelledRow, error: null }) as any)                            // cancel update
+      .mockReturnValueOnce(chain({ data: [{ cleaner_id: 'cleaner-xyz' }], error: null }) as any)        // booking_cleaners
+      .mockReturnValueOnce(chain({ data: null, error: null }) as any);                                   // availability free
 
     const result = await cancelConfirmedBooking(BOOKING_ID);
 
@@ -420,6 +473,7 @@ describe('cancelConfirmedBooking — transport paid but no transaction ref', () 
         chain({ data: confirmedBooking({ id: BOOKING_ID, transport_transaction_ref: null }), error: null }) as any,
       )
       .mockReturnValueOnce(chain({ data: cancelledRow, error: null }) as any)
+      .mockReturnValueOnce(chain({ data: [{ cleaner_id: 'cleaner-xyz' }], error: null }) as any)  // booking_cleaners
       .mockReturnValueOnce(chain({ data: null, error: null }) as any);
 
     const result = await cancelConfirmedBooking(BOOKING_ID);
@@ -451,6 +505,7 @@ describe('cancelConfirmedBooking — transport not paid (awaiting_payment)', () 
         }) as any,
       )
       .mockReturnValueOnce(chain({ data: cancelledRow, error: null }) as any)
+      .mockReturnValueOnce(chain({ data: [{ cleaner_id: 'cleaner-xyz' }], error: null }) as any)  // booking_cleaners
       .mockReturnValueOnce(chain({ data: null, error: null }) as any);
 
     const result = await cancelConfirmedBooking(BOOKING_ID);
@@ -471,7 +526,8 @@ describe('cancelConfirmedBooking — clean refund fails', () => {
     vi.mocked(supabase.from)
       .mockReturnValueOnce(chain({ data: confirmedBooking({ id: BOOKING_ID }), error: null }) as any)
       .mockReturnValueOnce(chain({ data: cancelledRow, error: null }) as any)
-      .mockReturnValueOnce(chain({ data: null, error: null }) as any);
+      .mockReturnValueOnce(chain({ data: [{ cleaner_id: 'cleaner-xyz' }], error: null }) as any)  // booking_cleaners
+      .mockReturnValueOnce(chain({ data: null, error: null }) as any);                              // availability free
 
     const result = await cancelConfirmedBooking(BOOKING_ID);
 
@@ -493,6 +549,7 @@ describe('cancelConfirmedBooking — no paystack_reference on booking', () => {
         chain({ data: confirmedBooking({ id: BOOKING_ID, paystack_reference: null }), error: null }) as any,
       )
       .mockReturnValueOnce(chain({ data: cancelledRow, error: null }) as any)
+      .mockReturnValueOnce(chain({ data: [{ cleaner_id: 'cleaner-xyz' }], error: null }) as any)  // booking_cleaners
       .mockReturnValueOnce(chain({ data: null, error: null }) as any);
 
     const result = await cancelConfirmedBooking(BOOKING_ID);

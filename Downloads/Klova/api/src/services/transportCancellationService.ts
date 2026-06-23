@@ -15,6 +15,52 @@ export class TransportCancellationError extends Error {
   }
 }
 
+// ─── Internal: free all keeper slots for a booking ───────────────────────────
+
+/**
+ * Frees the cleaner_availability slot for every keeper assigned to `bookingId`.
+ * Queries booking_cleaners (the authoritative source) and falls back to
+ * fallbackCleanerId (bookings.cleaner_id) for backward-compat with older rows.
+ * A single `.in()` update covers all keepers in one round-trip.
+ * Non-fatal: logs on error but never throws.
+ */
+async function freeAllKeeperSlots(
+  bookingId: string,
+  bookingDate: string,
+  fallbackCleanerId: string | null,
+  logPrefix: string,
+): Promise<void> {
+  const { data: bcRows } = await supabase
+    .from('booking_cleaners')
+    .select('cleaner_id')
+    .eq('booking_id', bookingId);
+
+  const cleanerIds = new Set<string>(
+    (bcRows ?? []).map((r) => r.cleaner_id as string),
+  );
+  if (fallbackCleanerId) cleanerIds.add(fallbackCleanerId);
+
+  if (cleanerIds.size === 0) return;
+
+  const ids = [...cleanerIds];
+  const { error: availErr } = await supabase
+    .from('cleaner_availability')
+    .update({ is_booked: false })
+    .in('cleaner_id', ids)
+    .eq('available_date', bookingDate);
+
+  if (availErr) {
+    console.error(
+      `[${logPrefix}] Failed to free availability for ${ids.length} keeper(s) on ${bookingDate}:`,
+      availErr.message,
+    );
+  } else {
+    ids.forEach((id) =>
+      console.log(`[${logPrefix}] Freed slot: cleaner ${id} on ${bookingDate}`),
+    );
+  }
+}
+
 // ─── Deadline helpers ─────────────────────────────────────────────────────────
 
 // Lagos is WAT = UTC+1, no DST. Cheaper than Intl.DateTimeFormat for a date comparison.
@@ -170,26 +216,13 @@ export async function cancelTransportOverdue(bookingId: string): Promise<Cancell
     throw cancelErr ?? new Error('Failed to cancel booking.');
   }
 
-  // ── 2. Free the Keeper's availability slot ─────────────────────────────────
-  if (booking.cleaner_id) {
-    const { error: availErr } = await supabase
-      .from('cleaner_availability')
-      .update({ is_booked: false })
-      .eq('cleaner_id', booking.cleaner_id as string)
-      .eq('available_date', booking.booking_date as string);
-
-    if (availErr) {
-      // Non-fatal — log but don't block. Admin can manually fix in Supabase if needed.
-      console.error(
-        `[transport-cancel] Failed to free availability for cleaner ${booking.cleaner_id as string} on ${booking.booking_date as string}:`,
-        availErr.message,
-      );
-    } else {
-      console.log(
-        `[transport-cancel] Freed slot: cleaner ${booking.cleaner_id as string} on ${booking.booking_date as string}`,
-      );
-    }
-  }
+  // ── 2. Free every Keeper's availability slot ──────────────────────────────
+  await freeAllKeeperSlots(
+    bookingId,
+    booking.booking_date as string,
+    booking.cleaner_id as string | null,
+    'transport-cancel',
+  );
 
   console.log(`[transport-cancel] Booking ${bookingId} cancelled — transport payment overdue`);
 
@@ -304,25 +337,13 @@ export async function cancelConfirmedBooking(bookingId: string): Promise<Cancell
 
   console.log(`[cancel-booking] Booking ${bookingId} cancelled by admin`);
 
-  // ── 2. Free the Keeper's slot ──────────────────────────────────────────────
-  if (booking.cleaner_id) {
-    const { error: availErr } = await supabase
-      .from('cleaner_availability')
-      .update({ is_booked: false })
-      .eq('cleaner_id', booking.cleaner_id)
-      .eq('available_date', booking.booking_date);
-
-    if (availErr) {
-      console.error(
-        `[cancel-booking] Failed to free slot for cleaner ${booking.cleaner_id} ` +
-        `on ${booking.booking_date}: ${availErr.message}`,
-      );
-    } else {
-      console.log(
-        `[cancel-booking] Freed slot: cleaner ${booking.cleaner_id} on ${booking.booking_date}`,
-      );
-    }
-  }
+  // ── 2. Free every Keeper's slot ───────────────────────────────────────────
+  await freeAllKeeperSlots(
+    bookingId,
+    booking.booking_date,
+    booking.cleaner_id,
+    'cancel-booking',
+  );
 
   // ── 3. Refund the clean payment ────────────────────────────────────────────
   let clean_refund: CleanRefundOutcome = 'skipped_no_ref';

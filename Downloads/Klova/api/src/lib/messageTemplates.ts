@@ -92,10 +92,17 @@ export function keeperDispatchedMsg(ctx: BookingNotifContext): string {
 // Reserved for when the admin panel can trigger dispatch confirmation.
 // Not sent automatically — admin contacts the customer manually for V1.
 
-export function customerDispatchConfirmedMsg(ctx: BookingNotifContext): string {
+export function customerDispatchConfirmedMsg(
+  ctx: BookingNotifContext,
+  allKeeperFirstNames?: string[],
+): string {
+  const keeperPhrase =
+    allKeeperFirstNames && allKeeperFirstNames.length > 1
+      ? allKeeperFirstNames.join(' and ')
+      : ctx.cleanerFirstName;
   return (
     `Hi ${ctx.customerFirstName}! Your Klova booking is confirmed. ` +
-    `${ctx.cleanerFirstName} will be with you on ${ctx.bookingDate} for your ${ctx.serviceName}. ` +
+    `${keeperPhrase} will be with you on ${ctx.bookingDate} for your ${ctx.serviceName}. ` +
     `Questions? WhatsApp us on +234 800 000 0000.`
   );
 }
