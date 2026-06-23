@@ -124,6 +124,14 @@ export function validateBookingInput(body: Record<string, unknown>): BookingInpu
     }
   }
 
+  // keeper_count must be 1 or 2 — reject anything else to avoid silent mis-pricing
+  if (body.keeper_count != null) {
+    const kc = Number(body.keeper_count);
+    if (!Number.isInteger(kc) || kc < 1 || kc > 2) {
+      errors.keeper_count = 'keeper_count must be 1 or 2.';
+    }
+  }
+
   // Phone format — accepts 0XXXXXXXXXX, +234XXXXXXXXX, 234XXXXXXXXX (Nigerian mobile)
   if (!errors.phone && typeof body.phone === 'string') {
     const normalized = (body.phone as string).replace(/\s/g, '');
@@ -156,7 +164,7 @@ export function validateBookingInput(body: Record<string, unknown>): BookingInpu
     booking_date: (body.booking_date as string).trim(),
     time_slot: typeof body.time_slot === 'string' && body.time_slot.trim() ? body.time_slot.trim() : null,
     keeper_count:
-      typeof body.keeper_count === 'number' && body.keeper_count >= 1
+      typeof body.keeper_count === 'number' && body.keeper_count >= 1 && body.keeper_count <= 2
         ? Math.round(body.keeper_count)
         : undefined,
     wants_insurance: body.wants_insurance === true,

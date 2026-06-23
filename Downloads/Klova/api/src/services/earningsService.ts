@@ -112,7 +112,25 @@ export async function recordEarning(bookingId: string): Promise<void> {
     status,
   }));
 
-  // 5. Upsert all rows in one call — idempotent on (booking_id, cleaner_id)
+  // 5. Log and verify the split before writing (2-keeper bookings only)
+  if (keeperCount > 1) {
+    const sumKobo = rows.reduce((s, r) => s + r.earning_kobo, 0);
+    if (sumKobo !== earningPoolKobo) {
+      console.error(
+        `[earnings] SPLIT BUG: booking ${bookingId}, pool ${earningPoolKobo} kobo, ` +
+        `sum of ${keeperCount} rows = ${sumKobo} — off by ${sumKobo - earningPoolKobo}. ` +
+        `Investigate immediately.`,
+      );
+    } else {
+      console.log(
+        `[earnings] Booking ${bookingId}: ${keeperCount} keepers, ` +
+        `pool ₦${(earningPoolKobo / 100).toFixed(2)}, ` +
+        `split: ${rows.map((r) => `₦${(r.earning_kobo / 100).toFixed(2)}`).join(' + ')}`,
+      );
+    }
+  }
+
+  // 6. Upsert all rows in one call — idempotent on (booking_id, cleaner_id)
   const { error: insErr } = await supabase
     .from('cleaner_earnings')
     .upsert(rows, { onConflict: 'booking_id,cleaner_id', ignoreDuplicates: true });

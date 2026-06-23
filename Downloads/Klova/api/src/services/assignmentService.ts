@@ -47,5 +47,15 @@ export async function assignCleaner(
     return { outcome: 'matched', cleanerIds };
   }
 
+  // RPC exhausted the candidate list before filling all required slots.
+  // For 2-keeper bookings this most likely means a race (another booking
+  // claimed the second slot between matchCleaner() and the RPC).
+  if (keeperCount > 1) {
+    console.error(
+      `[assignment] ${bookingId}: assign_cleaner returned no_match for ${keeperCount}-keeper ` +
+      `booking (${candidates.length} candidate(s) passed) — likely a concurrent race`,
+    );
+  }
+
   return { outcome: 'no_match' };
 }
