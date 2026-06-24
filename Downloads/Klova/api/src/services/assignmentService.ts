@@ -43,7 +43,16 @@ export async function assignCleaner(
 
   const raw = data as string;
   if (raw.startsWith('matched:')) {
-    const cleanerIds = raw.slice('matched:'.length).split(',');
+    const cleanerIds = raw.slice('matched:'.length).split(',').filter(Boolean);
+    // Guard the all-or-nothing RPC contract at the application layer.
+    // The Postgres fn guarantees this, but we defend against protocol drift.
+    if (cleanerIds.length !== keeperCount) {
+      console.error(
+        `[assignment] ${bookingId}: RPC returned ${cleanerIds.length}/${keeperCount} IDs — ` +
+        `treating as no_match (RPC contract violation)`,
+      );
+      return { outcome: 'no_match' };
+    }
     return { outcome: 'matched', cleanerIds };
   }
 
