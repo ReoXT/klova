@@ -124,7 +124,7 @@ export default function PayoutsPage() {
       `──────────────────────────────`,
       `Total:          ${ngnAmt(k.total_payout_ngn)}`,
       "",
-      "Flip keeper_paid_out on all unpaid completed bookings. This cannot be undone.",
+      "Settle all unpaid earnings and transport fares. This cannot be undone.",
     ].filter(Boolean).join("\n");
 
     if (!window.confirm(lines)) return;
@@ -188,7 +188,7 @@ export default function PayoutsPage() {
                 { label: "Clean earnings", value: ngnAmt(cleanTotal),   primary: false },
                 { label: "Transport",      value: ngnAmt(transportTotal), primary: false },
                 { label: `${keepers.length} Keeper${keepers.length !== 1 ? "s" : ""} · ${totalJobs} job${totalJobs !== 1 ? "s" : ""}`,
-                  value: "this week",      primary: false },
+                  value: "outstanding",    primary: false },
               ].map(({ label, value, primary }) => (
                 <div
                   key={label}

@@ -12,21 +12,57 @@ export async function POST(
   const { cleaner_id } = await params;
   const admin = createAdminClient();
 
-  // Fetch all completed, unpaid bookings for this Keeper.
-  const { data: bookings, error: bErr } = await admin
-    .from("bookings")
-    .select("id, total_amount_kobo, commission_kobo, transport_fare, transport_status")
+  // 1. Gather all unpaid cleaning earnings for this keeper.
+  //    cleaner_earnings is now the authoritative settled-state ledger.
+  const { data: earnings, error: eErr } = await admin
+    .from("cleaner_earnings")
+    .select("id, booking_id, earning_kobo")
     .eq("cleaner_id", cleaner_id)
-    .eq("status", "completed")
-    .eq("keeper_paid_out", false);
+    .eq("status", "unpaid");
 
-  if (bErr) return Response.json({ error: "Database error" }, { status: 500 });
+  if (eErr) return Response.json({ error: "Database error" }, { status: 500 });
 
-  // Idempotent: if nothing is pending, return success — nothing to do.
-  if (!bookings || bookings.length === 0) {
+  // 2. Gather eligible transport reimbursements: unsettled rows with a positive
+  //    fare on a booking whose transport invoice has been paid by the customer.
+  const { data: transportRows, error: trErr } = await admin
+    .from("booking_cleaners")
+    .select("id, booking_id, transport_fare_kobo")
+    .eq("cleaner_id", cleaner_id)
+    .eq("paid_out", false)
+    .gt("transport_fare_kobo", 0);
+
+  if (trErr) return Response.json({ error: "Database error" }, { status: 500 });
+
+  let eligibleTransportIds: string[] = [];
+  let transportKobo = 0;
+
+  if (transportRows && transportRows.length > 0) {
+    const bookingIds = (transportRows as { booking_id: string }[]).map((r) => r.booking_id);
+    const { data: paidBookings, error: pbErr } = await admin
+      .from("bookings")
+      .select("id")
+      .in("id", bookingIds)
+      .eq("transport_status", "paid");
+
+    if (pbErr) return Response.json({ error: "Database error" }, { status: 500 });
+
+    const paidIds = new Set((paidBookings ?? []).map((b) => b.id as string));
+    for (const row of transportRows as { id: string; booking_id: string; transport_fare_kobo: number }[]) {
+      if (!paidIds.has(row.booking_id)) continue;
+      transportKobo += row.transport_fare_kobo;
+      eligibleTransportIds.push(row.id);
+    }
+  }
+
+  const earningRows = (earnings ?? []) as { id: string; booking_id: string; earning_kobo: number }[];
+  const earningsKobo = earningRows.reduce((s, e) => s + e.earning_kobo, 0);
+  const totalKobo = earningsKobo + transportKobo;
+
+  // Idempotent: nothing to do
+  if (totalKobo === 0) {
     return Response.json({
       ok: true,
-      message: "No unpaid bookings — already up to date.",
+      message: "No unpaid earnings or transport fares — already up to date.",
       booking_count: 0,
       clean_ngn: 0,
       transport_ngn: 0,
@@ -34,26 +70,9 @@ export async function POST(
     });
   }
 
-  const cleanKobo = bookings.reduce(
-    (s, b) => s + ((b.total_amount_kobo as number) - (b.commission_kobo as number)),
-    0,
-  );
-  const transportNgn = bookings.reduce((s, b) => {
-    if (
-      b.transport_status === "paid" &&
-      b.transport_fare != null &&
-      (b.transport_fare as number) > 0
-    ) {
-      return s + (b.transport_fare as number);
-    }
-    return s;
-  }, 0);
-  const totalKobo = cleanKobo + Math.round(transportNgn * 100);
-
-  const bookingIds = bookings.map((b) => b.id as string);
   const now = new Date().toISOString();
 
-  // Create a cleaner_payouts audit record if the Keeper has a bank account on file.
+  // 3. Create an audit record if the keeper has a primary bank account on file.
   let payoutId: string | null = null;
   const { data: ba } = await admin
     .from("cleaner_bank_accounts")
@@ -63,10 +82,10 @@ export async function POST(
     .maybeSingle();
 
   if (ba) {
-    const { data: payout } = await admin
+    const { data: payout, error: pErr } = await admin
       .from("cleaner_payouts")
       .insert({
-        cleaner_id:      cleaner_id,
+        cleaner_id,
         bank_account_id: (ba as unknown as { id: string }).id,
         total_kobo:      totalKobo,
         method:          "manual",
@@ -76,22 +95,38 @@ export async function POST(
       })
       .select("id")
       .single();
+
+    if (pErr) return Response.json({ error: "Failed to create payout record" }, { status: 500 });
     payoutId = (payout as unknown as { id: string } | null)?.id ?? null;
   }
 
-  // Flip keeper_paid_out = true — the primary source of truth.
-  const { error: updateErr } = await admin
-    .from("bookings")
-    .update({ keeper_paid_out: true })
-    .in("id", bookingIds);
+  // 4. Settle cleaning earnings — status 'paid', linked to the payout row.
+  if (earningRows.length > 0) {
+    const { error: eUpdateErr } = await admin
+      .from("cleaner_earnings")
+      .update({ status: "paid", ...(payoutId ? { payout_id: payoutId } : {}) })
+      .in("id", earningRows.map((e) => e.id));
 
-  if (updateErr) return Response.json({ error: "Failed to update bookings" }, { status: 500 });
+    if (eUpdateErr) return Response.json({ error: "Failed to settle earnings" }, { status: 500 });
+  }
+
+  // 5. Settle transport reimbursements — paid_out true, linked to the payout row.
+  if (eligibleTransportIds.length > 0) {
+    const { error: tUpdateErr } = await admin
+      .from("booking_cleaners")
+      .update({ paid_out: true, ...(payoutId ? { transport_payout_id: payoutId } : {}) })
+      .in("id", eligibleTransportIds);
+
+    if (tUpdateErr) return Response.json({ error: "Failed to settle transport" }, { status: 500 });
+  }
+
+  const distinctBookingCount = new Set(earningRows.map((e) => e.booking_id)).size;
 
   return Response.json({
     ok: true,
-    booking_count:    bookings.length,
-    clean_ngn:        Math.round(cleanKobo / 100),
-    transport_ngn:    transportNgn,
+    booking_count:    distinctBookingCount,
+    clean_ngn:        Math.round(earningsKobo / 100),
+    transport_ngn:    Math.round(transportKobo / 100),
     total_payout_ngn: Math.round(totalKobo / 100),
     payout_id:        payoutId,
   });

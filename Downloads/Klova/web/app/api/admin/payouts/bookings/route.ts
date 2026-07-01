@@ -8,7 +8,21 @@ export async function GET(_req: NextRequest) {
 
   const admin = createAdminClient();
 
-  // All completed bookings not yet paid out, across all Keepers.
+  // Derive the outstanding booking set from cleaner_earnings — the authoritative
+  // settled-state ledger — rather than the deprecated keeper_paid_out flag.
+  const { data: unpaidEarningsRows, error: ueErr } = await admin
+    .from("cleaner_earnings")
+    .select("booking_id")
+    .eq("status", "unpaid");
+
+  if (ueErr) return Response.json({ error: "Database error" }, { status: 500 });
+
+  const unpaidBookingIds = [
+    ...new Set((unpaidEarningsRows ?? []).map((e) => e.booking_id as string)),
+  ];
+  if (unpaidBookingIds.length === 0) return Response.json({ keepers: [] });
+
+  // All completed bookings that have at least one unpaid earning row.
   const { data, error } = await admin
     .from("bookings")
     .select(`
@@ -18,8 +32,8 @@ export async function GET(_req: NextRequest) {
       cleaner_id,
       service:services(name)
     `)
+    .in("id", unpaidBookingIds)
     .eq("status", "completed")
-    .eq("keeper_paid_out", false)
     .not("cleaner_id", "is", null)
     .order("cleaner_id")
     .order("booking_date", { ascending: false });
