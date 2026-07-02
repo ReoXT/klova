@@ -23,6 +23,8 @@ type Cleaner = {
   rating: string | null;
   total_jobs: number;
   created_at: string;
+  email: string | null;
+  auth_user_id: string | null;
 };
 
 type FormState = {
@@ -137,6 +139,13 @@ export default function CleanersPage() {
     closePanel();
   }
 
+  // Patches a cleaner in the list AND the open panel's selection, without
+  // closing the panel — used for in-panel actions like the keeper invite.
+  function patchCleaner(id: string, patch: Partial<Cleaner>) {
+    setCleaners((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
+    setSelected((prev) => (prev && prev.id === id ? { ...prev, ...patch } : prev));
+  }
+
   return (
     <div className="flex h-full">
       {/* List */}
@@ -225,6 +234,7 @@ export default function CleanersPage() {
           zones={zones}
           onClose={closePanel}
           onSaved={onSaved}
+          onCleanerPatched={patchCleaner}
         />
       )}
     </div>
@@ -234,13 +244,14 @@ export default function CleanersPage() {
 /* ── Panel ───────────────────────────────────────────────────── */
 
 function CleanerPanel({
-  mode, cleaner, zones, onClose, onSaved,
+  mode, cleaner, zones, onClose, onSaved, onCleanerPatched,
 }: {
   mode: "add" | "edit";
   cleaner: Cleaner | null;
   zones: Zone[];
   onClose: () => void;
   onSaved: (c: Cleaner) => void;
+  onCleanerPatched: (id: string, patch: Partial<Cleaner>) => void;
 }) {
   const [form, setForm] = useState<FormState>(
     cleaner
@@ -550,6 +561,14 @@ function CleanerPanel({
             </div>
           )}
 
+          {/* Keeper login — edit mode only */}
+          {mode === "edit" && cleaner && (
+            <KeeperLoginSection
+              cleaner={cleaner}
+              onUpdated={(patch) => onCleanerPatched(cleaner.id, patch)}
+            />
+          )}
+
           {saveError && (
             <div className="alert alert-soft alert-error text-sm py-2">{saveError}</div>
           )}
@@ -567,6 +586,100 @@ function CleanerPanel({
           </Button>
         </div>
       </form>
+    </div>
+  );
+}
+
+/* ── Keeper login section ────────────────────────────────────── */
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function KeeperLoginSection({
+  cleaner,
+  onUpdated,
+}: {
+  cleaner: Cleaner;
+  onUpdated: (patch: Partial<Cleaner>) => void;
+}) {
+  const [email, setEmail]     = useState(cleaner.email ?? "");
+  const [sending, setSending] = useState(false);
+  const [error, setError]     = useState<string | null>(null);
+  const [msg, setMsg]         = useState<string | null>(null);
+
+  async function handleInvite() {
+    const trimmed = email.trim().toLowerCase();
+    if (!EMAIL_RE.test(trimmed)) {
+      setError("Enter a valid email address");
+      return;
+    }
+    setSending(true);
+    setError(null);
+    setMsg(null);
+    try {
+      const r = await fetch(`/api/admin/cleaners/${cleaner.id}/invite`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: trimmed }),
+      });
+      const d = await r.json();
+      if (!r.ok) {
+        setError(d.errors?.email ?? d.error ?? "Failed to send invite");
+        return;
+      }
+      onUpdated({ email: d.cleaner.email, auth_user_id: d.cleaner.auth_user_id });
+      setMsg(
+        cleaner.auth_user_id
+          ? "Invite re-sent."
+          : "Account provisioned. The keeper can now sign in with a magic link at /keeper/login.",
+      );
+    } catch {
+      setError("Something went wrong");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-3 pt-2 mt-1 border-t" style={{ borderColor: "var(--border-subtle)" }}>
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
+          Keeper login
+        </p>
+        {cleaner.auth_user_id ? (
+          <span className="badge badge-sm badge-soft badge-success">Linked</span>
+        ) : cleaner.email ? (
+          <span className="badge badge-sm badge-soft badge-warning">Invited</span>
+        ) : (
+          <span className="badge badge-sm badge-soft badge-neutral">Not invited</span>
+        )}
+      </div>
+
+      <PanelField label="Email" error={error ?? undefined}>
+        <input
+          className={`input input-bordered w-full text-sm${error ? " input-error" : ""}`}
+          type="email"
+          value={email}
+          onChange={(e) => { setEmail(e.target.value); setError(null); setMsg(null); }}
+          placeholder="keeper@example.com"
+        />
+      </PanelField>
+
+      {msg && <p className="text-xs" style={{ color: "oklch(0.45 0.12 145)" }}>✓ {msg}</p>}
+
+      {cleaner.auth_user_id && (
+        <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+          This keeper has already signed in and is linked to this record.
+        </p>
+      )}
+
+      <button
+        type="button"
+        className="btn btn-soft btn-sm"
+        disabled={sending || !email.trim()}
+        onClick={handleInvite}
+      >
+        {sending ? <Spinner size="sm" /> : cleaner.auth_user_id ? "Update / re-invite" : "Send keeper invite"}
+      </button>
     </div>
   );
 }
