@@ -83,16 +83,8 @@ export default function KeeperDashboardPage() {
 
   return (
     <div>
-      {/* ── Greeting panel ────────────────────────────────────────── */}
-      <div
-        className="relative overflow-hidden px-5 pt-8 pb-9 rounded-b-4xl"
-        style={{
-          background:
-            "radial-gradient(120% 100% at 15% 0%, var(--klova-primary-soft), transparent 60%), " +
-            "radial-gradient(90% 90% at 100% 0%, var(--klova-accent-soft), transparent 55%), " +
-            "var(--surface-card)",
-        }}
-      >
+      {/* ── Greeting ──────────────────────────────────────────────── */}
+      <div className="px-4 pt-6">
         <p className="wordmark text-sm tracking-wide" style={{ color: "var(--klova-primary)" }}>
           Klova <span className="font-normal" style={{ color: "var(--text-subtle)" }}>Keeper</span>
         </p>
@@ -107,7 +99,7 @@ export default function KeeperDashboardPage() {
         <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>{todayDisplay}</p>
       </div>
 
-      <div className="px-4 -mt-4 space-y-4 relative">
+      <div className="px-4 mt-5 space-y-4">
         {error && (
           <div
             className="rounded-2xl p-4 text-sm"
