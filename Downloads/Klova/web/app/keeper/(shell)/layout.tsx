@@ -43,13 +43,6 @@ export default function KeeperShellLayout({
               className="relative flex flex-col items-center justify-center gap-1 py-2.5 min-h-[60px] active:scale-95 transition-transform"
               aria-current={active ? "page" : undefined}
             >
-              {active && (
-                <span
-                  className="absolute top-0 h-0.5 w-8 rounded-full"
-                  style={{ background: "var(--klova-primary)" }}
-                  aria-hidden="true"
-                />
-              )}
               <Icon
                 className="w-6 h-6 transition-colors"
                 style={{ color: active ? "var(--klova-primary)" : "var(--text-subtle)" }}

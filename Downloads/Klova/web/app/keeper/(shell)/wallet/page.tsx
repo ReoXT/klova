@@ -37,11 +37,7 @@ export default function KeeperWalletPage() {
         </div>
       ) : (
         <>
-          <Card
-            shadow="md"
-            className="p-6 text-center"
-            style={{ background: "linear-gradient(155deg, var(--klova-accent-soft), var(--surface-card) 65%)" }}
-          >
+          <Card shadow="md" className="p-6 text-center">
             <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
               Available balance
             </p>
