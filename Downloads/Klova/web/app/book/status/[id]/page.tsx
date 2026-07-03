@@ -121,7 +121,7 @@ function AwaitingPaymentState({
           </div>
           <div className="flex-1 min-w-0">
             <p className="font-semibold mb-0.5" style={{ color: "var(--text-strong)" }}>
-              Transport fare — {formatNGN(fare)}
+              Transport fare: {formatNGN(fare)}
             </p>
             <p className="text-sm leading-relaxed" style={{ color: "var(--text-muted)" }}>
               {two
@@ -221,7 +221,7 @@ function CancelledState() {
         </svg>
       }
       heading="Booking cancelled"
-      message="This booking was cancelled. If you paid for the cleaning, a refund has been issued to your original payment method — allow 3–5 business days."
+      message="This booking was cancelled. If you paid for the cleaning, a refund has been issued to your original payment method. Allow 3–5 business days."
     />
   );
 }
@@ -304,7 +304,7 @@ export default function BookingStatusPage() {
         </h1>
         {booking.first_name && !isCancelled && (
           <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-            Hi {booking.first_name} — here&apos;s your live booking status.
+            Hi {booking.first_name}, here&apos;s your live booking status.
           </p>
         )}
       </div>

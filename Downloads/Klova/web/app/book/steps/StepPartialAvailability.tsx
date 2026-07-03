@@ -68,7 +68,7 @@ export default function StepPartialAvailability({
           Only 1 keeper free {dateLine}
         </h2>
         <p className="text-sm leading-relaxed max-w-sm" style={{ color: "var(--text-muted)" }}>
-          We found 1 Klova Keeper available — not the 2 you requested. Continue with 1 at a lower price, or pick a date when 2 are free.
+          We found 1 Klova Keeper available, not the 2 you requested. Continue with 1 at a lower price, or pick a date when 2 are free.
         </p>
       </div>
 
@@ -87,7 +87,7 @@ export default function StepPartialAvailability({
           Continue with 1 keeper
         </p>
         <p className="text-xs mb-4" style={{ color: "var(--text-muted)" }}>
-          Re-priced at {formatNGN(singleKeeperTotal)} — your date and everything else stays the same.
+          Re-priced at {formatNGN(singleKeeperTotal)}. Your date and everything else stays the same.
         </p>
         <Button
           variant="primary"
@@ -98,7 +98,7 @@ export default function StepPartialAvailability({
           {submitting ? (
             <><Spinner size="sm" /><span>Finding your keeper…</span></>
           ) : (
-            `Book 1 keeper — ${formatNGN(singleKeeperTotal)}`
+            `Book 1 keeper: ${formatNGN(singleKeeperTotal)}`
           )}
         </Button>
       </div>

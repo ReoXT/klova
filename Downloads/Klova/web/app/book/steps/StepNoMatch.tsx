@@ -77,7 +77,7 @@ export default function StepNoMatch({
       {alternatives.length > 0 ? (
         <div className="mt-4">
           <p className="text-sm text-center font-medium mb-5" style={{ color: "var(--text-body)" }}>
-            Tap a date below — your other details stay exactly as you entered them:
+            Tap a date below. Your other details stay exactly as you entered them:
           </p>
 
           <div className="flex flex-wrap gap-2.5 justify-center">
@@ -114,7 +114,7 @@ export default function StepNoMatch({
           <p className="text-sm leading-relaxed" style={{ color: "var(--text-muted)" }}>
             Unfortunately there are no available slots in the next 14 days either.
             <br />
-            Please go back and try a different date — or check back soon.
+            Please go back and try a different date, or check back soon.
           </p>
         </div>
       )}

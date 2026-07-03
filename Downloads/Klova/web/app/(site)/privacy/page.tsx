@@ -3,12 +3,12 @@ import { LegalShell, Section, ReviewNote, Ul } from "../_legal";
 import { SUPPORT_EMAIL } from "@/lib/contact";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy — Klova",
+  title: "Privacy Policy | Klova",
   description: "How Klova collects, uses, and protects your personal information.",
 };
 
 export default function PrivacyPage() {
-  const emailDisplay = SUPPORT_EMAIL || "[email not set — update lib/contact.ts]";
+  const emailDisplay = SUPPORT_EMAIL || "[email not set, update lib/contact.ts]";
   const emailHref = SUPPORT_EMAIL ? `mailto:${SUPPORT_EMAIL}` : "#";
 
   return (

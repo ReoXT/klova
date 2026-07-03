@@ -55,7 +55,7 @@ function ngnAmt(ngn: number) {
   return "₦" + Math.round(ngn).toLocaleString("en-NG");
 }
 function fmtDate(iso: string | null) {
-  if (!iso) return "—";
+  if (!iso) return "-";
   return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 }
 function fmtShort(iso: string) {
@@ -137,7 +137,7 @@ export default function PayoutsPage() {
       setAction(
         k.cleaner_id,
         false,
-        `Paid out — ${d.booking_count} job${d.booking_count !== 1 ? "s" : ""}, ${ngnAmt(d.total_payout_ngn)} total.`,
+        `Paid out: ${d.booking_count} job${d.booking_count !== 1 ? "s" : ""}, ${ngnAmt(d.total_payout_ngn)} total.`,
         false,
       );
       setTimeout(load, 600);
@@ -160,7 +160,7 @@ export default function PayoutsPage() {
             Payouts
           </h1>
           <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
-            Keeper salary run — cleaning fees (78%) + transport reimbursements
+            Keeper salary run: cleaning fees (78%) + transport reimbursements
           </p>
         </div>
         <button onClick={load} className="btn btn-soft btn-sm gap-1.5">
@@ -290,7 +290,7 @@ export default function PayoutsPage() {
                                     {ngnAmt(b.transport_reimbursement_ngn)}
                                   </span>
                                 ) : (
-                                  <span style={{ color: "var(--text-muted)" }}>—</span>
+                                  <span style={{ color: "var(--text-muted)" }}>-</span>
                                 )}
                               </td>
                             </tr>
@@ -382,10 +382,10 @@ export default function PayoutsPage() {
             </svg>
             <div>
               <p className="text-xs font-semibold" style={{ color: "oklch(0.4 0.1 250)" }}>
-                Automated bank transfers — coming soon
+                Automated bank transfers: coming soon
               </p>
               <p className="text-xs mt-0.5" style={{ color: "oklch(0.5 0.07 250)" }}>
-                Transfer each Keeper manually by bank app, then hit "Mark as paid out" to clear their ledger. Paystack Transfers automation requires BVN/CAC verification — go to Paystack dashboard → Settings → Transfers to activate.
+                Transfer each Keeper manually by bank app, then hit "Mark as paid out" to clear their ledger. Paystack Transfers automation requires BVN/CAC verification. Go to Paystack dashboard → Settings → Transfers to activate.
               </p>
             </div>
           </div>
@@ -428,7 +428,7 @@ export default function PayoutsPage() {
                         {r.method}
                       </td>
                       <td className="px-5 py-3.5" style={{ color: "var(--text-muted)" }}>
-                        {r.bank_name ? `${r.bank_name} ****${r.account_number?.slice(-4) ?? ""}` : "—"}
+                        {r.bank_name ? `${r.bank_name} ****${r.account_number?.slice(-4) ?? ""}` : "-"}
                       </td>
                       <td className="px-5 py-3.5">
                         <span className={`badge badge-sm badge-soft ${STATUS_BADGE[r.status] ?? "badge-neutral"}`}>

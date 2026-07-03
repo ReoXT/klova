@@ -204,7 +204,7 @@ export default function CleanersPage() {
                         </div>
                       </td>
                       <td style={{ color: "var(--text-muted)" }}>{c.phone}</td>
-                      <td style={{ color: "var(--text-muted)" }}>{c.zone?.name ?? "—"}</td>
+                      <td style={{ color: "var(--text-muted)" }}>{c.zone?.name ?? "-"}</td>
                       <td>
                         <span className={`badge badge-sm badge-soft ${meta.badge}`}>
                           {meta.label}
@@ -215,7 +215,7 @@ export default function CleanersPage() {
                           ? <span className="badge badge-sm badge-soft badge-success">Verified</span>
                           : <span className="badge badge-sm badge-soft badge-warning">Unverified</span>}
                       </td>
-                      <td>{c.rating ? Number(c.rating).toFixed(1) : "—"}</td>
+                      <td>{c.rating ? Number(c.rating).toFixed(1) : "-"}</td>
                       <td>{c.total_jobs}</td>
                     </tr>
                   );
@@ -578,7 +578,7 @@ function CleanerPanel({
         <div className="p-5 border-t" style={{ borderColor: "var(--border-subtle)" }}>
           {mode === "add" && (
             <p className="text-xs mb-3" style={{ color: "var(--text-muted)" }}>
-              Active cleaners get 90 days of availability seeded automatically — they become matchable straight away.
+              Active cleaners get 90 days of availability seeded automatically. They become matchable straight away.
             </p>
           )}
           <Button type="submit" className="w-full" disabled={saving}>

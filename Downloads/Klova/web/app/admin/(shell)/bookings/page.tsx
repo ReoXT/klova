@@ -207,10 +207,10 @@ export default function AdminBookingsPage() {
     setSelected((prev) => (prev?.id === b.id ? null : b));
   }
 
-  // Summary cleaner label for the table (lead keeper or "—")
+  // Summary cleaner label for the table (lead keeper or "-")
   function tableCleanerLabel(b: Booking) {
     const lead = b.booking_cleaners?.find((bc) => bc.role === "lead")?.cleaner ?? b.cleaner;
-    if (!lead) return "—";
+    if (!lead) return "-";
     const suffix = (b.keeper_count ?? 1) >= 2 ? " +1" : "";
     return `${lead.first_name} ${lead.last_name[0]}.${suffix}`;
   }
@@ -521,7 +521,7 @@ function BookingDetail({
     const label =
       b.status === "confirmed"
         ? "Resend the dispatch email to the customer?"
-        : `Confirm dispatch — flip status to Confirmed and notify "${b.customer.first_name}" via email?`;
+        : `Confirm dispatch: flip status to Confirmed and notify "${b.customer.first_name}" via email?`;
 
     if (!window.confirm(label)) return;
 
@@ -534,7 +534,7 @@ function BookingDetail({
       const d = await r.json();
       if (!r.ok) throw new Error(d.error ?? "Failed");
       setConfirmIsError(false);
-      setConfirmMsg("Confirmed — n8n notification triggered.");
+      setConfirmMsg("Confirmed. n8n notification triggered.");
       await onUpdated(b.id);
     } catch (err) {
       setConfirmIsError(true);
@@ -547,7 +547,7 @@ function BookingDetail({
   async function handleCancel() {
     const isPaid = ["paid", "confirmed"].includes(b.status);
     const msg = isPaid
-      ? `Cancel this booking?\n\nPayment was already made (${b.paystack_reference ?? "ref unknown"}). You will need to issue a manual refund via Paystack — this does not do it automatically.\n\nAll cleaners' slots will be freed.`
+      ? `Cancel this booking?\n\nPayment was already made (${b.paystack_reference ?? "ref unknown"}). You will need to issue a manual refund via Paystack. This does not do it automatically.\n\nAll cleaners' slots will be freed.`
       : `Cancel this booking?\n\nAll cleaners' slots will be freed and the booking marked as cancelled.`;
     if (!window.confirm(msg)) return;
 
@@ -700,7 +700,7 @@ function BookingDetail({
                                 {roleLabel}
                                 {current && (
                                   <span className="font-normal ml-1">
-                                    — currently {current.first_name} {current.last_name}
+                                    (currently {current.first_name} {current.last_name})
                                   </span>
                                 )}
                               </p>
@@ -1169,7 +1169,7 @@ function TransportSection({
       const r = await fetch(`/api/admin/bookings/${b.id}/dispatch`, { method: "POST" });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.error?.message ?? d.error ?? "Dispatch failed");
-      setDispatchMsg("Dispatched — customer and Keeper(s) notified ✓");
+      setDispatchMsg("Dispatched. Customer and Keeper(s) notified ✓");
       await onUpdated(b.id);
     } catch (err) {
       setDispatchErr(true);
@@ -1248,11 +1248,11 @@ function TransportSection({
                 <div className="grid grid-cols-2 gap-2">
                   <FareInput
                     index={0}
-                    label={`Lead — ${keepers[0]?.cleaner?.first_name ?? "Keeper 1"}`}
+                    label={`Lead: ${keepers[0]?.cleaner?.first_name ?? "Keeper 1"}`}
                   />
                   <FareInput
                     index={1}
-                    label={`2nd — ${keepers[1]?.cleaner?.first_name ?? "Keeper 2"}`}
+                    label={`2nd: ${keepers[1]?.cleaner?.first_name ?? "Keeper 2"}`}
                   />
                 </div>
                 {combinedFare > 0 && (

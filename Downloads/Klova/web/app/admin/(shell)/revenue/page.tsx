@@ -39,7 +39,7 @@ function ngn(kobo: number) {
   return "₦" + Math.round(kobo / 100).toLocaleString("en-NG");
 }
 function pct(part: number, total: number) {
-  if (!total) return "—";
+  if (!total) return "-";
   return (part / total * 100).toFixed(1) + "%";
 }
 function fmtRange(from: string, to: string) {
@@ -180,7 +180,7 @@ function BreakdownTable({ title, rows, totalGross }: {
                 {ngn(r.cleaning_fee_kobo)}
               </td>
               <td className="px-5 py-3.5 text-right tabular-nums" style={{ color: "oklch(0.55 0.12 145)" }}>
-                {r.insurance_kobo ? ngn(r.insurance_kobo) : "—"}
+                {r.insurance_kobo ? ngn(r.insurance_kobo) : "-"}
               </td>
               <td className="px-5 py-3.5 text-right tabular-nums font-medium" style={{ color: "var(--color-primary)" }}>
                 {ngn(r.commission_kobo)}
@@ -219,7 +219,7 @@ function BreakdownTable({ title, rows, totalGross }: {
               {ngn(totals.cleaning_fee_kobo)}
             </td>
             <td className="px-5 py-3 text-right tabular-nums font-semibold" style={{ color: "oklch(0.55 0.12 145)" }}>
-              {totals.insurance_kobo ? ngn(totals.insurance_kobo) : "—"}
+              {totals.insurance_kobo ? ngn(totals.insurance_kobo) : "-"}
             </td>
             <td className="px-5 py-3 text-right tabular-nums font-bold" style={{ color: "var(--color-primary)" }}>
               {ngn(totals.commission_kobo)}
@@ -371,7 +371,7 @@ export default function AdminRevenuePage() {
             />
             <KpiCard
               label="Refunds issued"
-              value={s!.refunds_kobo > 0 ? `−${ngn(s!.refunds_kobo)}` : "—"}
+              value={s!.refunds_kobo > 0 ? `−${ngn(s!.refunds_kobo)}` : "-"}
               sub={s!.refunded_bookings > 0 ? `${s!.refunded_bookings} booking${s!.refunded_bookings > 1 ? "s" : ""}` : "none this period"}
             />
             <KpiCard
@@ -416,7 +416,7 @@ export default function AdminRevenuePage() {
                     <div className="flex justify-between">
                       <span>Add-ons</span>
                       <span className="tabular-nums font-medium" style={{ color: "var(--text-body)" }}>
-                        {s!.addons_kobo ? ngn(s!.addons_kobo) : "—"}
+                        {s!.addons_kobo ? ngn(s!.addons_kobo) : "-"}
                       </span>
                     </div>
                     <div className="flex justify-between border-t pt-1.5" style={{ borderColor: "var(--color-base-200)" }}>

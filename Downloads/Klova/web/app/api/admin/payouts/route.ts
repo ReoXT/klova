@@ -112,7 +112,7 @@ export async function GET() {
     return {
       id:                 r.id,
       cleaner_id:         r.cleaner_id,
-      cleaner_first_name: c?.first_name ?? "—",
+      cleaner_first_name: c?.first_name ?? "-",
       cleaner_last_name:  c?.last_name  ?? "",
       total_kobo:         r.total_kobo,
       method:             r.method,

@@ -3,12 +3,12 @@ import { LegalShell, Section, ReviewNote, Ul } from "../_legal";
 import { SUPPORT_EMAIL } from "@/lib/contact";
 
 export const metadata: Metadata = {
-  title: "Cancellation & Refunds — Klova",
+  title: "Cancellation & Refunds | Klova",
   description: "Klova's cancellation windows, refund timelines, and what to do if you have a problem with your clean.",
 };
 
 export default function CancellationPage() {
-  const emailDisplay = SUPPORT_EMAIL || "[email not set — update lib/contact.ts]";
+  const emailDisplay = SUPPORT_EMAIL || "[email not set, update lib/contact.ts]";
   const emailHref = SUPPORT_EMAIL ? `mailto:${SUPPORT_EMAIL}` : "#";
 
   return (

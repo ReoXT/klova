@@ -36,7 +36,7 @@ export default function Step09Summary({ data, price, onNext, onBack }: Props) {
         month: "long",
         year: "numeric",
       })
-    : "—";
+    : "-";
 
   const extrasLabel = selectedExtras
     .map((e) => {
@@ -80,7 +80,7 @@ export default function Step09Summary({ data, price, onNext, onBack }: Props) {
         <div>
           <SectionLabel>Booking</SectionLabel>
           <p className="font-semibold text-base" style={{ color: "var(--text-strong)" }}>
-            {service?.name ?? "—"}{data.bedrooms ? ` · ${data.bedrooms} bedroom${data.bedrooms === "1" ? "" : "s"}` : ""}
+            {service?.name ?? "-"}{data.bedrooms ? ` · ${data.bedrooms} bedroom${data.bedrooms === "1" ? "" : "s"}` : ""}
           </p>
           <p className="text-sm mt-0.5" style={{ color: "var(--text-body)" }}>
             {data.frequency === "recurring"
@@ -102,7 +102,7 @@ export default function Step09Summary({ data, price, onNext, onBack }: Props) {
         <div>
           <SectionLabel>Address</SectionLabel>
           <p className="text-sm" style={{ color: "var(--text-body)" }}>
-            {data.address || "—"}
+            {data.address || "-"}
           </p>
         </div>
 

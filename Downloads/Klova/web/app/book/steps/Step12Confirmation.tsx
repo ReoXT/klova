@@ -25,7 +25,7 @@ export default function Step12Confirmation({ data, price }: Props) {
         month: "long",
         year: "numeric",
       })
-    : "—";
+    : "-";
 
   return (
     <div className="max-w-lg mx-auto px-4 pt-10 pb-8">

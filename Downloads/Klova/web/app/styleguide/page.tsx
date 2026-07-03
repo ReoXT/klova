@@ -10,7 +10,7 @@ import { Alert }        from "@/components/ui/Alert";
 import { AlertDismissDemo } from "./_components/AlertDismissDemo";
 import { KeeperCard }      from "@/components/ui/KeeperCard";
 
-export const metadata: Metadata = { title: "Design System — Klova" };
+export const metadata: Metadata = { title: "Design System | Klova" };
 
 /* ── Internal helpers ─────────────────────────────────────── */
 
@@ -426,7 +426,7 @@ export default function StyleGuidePage() {
           <div className="space-y-4">
             <Card padded className="space-y-3">
               <Sub>All variants</Sub>
-              <Alert variant="info">No availability on Dec 25 — <strong>3 nearby dates have open slots.</strong> Choose one below.</Alert>
+              <Alert variant="info">No availability on Dec 25. <strong>3 nearby dates have open slots.</strong> Choose one below.</Alert>
               <Alert variant="success">Booking confirmed! <strong>Adaeze</strong> arrives Dec 18 between 9:00–9:30 AM. Check your phone for the SMS.</Alert>
               <Alert variant="warning">Free cancellation available until <strong>Dec 17 at 9:00 AM.</strong> A 50% fee applies after that.</Alert>
               <Alert variant="error">Payment failed. Please check your card details and try again.</Alert>
@@ -534,7 +534,7 @@ export default function StyleGuidePage() {
         {/* KEEPER CARD ────────────────────────────────── */}
         <Section id="keeper-card" title="Keeper Card">
           <p className="text-sm text-base-content/60 -mt-1">
-            Shown to the customer once a cleaner is matched — the trust moment before payment.
+            Shown to the customer once a cleaner is matched: the trust moment before payment.
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-3xl">
             {/* Established keeper — no photo yet */}

@@ -169,7 +169,7 @@ export default function AvailabilityPage() {
   function toggleDate(date: string) {
     const current = slots[date] ?? "none";
     if (current === "booked") {
-      alert(`${fmtShort(date)} already has a booking — handle the booking first before removing this slot.`);
+      alert(`${fmtShort(date)} already has a booking. Handle the booking first before removing this slot.`);
       return;
     }
     setSaveMsg(null);
@@ -211,8 +211,8 @@ export default function AvailabilityPage() {
       setSaveMsg({
         ok: blocked === 0,
         text: blocked > 0
-          ? `Saved. ${blocked} booked date${blocked > 1 ? "s" : ""} could not be removed — handle the booking first.`
-          : `Saved — ${parts.join(", ")}.`,
+          ? `Saved. ${blocked} booked date${blocked > 1 ? "s" : ""} could not be removed. Handle the booking first.`
+          : `Saved: ${parts.join(", ")}.`,
       });
 
       await loadSlots(selected.id, rangeFrom, rangeTo);
@@ -420,7 +420,7 @@ function DayCell({
           color:        "oklch(55% 0.12 75)",
         }}
         onClick={() => onToggle(date)}
-        title="Already booked — remove the booking first"
+        title="Already booked, remove the booking first"
       >
         <span className="text-base">{dayNum}</span>
         <span className="text-[9px] uppercase tracking-wide font-semibold opacity-80">Booked</span>

@@ -12,7 +12,7 @@ export function LegalShell({
   lastUpdated: string;
   children: React.ReactNode;
 }) {
-  const emailDisplay = SUPPORT_EMAIL || "[email not set — update lib/contact.ts]";
+  const emailDisplay = SUPPORT_EMAIL || "[email not set, update lib/contact.ts]";
   const emailHref = SUPPORT_EMAIL ? `mailto:${SUPPORT_EMAIL}` : "#";
 
   return (

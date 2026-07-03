@@ -56,7 +56,7 @@ export default function Step11Matching({ cleaners, serverTotal, payStatus, payEr
         <p className="text-sm" style={{ color: "var(--text-muted)" }}>
           {twoKeepers
             ? "The two keepers we've matched to your home"
-            : "Your keeper is ready — complete payment to confirm."}
+            : "Your keeper is ready. Complete payment to confirm."}
         </p>
         <p className="text-xs mt-2" style={{ color: "var(--text-muted)" }}>
           Your slot is reserved. Complete payment within:
@@ -71,7 +71,7 @@ export default function Step11Matching({ cleaners, serverTotal, payStatus, payEr
           {mins}:{secs}
         </p>
         {expired && (
-          <p className="text-xs text-error mt-1">Time expired — your slot may have been released.</p>
+          <p className="text-xs text-error mt-1">Time expired. Your slot may have been released.</p>
         )}
       </div>
 

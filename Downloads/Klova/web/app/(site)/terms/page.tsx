@@ -3,12 +3,12 @@ import { LegalShell, Section, ReviewNote, Ul } from "../_legal";
 import { SUPPORT_EMAIL } from "@/lib/contact";
 
 export const metadata: Metadata = {
-  title: "Terms of Service — Klova",
+  title: "Terms of Service | Klova",
   description: "The terms that govern your use of Klova, the on-demand home cleaning platform for Lagos.",
 };
 
 export default function TermsPage() {
-  const emailDisplay = SUPPORT_EMAIL || "[email not set — update lib/contact.ts]";
+  const emailDisplay = SUPPORT_EMAIL || "[email not set, update lib/contact.ts]";
   const emailHref = SUPPORT_EMAIL ? `mailto:${SUPPORT_EMAIL}` : "#";
 
   return (

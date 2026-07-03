@@ -103,7 +103,7 @@ export default function Step03Address({ data, patch, price, onNext, onBack }: Pr
         Where are we cleaning?
       </h1>
       <p className="text-sm mb-6" style={{ color: "var(--text-muted)" }}>
-        Enter your full address in Lekki or Ajah — we&apos;ll confirm your area when matching your keeper.
+        Enter your full address in Lekki or Ajah, we&apos;ll confirm your area when matching your keeper.
       </p>
 
       {/* Autocomplete combobox */}

@@ -62,7 +62,7 @@ export async function POST(
   if (totalKobo === 0) {
     return Response.json({
       ok: true,
-      message: "No unpaid earnings or transport fares — already up to date.",
+      message: "No unpaid earnings or transport fares. Already up to date.",
       booking_count: 0,
       clean_ngn: 0,
       transport_ngn: 0,

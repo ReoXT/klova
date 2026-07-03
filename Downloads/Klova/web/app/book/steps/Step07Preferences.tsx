@@ -110,7 +110,7 @@ export default function Step07Preferences({ data, patch, price, onNext, onBack }
         </div>
         {data.keeperCount === 2 && (
           <Alert variant="info" className="mt-3">
-            2 keepers requested — your base clean price will be doubled.
+            2 keepers requested. Your base clean price will be doubled.
           </Alert>
         )}
       </div>

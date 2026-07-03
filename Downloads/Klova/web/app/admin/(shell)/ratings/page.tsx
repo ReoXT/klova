@@ -234,7 +234,7 @@ export default function AdminRatingsPage() {
           {[
             { label: "Cleaners",      value: String(cleaners.length) },
             { label: "Total reviews", value: String(totalReviews) },
-            { label: "Overall avg",   value: globalAvg !== null ? `${globalAvg.toFixed(1)} ★` : "—" },
+            { label: "Overall avg",   value: globalAvg !== null ? `${globalAvg.toFixed(1)} ★` : "-" },
           ].map(({ label, value }) => (
             <div
               key={label}
@@ -274,7 +274,7 @@ export default function AdminRatingsPage() {
             />
           </svg>
           <p className="text-sm font-medium" style={{ color: "var(--color-error)" }}>
-            {flagged.length} cleaner{flagged.length > 1 ? "s" : ""} trending below 4.0 — action recommended.
+            {flagged.length} cleaner{flagged.length > 1 ? "s" : ""} trending below 4.0. Action recommended.
           </p>
         </div>
       )}

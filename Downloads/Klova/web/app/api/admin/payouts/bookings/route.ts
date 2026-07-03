@@ -84,7 +84,7 @@ export async function GET(_req: NextRequest) {
         booking_id:                  b.id as string,
         booking_date:                b.booking_date as string,
         time_slot:                   (b.time_slot as string | null) ?? null,
-        service_name:                ((b.service as unknown as { name: string } | null)?.name) ?? "—",
+        service_name:                ((b.service as unknown as { name: string } | null)?.name) ?? "-",
         total_amount_kobo:           b.total_amount_kobo as number,
         commission_kobo:             b.commission_kobo as number,
         clean_earnings_kobo:         cleanEarningsKobo,

@@ -93,10 +93,10 @@ function LoginForm() {
             required
           />
           <Button type="submit" loading={loading} wide className="mt-1">
-            Send magic link
+            Request login link
           </Button>
           <p className="text-xs text-center" style={{ color: "var(--text-muted)" }}>
-            No password needed — we&apos;ll email you a one-time sign-in link.
+            No password needed, we&apos;ll email you a one-time sign-in link.
           </p>
         </form>
       )}

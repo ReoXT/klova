@@ -270,7 +270,7 @@ export default function Step08Details({ data, patch, price, onNext, onBack }: Pr
               className="text-xs mt-2 py-3 px-1 min-w-[44px]"
               style={{ color: "var(--text-subtle)" }}
             >
-              No preference — any great keeper is fine
+              No preference, any great keeper is fine
             </button>
           )}
         </div>

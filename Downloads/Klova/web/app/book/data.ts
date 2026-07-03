@@ -31,7 +31,7 @@ export const EXTRAS = [
   { slug: "ironing",   name: "Ironing",                price: 4600, description: "Clothes ironed and neatly hung" },
   { slug: "laundry",  name: "Laundry",                price: 3500, description: "Wash and dry your laundry" },
   { slug: "wardrobe", name: "Wardrobe Organising",    price: 4000, description: "Sort and arrange wardrobe contents" },
-  { slug: "appliances",name:"Appliance Interiors",    price: 1500, description: "₦1,500 per appliance — customise on the next page", perUnit: true },
+  { slug: "appliances",name:"Appliance Interiors",    price: 1500, description: "₦1,500 per appliance, customise on the next page", perUnit: true },
   { slug: "cabinets", name: "Cabinet & Drawer Detailing", price: 1500, description: "Deep-clean inside all cabinets and drawers" },
   { slug: "windows",  name: "Window Cleaning",        price: 2000, description: "Interior glass and frames for all windows" },
   { slug: "fans",     name: "Fan Cleaning",           price: 1600, description: "Dismantle, clean blades and reassemble all fans" },

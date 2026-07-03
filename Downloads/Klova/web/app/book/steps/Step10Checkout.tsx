@@ -159,7 +159,7 @@ export default function Step10Checkout({ data, patch, price, onSubmit, submitSta
               className="font-semibold text-sm"
               style={{ color: data.wantsInsurance ? "var(--klova-primary)" : "var(--text-strong)" }}
             >
-              Add insurance — {formatNGN(INSURANCE_FEE)}
+              Add insurance: {formatNGN(INSURANCE_FEE)}
             </p>
             <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
               Protection against stolen or damaged items. Covers up to ₦200,000.
@@ -194,7 +194,7 @@ export default function Step10Checkout({ data, patch, price, onSubmit, submitSta
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            Code applied — {PROMO_CODES[data.promoCode]}% off!
+            Code applied: {PROMO_CODES[data.promoCode]}% off!
           </p>
         )}
         {promoStatus === "invalid" && (
@@ -315,7 +315,7 @@ export default function Step10Checkout({ data, patch, price, onSubmit, submitSta
             </h2>
 
             <p className="text-sm mb-3" style={{ color: "var(--text-body)" }}>
-              Klova Keepers are thoroughly vetted and background-checked — but life is unpredictable. For just{" "}
+              Klova Keepers are thoroughly vetted and background-checked, but life is unpredictable. For just{" "}
               <strong>{formatNGN(INSURANCE_FEE)}</strong> per visit, booking insurance protects you for
               stolen or damaged items up to <strong>₦200,000</strong>.
             </p>
@@ -375,7 +375,7 @@ export default function Step10Checkout({ data, patch, price, onSubmit, submitSta
                 className="text-xs py-3.5 w-full"
                 style={{ color: "var(--text-muted)" }}
               >
-                I understand — continue without insurance
+                I understand, continue without insurance
               </button>
             </div>
           </div>

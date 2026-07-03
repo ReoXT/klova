@@ -263,7 +263,7 @@ function KeeperCard({ size = "md" }: { size?: "md" | "lg" }) {
       </div>
 
       <p className="text-[11px] leading-relaxed pt-4" style={{ color: "var(--text-subtle)", borderTop: "1px solid var(--border-default)" }}>
-        You see this profile before you pay — every time, no exceptions.
+        You see this profile before you pay, every time, no exceptions.
       </p>
     </div>
   );
@@ -373,7 +373,7 @@ function Trust() {
           <div className="trust-card">
             <KeeperCard size="lg" />
             <p className="text-xs text-center mt-5 leading-relaxed" style={{ color: "var(--text-subtle)" }}>
-              Sample Keeper profile — what you see before paying.
+              Sample Keeper profile: what you see before paying.
             </p>
           </div>
         </div>

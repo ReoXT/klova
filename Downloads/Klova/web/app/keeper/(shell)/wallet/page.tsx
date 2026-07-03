@@ -64,8 +64,8 @@ export default function KeeperWalletPage() {
                 Withdrawals are coming soon
               </p>
               <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
-                Your balance updates automatically as jobs are completed. Cashing out from here launches shortly —
-                for now your admin can pay you out directly.
+                Your balance updates automatically as jobs are completed. Cashing out from here launches shortly.
+                For now, your admin can pay you out directly.
               </p>
             </div>
           </div>

@@ -242,7 +242,7 @@ export default function BookPage() {
         return n;
       });
     } catch {
-      setSubmitError("Network error — please check your connection and try again.");
+      setSubmitError("Network error. Please check your connection and try again.");
       setSubmitStatus("idle");
     }
   }, [data, patch]);
@@ -317,7 +317,7 @@ export default function BookPage() {
       setSubmitStatus("redirecting");
       window.location.href = authorization_url;
     } catch {
-      setSubmitError("Network error — please check your connection and try again.");
+      setSubmitError("Network error. Please check your connection and try again.");
       setSubmitStatus("idle");
     }
   }, [bookingId, data, serverTotal, matchedCleaners]);
@@ -358,9 +358,9 @@ export default function BookPage() {
       {/* Screen-reader step announcement */}
       <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
         {partialAvailData !== null
-          ? "Only 1 keeper available — choose to continue or pick another date"
+          ? "Only 1 keeper available. Choose to continue or pick another date"
           : noMatchDates !== null
-          ? "No availability — please choose another date"
+          ? "No availability. Please choose another date"
           : `Step ${stepIndex + 1} of ${totalSteps}`}
       </div>
 
