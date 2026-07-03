@@ -119,12 +119,7 @@ export default function KeeperDashboardPage() {
 
         {/* ── Hero: next job ──────────────────────────────────────── */}
         <Link href="/keeper/jobs" className="block active:scale-[0.98] transition-transform">
-          <Card shadow="md" className="overflow-hidden">
-            <div
-              className="h-1.5 w-full"
-              style={{ background: "var(--klova-primary)" }}
-              aria-hidden="true"
-            />
+          <Card shadow="md">
             {loading ? (
               <div className="p-5">
                 <SkeletonText lines={3} />
