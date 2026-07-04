@@ -1,5 +1,5 @@
 import { requireKeeperAuth } from "@/app/api/keeper/_auth";
-import { getWalletBalanceKobo } from "@/app/api/keeper/_wallet";
+import { getWalletSummary } from "@/app/api/keeper/_wallet";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 function lagosTodayISO(): string {
@@ -60,10 +60,10 @@ export async function GET() {
     service_name: j.service?.name ?? "Cleaning",
   });
 
-  // ── Wallet: unpaid cleaning earnings + settled, unpaid transport ────────
+  // ── Wallet: available balance (owed earnings + transport − withdrawals) ──
   let availableKobo: number;
   try {
-    availableKobo = await getWalletBalanceKobo(admin, auth.cleanerId);
+    availableKobo = (await getWalletSummary(admin, auth.cleanerId)).available_kobo;
   } catch {
     return Response.json({ error: "Database error" }, { status: 500 });
   }

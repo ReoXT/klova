@@ -4,12 +4,20 @@ import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Skeleton } from "@/components/ui/Skeleton";
 
+type WalletSummary = {
+  owed_earnings_kobo: number;
+  owed_transport_kobo: number;
+  withdrawn_or_pending_kobo: number;
+  available_kobo: number;
+  total_earned_kobo: number;
+};
+
 function ngn(kobo: number) {
   return "₦" + Math.round(kobo / 100).toLocaleString("en-NG");
 }
 
 export default function KeeperWalletPage() {
-  const [kobo, setKobo]       = useState<number | null>(null);
+  const [w, setW]             = useState<WalletSummary | null>(null);
   const [error, setError]     = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -18,14 +26,16 @@ export default function KeeperWalletPage() {
       .then((r) => r.json().then((d) => ({ ok: r.ok, d })))
       .then(({ ok, d }) => {
         if (!ok) throw new Error(d.error ?? "Failed to load wallet");
-        setKobo(d.available_kobo);
+        setW(d);
       })
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
 
+  const hasWithdrawals = (w?.withdrawn_or_pending_kobo ?? 0) > 0;
+
   return (
-    <div className="px-4 pt-6">
+    <div className="px-4 pt-6 pb-4">
       <h1 className="text-2xl" style={{ color: "var(--text-strong)" }}>Wallet</h1>
       <p className="text-sm mt-0.5 mb-5" style={{ color: "var(--text-muted)" }}>
         Your earnings, all in one place
@@ -45,9 +55,38 @@ export default function KeeperWalletPage() {
               <Skeleton className="h-10 w-40 mx-auto mt-3 rounded" />
             ) : (
               <p className="text-4xl font-bold mt-2 tabular-nums" style={{ color: "var(--text-strong)" }}>
-                {ngn(kobo ?? 0)}
+                {ngn(w?.available_kobo ?? 0)}
               </p>
             )}
+          </Card>
+
+          {/* Breakdown */}
+          <Card shadow="sm" className="p-4 mt-4 space-y-3">
+            <Row label="Cleaning earnings owed" loading={loading} value={w && ngn(w.owed_earnings_kobo)} />
+            <Row label="Transport owed" loading={loading} value={w && ngn(w.owed_transport_kobo)} />
+            {(loading || hasWithdrawals) && (
+              <Row
+                label="Withdrawn or pending"
+                loading={loading}
+                value={w && `− ${ngn(w.withdrawn_or_pending_kobo)}`}
+                muted
+              />
+            )}
+            <div className="border-t pt-3 flex items-center justify-between gap-4" style={{ borderColor: "var(--border-default)" }}>
+              <span className="text-sm font-semibold" style={{ color: "var(--text-strong)" }}>Available</span>
+              {loading ? (
+                <Skeleton className="h-5 w-20 rounded" />
+              ) : (
+                <span className="text-sm font-bold tabular-nums" style={{ color: "var(--text-strong)" }}>
+                  {ngn(w?.available_kobo ?? 0)}
+                </span>
+              )}
+            </div>
+          </Card>
+
+          {/* Lifetime */}
+          <Card shadow="sm" className="p-4 mt-3">
+            <Row label="Total earned all-time" loading={loading} value={w && ngn(w.total_earned_kobo)} strong />
           </Card>
 
           <div
@@ -66,6 +105,32 @@ export default function KeeperWalletPage() {
             </div>
           </div>
         </>
+      )}
+    </div>
+  );
+}
+
+function Row({
+  label, value, loading, muted, strong,
+}: {
+  label: string;
+  value: string | null | false | undefined;
+  loading: boolean;
+  muted?: boolean;
+  strong?: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <span className="text-sm" style={{ color: muted ? "var(--text-subtle)" : "var(--text-muted)" }}>{label}</span>
+      {loading ? (
+        <Skeleton className="h-4 w-20 rounded" />
+      ) : (
+        <span
+          className={`text-sm tabular-nums ${strong ? "font-bold" : "font-medium"}`}
+          style={{ color: muted ? "var(--text-subtle)" : "var(--text-strong)" }}
+        >
+          {value}
+        </span>
       )}
     </div>
   );

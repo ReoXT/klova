@@ -1,7 +1,10 @@
 import { requireKeeperAuth } from "@/app/api/keeper/_auth";
-import { getWalletBalanceKobo } from "@/app/api/keeper/_wallet";
+import { getWalletSummary } from "@/app/api/keeper/_wallet";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+// Wallet balance for the signed-in keeper, derived from the existing ledgers
+// (cleaner_earnings, booking_cleaners, cleaner_payouts). Scoped strictly to
+// the caller's cleaner_id via requireKeeperAuth — never a client-supplied id.
 export async function GET() {
   const auth = await requireKeeperAuth();
   if (!auth.ok) return auth.response;
@@ -9,8 +12,8 @@ export async function GET() {
   const admin = createAdminClient();
 
   try {
-    const available_kobo = await getWalletBalanceKobo(admin, auth.cleanerId);
-    return Response.json({ available_kobo });
+    const summary = await getWalletSummary(admin, auth.cleanerId);
+    return Response.json(summary);
   } catch {
     return Response.json({ error: "Database error" }, { status: 500 });
   }
