@@ -29,23 +29,19 @@ export async function GET() {
 
   if (error || !cleaner) return Response.json({ error: "Not found" }, { status: 404 });
 
-  // Live list of areas the transport-fare-suggestion system actually knows
-  // about, so the home-area picker only offers values that are useful (see
-  // supabase/migrations/20260620000002_transport_estimates_helper.sql).
-  const { data: estimateRows, error: estErr } = await admin
-    .from("transport_estimates")
-    .select("from_area, to_area");
+  // Flat, Lagos-wide area list (supabase/migrations/20260704000001_lagos_areas.sql)
+  // — deliberately decoupled from transport_estimates, which is just the
+  // Lekki/Ajah fare-corridor matrix, not a general place list.
+  const { data: areaRows, error: areaErr } = await admin
+    .from("lagos_areas")
+    .select("name")
+    .order("name", { ascending: true });
 
-  if (estErr) return Response.json({ error: "Database error" }, { status: 500 });
+  if (areaErr) return Response.json({ error: "Database error" }, { status: 500 });
 
-  const areaSet = new Set<string>();
-  for (const row of estimateRows ?? []) {
-    areaSet.add(row.from_area as string);
-    areaSet.add(row.to_area as string);
-  }
+  const areaSet = new Set((areaRows ?? []).map((r) => r.name as string));
   // Keep the keeper's current value selectable even if it predates the
-  // known list (e.g. a corridor that hasn't been seeded yet) so saving
-  // doesn't silently wipe out an existing value.
+  // known list, so saving doesn't silently wipe out an existing value.
   if (cleaner.home_area) areaSet.add(cleaner.home_area as string);
 
   return Response.json({
@@ -79,16 +75,12 @@ export async function PATCH(request: NextRequest) {
     } else if (trimmed.length > MAX_HOME_AREA_LEN) {
       errs.home_area = "Too long";
     } else {
-      const { data: estimateRows, error: estErr } = await admin
-        .from("transport_estimates")
-        .select("from_area, to_area");
-      if (estErr) return Response.json({ error: "Database error" }, { status: 500 });
+      const { data: areaRows, error: areaErr } = await admin
+        .from("lagos_areas")
+        .select("name");
+      if (areaErr) return Response.json({ error: "Database error" }, { status: 500 });
 
-      const known = new Set<string>();
-      for (const row of estimateRows ?? []) {
-        known.add((row.from_area as string).toLowerCase());
-        known.add((row.to_area as string).toLowerCase());
-      }
+      const known = new Set((areaRows ?? []).map((r) => (r.name as string).toLowerCase()));
       if (!known.has(trimmed.toLowerCase())) {
         errs.home_area = "Pick an area from the list";
       } else {
