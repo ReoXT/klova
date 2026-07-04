@@ -8,6 +8,17 @@ import { createAdminClient } from "@/lib/supabase/admin";
 // row by email — this is the ONLY place auth_user_id ever gets set.
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code");
+
+  // Where to land after a successful sign-in. Only in-portal keeper paths are
+  // allowed (prevents open-redirect); anything else falls back to the
+  // dashboard. Used by the step-up flow to return the keeper to the page
+  // they were on (e.g. /keeper/bank).
+  const nextParam = request.nextUrl.searchParams.get("next");
+  const safeNext =
+    nextParam && nextParam.startsWith("/keeper/") && !nextParam.startsWith("//")
+      ? nextParam
+      : "/keeper/dashboard";
+
   const loginUrl = (error: string) => {
     const url = request.nextUrl.clone();
     url.pathname = "/keeper/login";
@@ -90,8 +101,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(loginUrl("inactive"));
   }
 
-  const dashboardUrl = request.nextUrl.clone();
-  dashboardUrl.pathname = "/keeper/dashboard";
-  dashboardUrl.search = "";
-  return NextResponse.redirect(dashboardUrl);
+  const destUrl = request.nextUrl.clone();
+  destUrl.pathname = safeNext;
+  destUrl.search = "";
+  return NextResponse.redirect(destUrl);
 }

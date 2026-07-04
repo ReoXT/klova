@@ -9,7 +9,7 @@ export type AuthedCleaner = {
 };
 
 type KeeperAuthResult =
-  | { ok: true; cleanerId: string; cleaner: AuthedCleaner }
+  | { ok: true; cleanerId: string; authUserId: string; cleaner: AuthedCleaner }
   | { ok: false; response: Response };
 
 // Resolves the signed-in Supabase Auth user to their cleaner record.
@@ -44,5 +44,10 @@ export async function requireKeeperAuth(): Promise<KeeperAuthResult> {
     return { ok: false, response: Response.json({ error: "Account inactive" }, { status: 403 }) };
   }
 
-  return { ok: true, cleanerId: cleaner.id as string, cleaner: cleaner as AuthedCleaner };
+  return {
+    ok: true,
+    cleanerId: cleaner.id as string,
+    authUserId: user.id,
+    cleaner: cleaner as AuthedCleaner,
+  };
 }

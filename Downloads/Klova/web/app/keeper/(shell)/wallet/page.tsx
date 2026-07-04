@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { Skeleton } from "@/components/ui/Skeleton";
 
@@ -89,6 +90,20 @@ export default function KeeperWalletPage() {
             <Row label="Total earned all-time" loading={loading} value={w && ngn(w.total_earned_kobo)} strong />
           </Card>
 
+          {/* Payout account */}
+          <Link href="/keeper/bank" className="block active:scale-[0.98] transition-transform mt-3">
+            <Card shadow="sm" className="p-4 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <BankIcon />
+                <div>
+                  <p className="text-sm font-semibold" style={{ color: "var(--text-strong)" }}>Payout account</p>
+                  <p className="text-xs" style={{ color: "var(--text-muted)" }}>Manage where withdrawals are paid</p>
+                </div>
+              </div>
+              <ChevronIcon />
+            </Card>
+          </Link>
+
           <div
             className="rounded-2xl p-4 mt-4 flex items-start gap-3"
             style={{ background: "var(--klova-primary-soft)" }}
@@ -144,6 +159,22 @@ function ClockIcon() {
       style={{ color: "var(--klova-primary)" }}
     >
       <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+    </svg>
+  );
+}
+
+function BankIcon() {
+  return (
+    <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75} style={{ color: "var(--klova-primary)" }}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.332A48.36 48.36 0 0 0 12 9.75c-2.551 0-5.056.2-7.5.582V21M3 21h18M12 6.75h.008v.008H12V6.75Z" />
+    </svg>
+  );
+}
+
+function ChevronIcon() {
+  return (
+    <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} style={{ color: "var(--text-subtle)" }}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
     </svg>
   );
 }
