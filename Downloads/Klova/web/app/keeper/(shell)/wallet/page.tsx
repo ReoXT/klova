@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Card } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
 
 type WalletSummary = {
@@ -61,6 +62,10 @@ export default function KeeperWalletPage() {
             )}
           </Card>
 
+          <Link href="/keeper/withdraw">
+            <Button wide className="mt-3">Withdraw</Button>
+          </Link>
+
           {/* Breakdown */}
           <Card shadow="sm" className="p-4 mt-4 space-y-3">
             <Row label="Cleaning earnings owed" loading={loading} value={w && ngn(w.owed_earnings_kobo)} />
@@ -103,22 +108,6 @@ export default function KeeperWalletPage() {
               <ChevronIcon />
             </Card>
           </Link>
-
-          <div
-            className="rounded-2xl p-4 mt-4 flex items-start gap-3"
-            style={{ background: "var(--klova-primary-soft)" }}
-          >
-            <ClockIcon />
-            <div>
-              <p className="text-sm font-semibold" style={{ color: "var(--text-strong)" }}>
-                Withdrawals are coming soon
-              </p>
-              <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
-                Your balance updates automatically as jobs are completed. Cashing out from here launches shortly.
-                For now, your admin can pay you out directly.
-              </p>
-            </div>
-          </div>
         </>
       )}
     </div>
@@ -148,18 +137,6 @@ function Row({
         </span>
       )}
     </div>
-  );
-}
-
-function ClockIcon() {
-  return (
-    <svg
-      className="w-5 h-5 shrink-0 mt-0.5"
-      fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}
-      style={{ color: "var(--klova-primary)" }}
-    >
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-    </svg>
   );
 }
 

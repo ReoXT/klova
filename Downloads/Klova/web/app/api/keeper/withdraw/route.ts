@@ -6,14 +6,18 @@ import { createAdminClient } from "@/lib/supabase/admin";
 //
 // Flow:
 //  1. Validate the amount is a positive integer (no minimum, no cooldown).
-//  2. keeper_request_withdrawal RPC atomically re-checks available balance
+//  2. Verify the permanent withdrawal PIN (keeper_verify_withdrawal_pin) —
+//     a persistent secret, independent of session/reauth freshness. Blocks
+//     entirely if no PIN is set yet, or if locked out from repeated wrong
+//     guesses. This gate always runs BEFORE any money moves.
+//  3. keeper_request_withdrawal RPC atomically re-checks available balance
 //     (subtracting pending withdrawals) under a per-keeper advisory lock and,
 //     only if sufficient, inserts a 'pending' cleaner_payouts row. Two
 //     concurrent requests can never both pass — see the migration.
-//  3. Ensure a Paystack recipient, then initiate a single transfer for the
+//  4. Ensure a Paystack recipient, then initiate a single transfer for the
 //     amount, storing the reference on the row (so the existing Express
 //     transfer webhook can finalize it) and moving it to 'processing'.
-//  4. On any Paystack initiation failure, mark the row 'failed' so the
+//  5. On any Paystack initiation failure, mark the row 'failed' so the
 //     reserved amount returns to available.
 //
 // Scoped strictly to the caller's cleaner_id via requireKeeperAuth.
@@ -21,18 +25,55 @@ type WithdrawalRpc =
   | { ok: true; payout_id: string; bank_account_id: string; available_kobo: number }
   | { ok: false; reason: "invalid_amount" | "no_bank" | "insufficient"; available_kobo?: number };
 
+type PinRpc =
+  | { ok: true }
+  | { ok: false; reason: "invalid_format" | "not_set" | "locked" | "incorrect"; locked_until?: string; attempts_remaining?: number };
+
 export async function POST(request: Request) {
   const auth = await requireKeeperAuth();
   if (!auth.ok) return auth.response;
 
-  const body = (await request.json().catch(() => ({}))) as { amount_kobo?: unknown };
+  const body = (await request.json().catch(() => ({}))) as { amount_kobo?: unknown; pin?: unknown };
   const amountKobo = body.amount_kobo;
+  const pin = typeof body.pin === "string" ? body.pin : "";
 
   if (typeof amountKobo !== "number" || !Number.isInteger(amountKobo) || amountKobo <= 0) {
     return Response.json({ error: "Enter a valid amount." }, { status: 422 });
   }
+  if (!/^\d{4}$/.test(pin)) {
+    return Response.json({ error: "Enter your 4-digit PIN." }, { status: 422 });
+  }
 
   const admin = createAdminClient();
+
+  // ── Permanent PIN gate — runs before anything money-related ─────────────
+  const { data: pinData, error: pinErr } = await admin.rpc("keeper_verify_withdrawal_pin", {
+    p_cleaner_id: auth.cleanerId,
+    p_submitted_pin: pin,
+  });
+
+  if (pinErr) return Response.json({ error: "Database error" }, { status: 500 });
+
+  const pinResult = pinData as unknown as PinRpc;
+
+  if (!pinResult.ok) {
+    if (pinResult.reason === "not_set") {
+      return Response.json(
+        { error: "Set up your withdrawal PIN first.", pin_setup_required: true },
+        { status: 409 },
+      );
+    }
+    if (pinResult.reason === "locked") {
+      return Response.json(
+        { error: "Too many incorrect attempts. Try again later, or reset your PIN.", locked_until: pinResult.locked_until },
+        { status: 423 },
+      );
+    }
+    return Response.json(
+      { error: "Incorrect PIN.", attempts_remaining: pinResult.attempts_remaining ?? 0 },
+      { status: 422 },
+    );
+  }
 
   // ── Atomic balance check + reservation ────────────────────────────────────
   const { data: rpcData, error: rpcErr } = await admin.rpc("keeper_request_withdrawal", {
