@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { Skeleton } from "@/components/ui/Skeleton";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Skeleton, SkeletonText } from "@/components/ui/Skeleton";
 
 type WalletSummary = {
   owed_earnings_kobo: number;
@@ -14,25 +15,58 @@ type WalletSummary = {
   total_earned_kobo: number;
 };
 
+type TransactionStatus = "pending" | "processing" | "success" | "failed" | "reversed";
+
+type Transaction = {
+  id: string;
+  type: "earning" | "transport" | "withdrawal";
+  amount_kobo: number;
+  date: string;
+  label: string;
+  sublabel: string;
+  status?: TransactionStatus;
+};
+
+const STATUS_META: Record<TransactionStatus, { label: string; badge: string }> = {
+  pending:    { label: "Pending",    badge: "badge-warning" },
+  processing: { label: "Processing", badge: "badge-info" },
+  success:    { label: "Paid",       badge: "badge-success" },
+  failed:     { label: "Failed",     badge: "badge-error" },
+  reversed:   { label: "Reversed",   badge: "badge-error" },
+};
+
 function ngn(kobo: number) {
   return "₦" + Math.round(kobo / 100).toLocaleString("en-NG");
 }
 
+function friendlyDate(iso: string) {
+  return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+}
+
 export default function KeeperWalletPage() {
-  const [w, setW]             = useState<WalletSummary | null>(null);
-  const [error, setError]     = useState<string | null>(null);
+  const [w, setW] = useState<WalletSummary | null>(null);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetch("/api/keeper/wallet")
-      .then((r) => r.json().then((d) => ({ ok: r.ok, d })))
-      .then(({ ok, d }) => {
-        if (!ok) throw new Error(d.error ?? "Failed to load wallet");
-        setW(d);
+  const load = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    Promise.all([
+      fetch("/api/keeper/wallet").then((r) => r.json().then((d) => ({ ok: r.ok, d }))),
+      fetch("/api/keeper/wallet/transactions").then((r) => r.json().then((d) => ({ ok: r.ok, d }))),
+    ])
+      .then(([wallet, tx]) => {
+        if (!wallet.ok) throw new Error(wallet.d.error ?? "Failed to load wallet");
+        if (!tx.ok) throw new Error(tx.d.error ?? "Failed to load transaction history");
+        setW(wallet.d);
+        setTransactions(tx.d.transactions ?? []);
       })
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => { load(); }, [load]);
 
   const hasWithdrawals = (w?.withdrawn_or_pending_kobo ?? 0) > 0;
 
@@ -108,7 +142,72 @@ export default function KeeperWalletPage() {
               <ChevronIcon />
             </Card>
           </Link>
+
+          {/* Recent activity */}
+          <div className="mt-6">
+            <h2 className="text-sm font-semibold mb-2" style={{ color: "var(--text-strong)" }}>
+              Recent activity
+            </h2>
+
+            {loading ? (
+              <Card shadow="sm" className="p-4">
+                <SkeletonText lines={4} />
+              </Card>
+            ) : transactions.length === 0 ? (
+              <Card shadow="sm">
+                <EmptyState
+                  heading="No activity yet"
+                  message="Your cleaning earnings, transport reimbursements, and withdrawals will show up here."
+                />
+              </Card>
+            ) : (
+              <Card shadow="sm" className="px-4 divide-y" style={{ borderColor: "var(--border-default)" }}>
+                {transactions.map((tx) => (
+                  <TransactionRow key={tx.id} tx={tx} />
+                ))}
+              </Card>
+            )}
+          </div>
         </>
+      )}
+    </div>
+  );
+}
+
+function TransactionRow({ tx }: { tx: Transaction }) {
+  const isCredit = tx.type !== "withdrawal";
+  const statusMeta = tx.status ? STATUS_META[tx.status] : null;
+  const isReturned = tx.status === "failed" || tx.status === "reversed";
+
+  return (
+    <div className="py-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-medium truncate" style={{ color: "var(--text-strong)" }}>
+            {tx.label}
+          </p>
+          <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
+            {tx.sublabel} · {friendlyDate(tx.date)}
+          </p>
+        </div>
+        <div className="text-right shrink-0">
+          <p
+            className="text-sm font-semibold tabular-nums"
+            style={{ color: isCredit ? "oklch(0.45 0.12 145)" : "var(--text-strong)" }}
+          >
+            {isCredit ? "+" : "−"} {ngn(tx.amount_kobo)}
+          </p>
+          {statusMeta && (
+            <span className={`badge badge-sm badge-soft mt-1 ${statusMeta.badge}`}>
+              {statusMeta.label}
+            </span>
+          )}
+        </div>
+      </div>
+      {isReturned && (
+        <p className="text-xs mt-1.5" style={{ color: "var(--text-subtle)" }}>
+          Funds returned to your available balance.
+        </p>
       )}
     </div>
   );

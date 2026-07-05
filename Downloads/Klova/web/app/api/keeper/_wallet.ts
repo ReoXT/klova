@@ -102,3 +102,123 @@ export async function getWalletSummary(
     total_earned_kobo: totalEarnedKobo,
   };
 }
+
+// ─── Transaction history ──────────────────────────────────────────────────────
+
+export type WalletTransactionStatus = "pending" | "processing" | "success" | "failed" | "reversed";
+
+export interface WalletTransaction {
+  id: string;
+  type: "earning" | "transport" | "withdrawal";
+  amount_kobo: number;
+  date: string; // ISO timestamp — the credit/request date, used for sorting
+  label: string;
+  sublabel: string;
+  // Only present for type 'withdrawal'. Earnings/transport are one-shot
+  // credits with no lifecycle to track.
+  status?: WalletTransactionStatus;
+}
+
+const TRANSACTION_LIMIT = 50;
+
+type EarningRow = {
+  id: string;
+  earning_kobo: number;
+  created_at: string;
+  booking: { service: { name: string } | null } | null;
+};
+
+type TransportRow = {
+  id: string;
+  transport_fare_kobo: number | null;
+  booking: { transport_paid_at: string | null; booking_date: string; service: { name: string } | null } | null;
+};
+
+type PayoutRow = {
+  id: string;
+  amount_kobo: number | null;
+  total_kobo: number;
+  status: WalletTransactionStatus;
+  created_at: string;
+  bank_account: { bank_name: string; account_number: string } | null;
+};
+
+// Unified, newest-first feed of every credit and withdrawal a keeper has ever
+// had, for the Wallet screen's transaction history. Three independent
+// sources, combined and re-sorted here since they're different tables with
+// different date columns:
+//   - cleaner_earnings   → one row per completed booking's cleaning fee.
+//     'refunded' rows are excluded — earning_kobo is zeroed on a full refund
+//     (see adjustEarningForRefund), so there's nothing to show as credited.
+//   - booking_cleaners   → transport reimbursement, credited the moment the
+//     customer's transport invoice is paid (transport_status='paid'). Shown
+//     unconditionally (not just currently-unpaid-out rows) — history is
+//     every credit that ever happened, not just what's still outstanding.
+//   - cleaner_payouts     → this keeper's own withdrawals (requested_by=
+//     'keeper'), each carrying its live status.
+export async function getWalletTransactions(
+  admin: SupabaseClient,
+  cleanerId: string,
+): Promise<WalletTransaction[]> {
+  const [earningsRes, transportRes, payoutsRes] = await Promise.all([
+    admin
+      .from("cleaner_earnings")
+      .select("id, earning_kobo, created_at, booking:bookings(service:services(name))")
+      .eq("cleaner_id", cleanerId)
+      .neq("status", "refunded")
+      .order("created_at", { ascending: false })
+      .limit(TRANSACTION_LIMIT),
+    admin
+      .from("booking_cleaners")
+      .select("id, transport_fare_kobo, booking:bookings!inner(transport_paid_at, booking_date, service:services(name))")
+      .eq("cleaner_id", cleanerId)
+      .gt("transport_fare_kobo", 0)
+      .eq("booking.transport_status", "paid")
+      .limit(TRANSACTION_LIMIT),
+    admin
+      .from("cleaner_payouts")
+      .select("id, amount_kobo, total_kobo, status, created_at, bank_account:cleaner_bank_accounts!bank_account_id(bank_name, account_number)")
+      .eq("cleaner_id", cleanerId)
+      .eq("requested_by", "keeper")
+      .order("created_at", { ascending: false })
+      .limit(TRANSACTION_LIMIT),
+  ]);
+
+  if (earningsRes.error) throw earningsRes.error;
+  if (transportRes.error) throw transportRes.error;
+  if (payoutsRes.error) throw payoutsRes.error;
+
+  const earningTx: WalletTransaction[] = ((earningsRes.data ?? []) as unknown as EarningRow[]).map((e) => ({
+    id: `earning-${e.id}`,
+    type: "earning",
+    amount_kobo: e.earning_kobo,
+    date: e.created_at,
+    label: e.booking?.service?.name ?? "Cleaning job",
+    sublabel: "Cleaning fee earned",
+  }));
+
+  const transportTx: WalletTransaction[] = ((transportRes.data ?? []) as unknown as TransportRow[]).map((r) => ({
+    id: `transport-${r.id}`,
+    type: "transport",
+    amount_kobo: r.transport_fare_kobo ?? 0,
+    date: r.booking?.transport_paid_at ?? r.booking?.booking_date ?? new Date(0).toISOString(),
+    label: r.booking?.service?.name ?? "Transport",
+    sublabel: "Transport reimbursement",
+  }));
+
+  const withdrawalTx: WalletTransaction[] = ((payoutsRes.data ?? []) as unknown as PayoutRow[]).map((p) => ({
+    id: `withdrawal-${p.id}`,
+    type: "withdrawal",
+    amount_kobo: p.amount_kobo ?? p.total_kobo,
+    date: p.created_at,
+    label: "Withdrawal",
+    sublabel: p.bank_account
+      ? `To ${p.bank_account.bank_name} ****${p.bank_account.account_number.slice(-4)}`
+      : "To your bank account",
+    status: p.status,
+  }));
+
+  return [...earningTx, ...transportTx, ...withdrawalTx]
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .slice(0, TRANSACTION_LIMIT);
+}

@@ -75,6 +75,12 @@ export default function KeeperWithdrawPage() {
     setStep("confirm");
   }
 
+  function handleWithdrawAll() {
+    if (availableKobo == null) return;
+    setAmountNaira((availableKobo / 100).toString());
+    setAmountError(null);
+  }
+
   async function handleConfirm() {
     setPinError(null);
     setSubmitError(null);
@@ -126,7 +132,7 @@ export default function KeeperWithdrawPage() {
         return;
       }
 
-      setSuccessMsg(`Withdrawal of ${ngn(d.amount_kobo)} is on its way to your bank account.`);
+      setSuccessMsg(`Withdrawal of ${ngn(d.amount_kobo)} is processing — it'll land in your bank account shortly.`);
       setAmountNaira("");
       setPin("");
       setStep("amount");
@@ -155,6 +161,16 @@ export default function KeeperWithdrawPage() {
         </div>
       ) : loading ? (
         <Card shadow="sm" className="p-4"><Skeleton className="h-10 w-full rounded" /></Card>
+      ) : !bank ? (
+        <Card shadow="sm" className="p-4">
+          <p className="text-sm font-semibold" style={{ color: "var(--text-strong)" }}>Add a payout account</p>
+          <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
+            You&apos;ll need a bank account on file before you can withdraw.
+          </p>
+          <Link href="/keeper/bank">
+            <Button wide className="mt-3">Add bank account</Button>
+          </Link>
+        </Card>
       ) : !pinStatus?.is_set ? (
         <Card shadow="sm" className="p-4">
           <p className="text-sm font-semibold" style={{ color: "var(--text-strong)" }}>Set up your withdrawal PIN</p>
@@ -194,21 +210,30 @@ export default function KeeperWithdrawPage() {
 
           {step === "amount" ? (
             <Card shadow="sm" className="p-4 mt-4 space-y-3">
-              <FormField
-                label="Amount (₦)"
-                inputMode="decimal"
-                value={amountNaira}
-                onChange={(e) => { setAmountNaira(e.target.value.replace(/[^\d.]/g, "")); setAmountError(null); }}
-                error={amountError ?? undefined}
-                placeholder="500"
-              />
-              {!bank && (
-                <p className="text-xs" style={{ color: "var(--color-error)" }}>
-                  You don&apos;t have a payout account yet.{" "}
-                  <Link href="/keeper/bank" className="underline">Add one</Link> before withdrawing.
-                </p>
-              )}
-              <Button onClick={handleContinue} wide disabled={!bank}>Continue</Button>
+              <div>
+                <FormField
+                  label="Amount (₦)"
+                  inputMode="decimal"
+                  value={amountNaira}
+                  onChange={(e) => { setAmountNaira(e.target.value.replace(/[^\d.]/g, "")); setAmountError(null); }}
+                  error={amountError ?? undefined}
+                  placeholder="500"
+                />
+                <div className="flex justify-end mt-1.5">
+                  <button
+                    type="button"
+                    onClick={handleWithdrawAll}
+                    className="text-xs font-semibold underline"
+                    style={{ color: "var(--klova-primary)" }}
+                  >
+                    Withdraw all
+                  </button>
+                </div>
+              </div>
+              <p className="text-xs" style={{ color: "var(--text-subtle)" }}>
+                No minimum, no fee — you receive the full amount you request.
+              </p>
+              <Button onClick={handleContinue} wide>Continue</Button>
             </Card>
           ) : (
             <Card shadow="sm" className="p-4 mt-4 space-y-4">
