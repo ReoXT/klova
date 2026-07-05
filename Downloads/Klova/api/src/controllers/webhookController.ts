@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import {
   notifyAdminPaidBooking,
   notifyCleanerNewJob,
+  notifyCleanerNewJobEmail,
 } from '../services/notificationService';
 import { handleTransferWebhook } from '../services/payoutService';
 import { adjustEarningForRefund } from '../services/earningsService';
@@ -58,7 +59,7 @@ interface PaystackRefundEvent {
 interface PaystackInvoicePaidEvent {
   event: 'invoice.payment_successful';
   data: {
-    request_code: string;  // PRQ_xxxx — matches transport_payment_ref
+    request_code: string;  // PRQ_xxxx, matches transport_payment_ref
     paid: boolean;
     paid_at: string;
     amount: number;        // kobo
@@ -133,7 +134,7 @@ export async function postPaystackWebhook(req: Request, res: Response): Promise<
   if (payload.event === 'invoice.payment_successful') {
     const event = payload as unknown as PaystackInvoicePaidEvent;
     const { request_code, transactions } = event.data;
-    // Paystack includes the settling transaction(s) in the payload — capture the
+    // Paystack includes the settling transaction(s) in the payload. Capture the
     // first reference so we can issue a refund later if the booking is cancelled.
     const txRef = transactions?.[0]?.reference ?? null;
     if (request_code) {
@@ -149,7 +150,7 @@ export async function postPaystackWebhook(req: Request, res: Response): Promise<
     return;
   }
 
-  // All other events — acknowledge and ignore
+  // All other events: acknowledge and ignore
   res.sendStatus(200);
 }
 
@@ -180,13 +181,13 @@ async function processRefundProcessed(transactionRef: string, refundKobo: number
     })
     .eq('id', booking.id as string);
 
-  // Adjust or cancel cleaner earning (idempotent — safe if issueRefund already ran)
+  // Adjust or cancel cleaner earning (idempotent, safe if issueRefund already ran)
   await adjustEarningForRefund(booking.id as string, newRefundTotal, totalKobo);
 }
 
 async function processChargeSuccess(reference: string): Promise<void> {
   // Atomically confirm: flip matched → confirmed.
-  // The cleaner was already assigned at booking creation — payment just confirms it.
+  // The cleaner was already assigned at booking creation, payment just confirms it.
   const { data: claimed, error: claimErr } = await supabase
     .from('bookings')
     .update({ status: 'confirmed', confirmed_at: new Date().toISOString() })
@@ -197,7 +198,7 @@ async function processChargeSuccess(reference: string): Promise<void> {
   if (claimErr) throw claimErr;
 
   if (!claimed || claimed.length === 0) {
-    // No row claimed — check whether this is a duplicate delivery or something unexpected
+    // No row claimed, check whether this is a duplicate delivery or something unexpected
     const { data: existing, error: lookupErr } = await supabase
       .from('bookings')
       .select('id, status')
@@ -212,7 +213,7 @@ async function processChargeSuccess(reference: string): Promise<void> {
     }
 
     if (existing.status === 'confirmed') {
-      // Duplicate delivery — already processed, nothing to do
+      // Duplicate delivery, already processed, nothing to do
       return;
     }
 
@@ -220,13 +221,13 @@ async function processChargeSuccess(reference: string): Promise<void> {
     // Auto-refund so the customer is never charged for a booking that wasn't confirmed.
     if (existing.status === 'cancelled') {
       console.error(
-        `[webhook] Booking ${existing.id as string} was slot-expired (cancelled) but charged — auto-refunding ref: ${reference}`,
+        `[webhook] Booking ${existing.id as string} was slot-expired (cancelled) but charged, auto-refunding ref: ${reference}`,
       );
       await issueRefund(existing.id as string, reference);
       return;
     }
 
-    // Any other status (no_match, pending_payment) — unexpected; log and ignore
+    // Any other status (no_match, pending_payment) is unexpected; log and ignore
     console.warn(`[webhook] Unexpected booking status "${existing.status as string}" for reference: ${reference}`);
     return;
   }
@@ -237,4 +238,5 @@ async function processChargeSuccess(reference: string): Promise<void> {
   // Customer notification fires later from the admin panel when dispatch is confirmed.
   await notifyAdminPaidBooking(bookingId);
   await notifyCleanerNewJob(bookingId);
+  await notifyCleanerNewJobEmail(bookingId);
 }

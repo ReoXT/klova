@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase';
 import { config } from '../config';
 import { sendSms, sendWhatsApp } from '../lib/termiiClient';
+import { notifyKeeperNewJob } from './keeperEmailService';
 import {
   BookingNotifContext,
   adminPaidBookingMsg,
@@ -22,7 +23,7 @@ async function fetchNotifContext(bookingId: string): Promise<BookingNotifContext
       address,
       total_amount_kobo,
       customers:customer_id (first_name, last_name, phone),
-      cleaners:cleaner_id (first_name, last_name, phone),
+      cleaners:cleaner_id (first_name, last_name, phone, email),
       services:service_id (name),
       zones:zone_id (name)
     `)
@@ -34,9 +35,9 @@ async function fetchNotifContext(bookingId: string): Promise<BookingNotifContext
     return null;
   }
 
-  // Supabase infers relationship results as arrays without generated types — cast via unknown.
+  // Supabase infers relationship results as arrays without generated types, cast via unknown.
   const customer = data.customers as unknown as { first_name: string; last_name: string; phone: string } | null;
-  const cleaner  = data.cleaners  as unknown as { first_name: string; last_name: string; phone: string } | null;
+  const cleaner  = data.cleaners  as unknown as { first_name: string; last_name: string; phone: string; email: string | null } | null;
   const service  = data.services  as unknown as { name: string } | null;
   const zone     = data.zones     as unknown as { name: string } | null;
 
@@ -53,6 +54,7 @@ async function fetchNotifContext(bookingId: string): Promise<BookingNotifContext
     cleanerFirstName:  cleaner.first_name,
     cleanerLastName:   cleaner.last_name,
     cleanerPhone:      cleaner.phone,
+    cleanerEmail:      cleaner.email,
     serviceName:       service.name,
     zoneName:          zone.name,
     bookingDate:       formatDate(data.booking_date as string),
@@ -96,7 +98,7 @@ export async function notifyAdminPaidBooking(bookingId: string): Promise<void> {
   if (!ctx) return;
 
   if (!config.adminPhone) {
-    console.log(`[notify] ADMIN_PHONE not set — skipping admin SMS for booking ${bookingId}`);
+    console.log(`[notify] ADMIN_PHONE not set, skipping admin SMS for booking ${bookingId}`);
     return;
   }
 
@@ -107,7 +109,7 @@ export async function notifyAdminPaidBooking(bookingId: string): Promise<void> {
 }
 
 // Fires on payment confirmation (Paystack webhook → confirmed).
-// Sends to cleaner via both WhatsApp and SMS — WhatsApp first, then SMS regardless.
+// Sends to cleaner via both WhatsApp and SMS, WhatsApp first, then SMS regardless.
 export async function notifyCleanerNewJob(bookingId: string): Promise<void> {
   const ctx = await fetchNotifContext(bookingId);
   if (!ctx) return;
@@ -116,6 +118,28 @@ export async function notifyCleanerNewJob(bookingId: string): Promise<void> {
 
   await safeSend(() => sendWhatsApp(ctx.cleanerPhone, msg), 'cleaner-whatsapp');
   await safeSend(() => sendSms(ctx.cleanerPhone, msg),      'cleaner-sms');
+}
+
+// Fires on payment confirmation (Paystack webhook → confirmed), alongside
+// notifyCleanerNewJob's SMS/WhatsApp. Same trigger, same booking context,
+// just the email channel, routed through web/'s notify-keeper endpoint
+// since the email templates live there (see keeperEmailService.ts).
+export async function notifyCleanerNewJobEmail(bookingId: string): Promise<void> {
+  const ctx = await fetchNotifContext(bookingId);
+  if (!ctx) return;
+
+  await safeSend(
+    () =>
+      notifyKeeperNewJob({
+        email: ctx.cleanerEmail,
+        firstName: ctx.cleanerFirstName,
+        serviceName: ctx.serviceName,
+        zoneName: ctx.zoneName,
+        bookingDate: ctx.bookingDate,
+        jobUrl: `${config.frontendOrigin}/keeper/jobs/${ctx.bookingId}`,
+      }),
+    'cleaner-new-job-email',
+  );
 }
 
 // Fires when the Paystack transport Payment Request is paid.
@@ -132,7 +156,7 @@ export async function notifyAdminTransportPaid(bookingId: string): Promise<void>
     return;
   }
   if (!config.adminPhone) {
-    console.log(`[notify] ADMIN_PHONE not set — skipping transport paid SMS for booking ${bookingId}`);
+    console.log(`[notify] ADMIN_PHONE not set, skipping transport paid SMS for booking ${bookingId}`);
     return;
   }
 
@@ -147,7 +171,7 @@ export async function notifyAdminTransportPaid(bookingId: string): Promise<void>
   );
 }
 
-// Fires when admin cancels a booking due to unpaid transport — tells the Keeper
+// Fires when admin cancels a booking due to unpaid transport, tells the Keeper
 // their date has been freed and they should expect a new assignment.
 export async function notifyKeeperJobCancelled(bookingId: string): Promise<void> {
   const ctx = await fetchNotifContext(bookingId);
@@ -158,7 +182,7 @@ export async function notifyKeeperJobCancelled(bookingId: string): Promise<void>
   await safeSend(() => sendSms(ctx.cleanerPhone, msg),      'keeper-job-cancelled-sms');
 }
 
-// Fires when admin confirms dispatch — "go time" reminder to the Keeper.
+// Fires when admin confirms dispatch, "go time" reminder to the Keeper.
 // Always fires alongside notifyCustomerDispatchConfirmed through the gated dispatch endpoint.
 export async function notifyKeeperDispatched(bookingId: string): Promise<void> {
   const ctx = await fetchNotifContext(bookingId);
@@ -169,7 +193,7 @@ export async function notifyKeeperDispatched(bookingId: string): Promise<void> {
   await safeSend(() => sendSms(ctx.cleanerPhone, msg),      'keeper-dispatched-sms');
 }
 
-// Fires when admin confirms dispatch — "you're all set" to the customer.
+// Fires when admin confirms dispatch, "you're all set" to the customer.
 // Only ever called through the gated dispatch endpoint (transport must be settled first).
 // For 2-keeper bookings the SMS names both keepers: "Alice and Bob will be with you".
 export async function notifyCustomerDispatchConfirmed(bookingId: string): Promise<void> {

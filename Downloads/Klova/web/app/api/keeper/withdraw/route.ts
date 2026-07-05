@@ -1,19 +1,20 @@
 import { requireKeeperAuth } from "@/app/api/keeper/_auth";
 import { ensurePaystackRecipient, initiateSingleTransfer } from "@/lib/paystackTransfer";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { APP_URL, sendKeeperEmail } from "@/lib/keeperNotify";
 
 // Money-critical. Keeper requests an arbitrary withdrawal amount (kobo).
 //
 // Flow:
 //  1. Validate the amount is a positive integer (no minimum, no cooldown).
-//  2. Verify the permanent withdrawal PIN (keeper_verify_withdrawal_pin) —
+//  2. Verify the permanent withdrawal PIN (keeper_verify_withdrawal_pin),
 //     a persistent secret, independent of session/reauth freshness. Blocks
 //     entirely if no PIN is set yet, or if locked out from repeated wrong
 //     guesses. This gate always runs BEFORE any money moves.
 //  3. keeper_request_withdrawal RPC atomically re-checks available balance
 //     (subtracting pending withdrawals) under a per-keeper advisory lock and,
 //     only if sufficient, inserts a 'pending' cleaner_payouts row. Two
-//     concurrent requests can never both pass — see the migration.
+//     concurrent requests can never both pass, see the migration.
 //  4. Ensure a Paystack recipient, then initiate a single transfer for the
 //     amount, storing the reference on the row (so the existing Express
 //     transfer webhook can finalize it) and moving it to 'processing'.
@@ -46,7 +47,7 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient();
 
-  // ── Permanent PIN gate — runs before anything money-related ─────────────
+  // ── Permanent PIN gate, runs before anything money-related ──────────────
   const { data: pinData, error: pinErr } = await admin.rpc("keeper_verify_withdrawal_pin", {
     p_cleaner_id: auth.cleanerId,
     p_submitted_pin: pin,
@@ -129,9 +130,27 @@ export async function POST(request: Request) {
       .update({ paystack_transfer_code: tr.transfer_code ?? null })
       .eq("id", payoutId);
 
+    // Best-effort notification, never blocks or fails the response below.
+    const { data: bank } = await admin
+      .from("cleaner_bank_accounts")
+      .select("bank_name, account_number")
+      .eq("id", bankAccountId)
+      .maybeSingle();
+
+    void sendKeeperEmail(auth.cleaner.email, {
+      type: "withdrawal_initiated",
+      data: {
+        firstName: auth.cleaner.first_name,
+        amountNaira: (amountKobo / 100).toLocaleString("en-NG"),
+        bankName: bank?.bank_name ?? "your bank",
+        accountLast4: bank?.account_number ? bank.account_number.slice(-4) : "----",
+        walletUrl: `${APP_URL}/keeper/wallet`,
+      },
+    });
+
     return Response.json({ ok: true, payout_id: payoutId, amount_kobo: amountKobo, status: "processing" });
   } catch (err) {
-    // Initiation failed — return the reserved amount to available.
+    // Initiation failed, return the reserved amount to available.
     const reason = err instanceof Error ? err.message : "transfer failed";
     await admin
       .from("cleaner_payouts")
@@ -140,7 +159,7 @@ export async function POST(request: Request) {
 
     console.error(`[keeper-withdraw] transfer init failed for payout ${payoutId}: ${reason}`);
     return Response.json(
-      { error: "Couldn't start the transfer. Your balance is unchanged — please try again." },
+      { error: "Couldn't start the transfer. Your balance is unchanged, please try again." },
       { status: 502 },
     );
   }

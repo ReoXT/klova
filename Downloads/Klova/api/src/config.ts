@@ -21,7 +21,7 @@ export const config = {
   supabaseUrl: required('SUPABASE_URL'),
   supabaseServiceRoleKey: required('SUPABASE_SERVICE_ROLE_KEY'),
   paystackSecretKey: process.env.PAYSTACK_SECRET_KEY ?? '',
-  // Termii — optional locally; notifications silently skip if unset
+  // Termii is optional locally; notifications silently skip if unset
   termiiApiKey: process.env.TERMII_API_KEY,
   termiiSenderId: process.env.TERMII_SENDER_ID,
   // Phone to receive the admin confirmation SMS per paid booking
@@ -32,12 +32,18 @@ export const config = {
   transportFareCeilingNgn: parseInt(process.env.TRANSPORT_FARE_CEILING_NGN ?? '5000', 10),
   // How long a customer has to pay an outstanding transport invoice before the booking
   // is considered overdue in the admin cockpit. The hard deadline is always the booking
-  // date itself — whichever comes first governs.
+  // date itself, whichever comes first governs.
   transportPaymentDeadlineHours: parseInt(process.env.TRANSPORT_PAYMENT_DEADLINE_HOURS ?? '24', 10),
+  // Shared secret required on web/'s POST /api/internal/notify-keeper. Lets
+  // this Express backend trigger keeper emails (new job, withdrawal paid/
+  // failed) without duplicating the React Email templates, which live only
+  // in web/emails/. Must match the same value set in web/'s environment.
+  internalNotifySecret: process.env.INTERNAL_NOTIFY_SECRET ?? '',
 };
 
-// Startup diagnostics — visible in Railway logs immediately after deploy
+// Startup diagnostics, visible in Railway logs immediately after deploy
 console.log('[config] CORS origin:', config.frontendOrigin);
 console.log('[config] Paystack key present:', config.paystackSecretKey.startsWith('sk_live_') ? 'LIVE ✓' : config.paystackSecretKey.startsWith('sk_test_') ? 'TEST (switch to live!)' : 'MISSING ✗');
-console.log('[config] Termii:', config.termiiApiKey ? 'configured ✓' : 'not set — SMS disabled');
-console.log('[config] Admin phone:', config.adminPhone ? 'set ✓' : 'not set — admin SMS disabled');
+console.log('[config] Termii:', config.termiiApiKey ? 'configured ✓' : 'not set, SMS disabled');
+console.log('[config] Admin phone:', config.adminPhone ? 'set ✓' : 'not set, admin SMS disabled');
+console.log('[config] Internal notify secret:', config.internalNotifySecret ? 'set ✓' : 'not set, keeper emails disabled');

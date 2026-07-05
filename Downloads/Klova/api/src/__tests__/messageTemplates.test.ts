@@ -12,6 +12,7 @@ const BASE_CTX: BookingNotifContext = {
   cleanerFirstName:  'Tunde',
   cleanerLastName:   'Ola',
   cleanerPhone:      '08022222222',
+  cleanerEmail:      'tunde@example.com',
   serviceName:       'Standard Clean',
   zoneName:          'Lekki-Ajah',
   bookingDate:       'Wednesday, 25 June',

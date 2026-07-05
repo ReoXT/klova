@@ -17,6 +17,7 @@ vi.mock('../lib/supabase', () => ({
 vi.mock('../services/notificationService', () => ({
   notifyAdminPaidBooking: vi.fn().mockResolvedValue(undefined),
   notifyCleanerNewJob: vi.fn().mockResolvedValue(undefined),
+  notifyCleanerNewJobEmail: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('../services/payoutService', () => ({
@@ -36,7 +37,7 @@ vi.mock('../services/transportInvoiceService', () => ({
 }));
 
 import { supabase } from '../lib/supabase';
-import { notifyAdminPaidBooking, notifyCleanerNewJob } from '../services/notificationService';
+import { notifyAdminPaidBooking, notifyCleanerNewJob, notifyCleanerNewJobEmail } from '../services/notificationService';
 import { issueRefund } from '../services/refundService';
 import { handleTransportInvoicePaid } from '../services/transportInvoiceService';
 import { postPaystackWebhook } from '../controllers/webhookController';
@@ -136,6 +137,8 @@ describe('postPaystackWebhook — charge.success', () => {
     expect(vi.mocked(notifyAdminPaidBooking)).toHaveBeenCalledWith(BOOKING_ID);
     expect(vi.mocked(notifyCleanerNewJob)).toHaveBeenCalledOnce();
     expect(vi.mocked(notifyCleanerNewJob)).toHaveBeenCalledWith(BOOKING_ID);
+    expect(vi.mocked(notifyCleanerNewJobEmail)).toHaveBeenCalledOnce();
+    expect(vi.mocked(notifyCleanerNewJobEmail)).toHaveBeenCalledWith(BOOKING_ID);
   });
 
   // ─── Idempotency ─────────────────────────────────────────────────────────────
@@ -163,6 +166,7 @@ describe('postPaystackWebhook — charge.success', () => {
     expect(res.sendStatus).toHaveBeenCalledWith(200);
     expect(vi.mocked(notifyAdminPaidBooking)).not.toHaveBeenCalled();
     expect(vi.mocked(notifyCleanerNewJob)).not.toHaveBeenCalled();
+    expect(vi.mocked(notifyCleanerNewJobEmail)).not.toHaveBeenCalled();
     expect(vi.mocked(issueRefund)).not.toHaveBeenCalled();
   });
 
@@ -195,6 +199,7 @@ describe('postPaystackWebhook — charge.success', () => {
     expect(vi.mocked(issueRefund)).toHaveBeenCalledWith(BOOKING_ID, REF);
     expect(vi.mocked(notifyAdminPaidBooking)).not.toHaveBeenCalled();
     expect(vi.mocked(notifyCleanerNewJob)).not.toHaveBeenCalled();
+    expect(vi.mocked(notifyCleanerNewJobEmail)).not.toHaveBeenCalled();
   });
 
   it('returns 200 and warns when no booking matches the reference', async () => {
@@ -361,6 +366,7 @@ describe('postPaystackWebhook — path isolation', () => {
     // Clean-payment notifications still fire
     expect(vi.mocked(notifyAdminPaidBooking)).toHaveBeenCalledOnce();
     expect(vi.mocked(notifyCleanerNewJob)).toHaveBeenCalledOnce();
+    expect(vi.mocked(notifyCleanerNewJobEmail)).toHaveBeenCalledOnce();
   });
 
   it('invoice.payment_successful does NOT call notifyAdminPaidBooking, notifyCleanerNewJob, or issueRefund', async () => {
@@ -376,6 +382,7 @@ describe('postPaystackWebhook — path isolation', () => {
     expect(res.sendStatus).toHaveBeenCalledWith(200);
     expect(vi.mocked(notifyAdminPaidBooking)).not.toHaveBeenCalled();
     expect(vi.mocked(notifyCleanerNewJob)).not.toHaveBeenCalled();
+    expect(vi.mocked(notifyCleanerNewJobEmail)).not.toHaveBeenCalled();
     expect(vi.mocked(issueRefund)).not.toHaveBeenCalled();
     // No direct DB access from the webhook layer — all DB work is inside the mocked service
     expect(vi.mocked(supabase.from)).not.toHaveBeenCalled();

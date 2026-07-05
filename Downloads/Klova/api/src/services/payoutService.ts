@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { config } from '../config';
+import { notifyKeeperWithdrawalPaid, notifyKeeperWithdrawalFailed } from './keeperEmailService';
 
 const PAYSTACK_BASE = 'https://api.paystack.co';
 
@@ -25,7 +26,7 @@ async function paystackPost<T>(path: string, body: Record<string, unknown>): Pro
 
 /**
  * Creates a Paystack Transfer Recipient if one doesn't already exist.
- * Idempotent — safe to call on every payout.
+ * Idempotent, safe to call on every payout.
  */
 export async function ensurePaystackRecipient(bankAccountId: string): Promise<string> {
   const { data: ba, error } = await supabase
@@ -59,7 +60,7 @@ export async function ensurePaystackRecipient(bankAccountId: string): Promise<st
 /**
  * Called from the Paystack webhook handler for transfer events. Finalizes
  * BOTH payout paths that share the cleaner_payouts table:
- *  - admin batch payouts (requested_by='admin') — a retired path (no route
+ *  - admin batch payouts (requested_by='admin'), a retired path (no route
  *    creates these anymore; the admin portal now only shows keepers their own
  *    self-service withdrawals), kept here purely so any pre-existing
  *    pending/processing admin payout row still settles correctly. Those rows
@@ -67,15 +68,15 @@ export async function ensurePaystackRecipient(bankAccountId: string): Promise<st
  *    payout_id/transport_payout_id before the transfer is sent, so settlement
  *    here means flipping those linked rows to their paid state.
  *  - keeper self-service withdrawals (requested_by='keeper',
- *    keeper_request_withdrawal in 20260704000003_keeper_withdrawal_fn.sql) —
+ *    keeper_request_withdrawal in 20260704000003_keeper_withdrawal_fn.sql),
  *    an arbitrary amount reserved against a running total, with NO linked
  *    earnings/booking_cleaners rows to flip. cleaner_payouts.status is the
  *    sole source of truth for what's been withdrawn: both
  *    keeper_request_withdrawal's v_withdrawn and getWalletSummary's
  *    withdrawn_or_pending_kobo (web/app/api/keeper/_wallet.ts) sum only
  *    payouts NOT IN ('failed','reversed'), so flipping status on
- *    failure/reversal is the entire "return funds to available" effect —
- *    no separate credit-back step exists or is needed.
+ *    failure/reversal is the entire "return funds to available" effect.
+ *    No separate credit-back step exists or is needed.
  */
 export async function handleTransferWebhook(
   event: 'transfer.success' | 'transfer.failed' | 'transfer.reversed',
@@ -86,7 +87,11 @@ export async function handleTransferWebhook(
 
   const { data: payout, error } = await supabase
     .from('cleaner_payouts')
-    .select('id, status, requested_by')
+    .select(`
+      id, status, requested_by, amount_kobo, total_kobo,
+      cleaner:cleaners!cleaner_id(first_name, email),
+      bank_account:cleaner_bank_accounts!bank_account_id(bank_name, account_number)
+    `)
     .eq('paystack_transfer_reference', reference)
     .maybeSingle();
 
@@ -99,16 +104,20 @@ export async function handleTransferWebhook(
   const payoutId = payout.id as string;
   const currentStatus = payout.status as string;
   const isKeeperWithdrawal = payout.requested_by === 'keeper';
+  const amountNaira = ((payout.amount_kobo ?? payout.total_kobo) as number / 100).toLocaleString('en-NG');
+  const cleaner = payout.cleaner as unknown as { first_name: string; email: string | null } | null;
+  const bankAccount = payout.bank_account as unknown as { bank_name: string; account_number: string } | null;
+  const walletUrl = `${config.frontendOrigin}/keeper/wallet`;
 
   // Idempotency / delivery-order guard. Paystack delivers webhooks at-least
   // once with no ordering guarantee, so a payout may already be terminal by
   // the time this event arrives:
-  //  - failed/reversed are always final — ignore anything after them.
+  //  - failed/reversed are always final: ignore anything after them.
   //  - success is final EXCEPT a genuine later transfer.reversed (Paystack
   //    can reverse an already-successful transfer, e.g. a bank-side issue
-  //    found after settlement) — that's a real transition, not a duplicate.
+  //    found after settlement), that's a real transition, not a duplicate.
   //  - a transfer.failed arriving after success would mean downgrading a
-  //    transfer that already paid out — never apply it; a late/out-of-order
+  //    transfer that already paid out; never apply it. A late/out-of-order
   //    delivery must not corrupt an already-settled ledger.
   if (currentStatus === 'failed' || currentStatus === 'reversed') return;
   if (currentStatus === 'success' && event !== 'transfer.reversed') return;
@@ -131,6 +140,15 @@ export async function handleTransferWebhook(
         .from('booking_cleaners')
         .update({ paid_out: true })
         .eq('transport_payout_id', payoutId);
+    } else {
+      await notifyKeeperWithdrawalPaid({
+        email: cleaner?.email ?? null,
+        firstName: cleaner?.first_name ?? 'there',
+        amountNaira,
+        bankName: bankAccount?.bank_name ?? 'your bank',
+        accountLast4: bankAccount?.account_number ? bankAccount.account_number.slice(-4) : '----',
+        walletUrl,
+      });
     }
 
   } else {
@@ -153,8 +171,15 @@ export async function handleTransferWebhook(
         .from('booking_cleaners')
         .update({ transport_payout_id: null })
         .eq('transport_payout_id', payoutId);
+    } else {
+      await notifyKeeperWithdrawalFailed({
+        email: cleaner?.email ?? null,
+        firstName: cleaner?.first_name ?? 'there',
+        amountNaira,
+        walletUrl,
+      });
     }
 
-    console.warn(`[payout] Transfer ${event} for reference ${reference}: ${data.reason ?? '—'}`);
+    console.warn(`[payout] Transfer ${event} for reference ${reference}: ${data.reason ?? 'no reason given'}`);
   }
 }

@@ -1,4 +1,4 @@
-// All notification message templates live here — edit copy in one place.
+// All notification message templates live here. Edit copy in one place.
 
 export interface BookingNotifContext {
   bookingId: string;
@@ -8,6 +8,7 @@ export interface BookingNotifContext {
   cleanerFirstName: string;
   cleanerLastName: string;
   cleanerPhone: string;
+  cleanerEmail: string | null;
   serviceName: string;
   zoneName: string;
   bookingDate: string;   // pre-formatted, e.g. "Tuesday, 1 July"
@@ -43,9 +44,9 @@ export function cleanerNewJobMsg(ctx: BookingNotifContext): string {
   );
 }
 
-// ─── Admin — transport paid ───────────────────────────────────────────────────
+// ─── Admin: transport paid ─────────────────────────────────────────────────────
 // Fires when the customer pays the Paystack transport Payment Request.
-// Short enough for a quick glance — full details are in the dashboard.
+// Short enough for a quick glance; full details are in the dashboard.
 
 export function adminTransportPaidMsg(
   bookingId: string,
@@ -54,14 +55,14 @@ export function adminTransportPaidMsg(
   bookingDate: string,
 ): string {
   return (
-    `Transport paid — booking ${bookingId.slice(0, 8).toUpperCase()}. ` +
+    `Transport paid, booking ${bookingId.slice(0, 8).toUpperCase()}. ` +
     `₦${fareNgn.toLocaleString('en-NG')} received. ` +
     `Customer: ${customerName}. Date: ${bookingDate}. ` +
     `Confirm dispatch when ready.`
   );
 }
 
-// ─── Keeper — job cancelled (transport not paid) ──────────────────────────────
+// ─── Keeper: job cancelled (transport not paid) ────────────────────────────────
 // Fires when admin cancels a booking because the customer never paid transport.
 // The Keeper's date is freed at the same time this message is sent.
 
@@ -69,13 +70,13 @@ export function keeperJobCancelledMsg(ctx: BookingNotifContext): string {
   return (
     `Hi ${ctx.cleanerFirstName}, unfortunately the ${ctx.bookingDate} job has been cancelled. ` +
     `The customer did not complete their transport payment. ` +
-    `Your date has been freed — you'll receive a new booking soon.`
+    `Your date has been freed, you'll receive a new booking soon.`
   );
 }
 
-// ─── Keeper — dispatch confirmed ─────────────────────────────────────────────
+// ─── Keeper: dispatch confirmed ─────────────────────────────────────────────────
 // Fires when admin hits confirm-dispatch. Transport is already settled by this point.
-// Distinct from cleanerNewJobMsg (which fires on clean-payment) — this is the "go now".
+// Distinct from cleanerNewJobMsg (which fires on clean-payment): this is the "go now".
 
 export function keeperDispatchedMsg(ctx: BookingNotifContext): string {
   return (
@@ -84,13 +85,13 @@ export function keeperDispatchedMsg(ctx: BookingNotifContext): string {
     `Date: ${ctx.bookingDate}\n` +
     `Address: ${ctx.address}\n` +
     `Customer: ${ctx.customerFirstName} ${ctx.customerLastName} (${ctx.customerPhone})\n` +
-    `Head out on time — the customer has been notified you're coming.`
+    `Head out on time, the customer has been notified you're coming.`
   );
 }
 
 // ─── Customer ─────────────────────────────────────────────────────────────────
 // Reserved for when the admin panel can trigger dispatch confirmation.
-// Not sent automatically — admin contacts the customer manually for V1.
+// Not sent automatically. Admin contacts the customer manually for V1.
 
 export function customerDispatchConfirmedMsg(
   ctx: BookingNotifContext,

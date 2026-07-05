@@ -6,6 +6,7 @@ export type AuthedCleaner = {
   first_name: string;
   last_name: string;
   status: string;
+  email: string | null;
 };
 
 type KeeperAuthResult =
@@ -17,7 +18,7 @@ type KeeperAuthResult =
 // (auth_user_id), and anyone whose cleaner record isn't 'active'.
 //
 // Every /api/keeper/* route must call this first and use the returned
-// cleanerId to scope all queries — never accept a client-supplied cleaner_id
+// cleanerId to scope all queries. Never accept a client-supplied cleaner_id
 // for a keeper-authenticated request.
 export async function requireKeeperAuth(): Promise<KeeperAuthResult> {
   const supabase = await createClient();
@@ -32,7 +33,7 @@ export async function requireKeeperAuth(): Promise<KeeperAuthResult> {
   const admin = createAdminClient();
   const { data: cleaner, error } = await admin
     .from("cleaners")
-    .select("id, first_name, last_name, status")
+    .select("id, first_name, last_name, status, email")
     .eq("auth_user_id", user.id)
     .maybeSingle();
 
