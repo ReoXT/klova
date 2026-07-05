@@ -5,7 +5,6 @@
  *   A. assignCleaner   — all-or-nothing RPC contract + 2-keeper concurrency race
  *   B. earningsService — 2-keeper split with insurance present
  *   C. getBookingStatus — response shape (2 profiles / 1 profile / 0 before dispatch)
- *   D. markPaidManually — per-keeper paid_out independence
  *
  * Matching priority-order and dedup are already covered by:
  *   matchingService.test.ts (P1/P2/P3 ordering, NO_MATCH paths)
@@ -33,7 +32,6 @@ import { matchCleaner } from '../services/matchingService';
 import { assignCleaner } from '../services/assignmentService';
 import { recordEarning } from '../services/earningsService';
 import { getBookingStatus } from '../services/bookingService';
-import { markPaidManually } from '../services/payoutService';
 
 // ─── Chain helper ─────────────────────────────────────────────────────────────
 // Returns a thenable that exposes every chainable Supabase builder method.
@@ -460,152 +458,5 @@ describe('getBookingStatus — cleaners array shape', () => {
 
     expect(result).toBeNull();
     expect(mockFrom()).toHaveBeenCalledTimes(1);
-  });
-});
-
-// ════════════════════════════════════════════════════════════════════════════
-// D. markPaidManually — per-keeper paid_out independence
-// ════════════════════════════════════════════════════════════════════════════
-//
-// For a 2-keeper booking each keeper has THEIR OWN:
-//   • cleaner_earnings rows  (filtered by cleaner_id)
-//   • booking_cleaners row   (filtered by cleaner_id, holds transport_fare_kobo)
-//
-// Paying one keeper must NOT touch the other's paid_out flag or earning rows.
-//
-// markPaidManually DB call sequence (with earnings + paid transport):
-//   1. cleaner_earnings  .select('id,earning_kobo').eq('cleaner_id',X).eq('status','unpaid')
-//   2. booking_cleaners  .select('id,...').eq('cleaner_id',X).eq('paid_out',false)...
-//   3. bookings          .select('id').in('id', bookingIds).eq('transport_status','paid')
-//   4. cleaner_payouts   .insert({...}).select('id').single()
-//   5. cleaner_earnings  .update({status:'paid',...}).eq(...)
-//   6. booking_cleaners  .update({paid_out:true,...}).in('id', [X_BC_ROW_ID])
-
-const LEAD_ID   = 'keeper-lead-01';
-const SECOND_ID = 'keeper-second-01';
-const BOOKING   = 'bk-shared-001';
-
-// Sets up the 6 from() calls for markPaidManually (with earnings + paid transport).
-// Returns the booking_cleaners update chain so tests can inspect the .in() argument.
-function setupPayoutMocks(
-  cleanerId:     string,
-  earningKobo:   number,
-  bcRowId:       string,
-  transportKobo: number,
-  bankAccountId: string,
-  payoutId:      string,
-) {
-  const updateBcChain = chain({ data: null, error: null });
-
-  mockFrom()
-    .mockReturnValueOnce(chain({                                                         // 1. earnings select
-      data: [{ id: `earn-${cleanerId}`, earning_kobo: earningKobo }],
-      error: null,
-    }) as any)
-    .mockReturnValueOnce(chain({                                                         // 2. bc select
-      data: [{ id: bcRowId, transport_fare_kobo: transportKobo, booking_id: BOOKING }],
-      error: null,
-    }) as any)
-    .mockReturnValueOnce(chain({ data: [{ id: BOOKING }], error: null }) as any)         // 3. bookings (transport paid check)
-    .mockReturnValueOnce(chain({ data: { id: payoutId }, error: null }) as any)          // 4. cleaner_payouts insert
-    .mockReturnValueOnce(chain({ data: null, error: null }) as any)                      // 5. earnings update
-    .mockReturnValueOnce(updateBcChain as any);                                          // 6. bc update
-
-  return { updateBcChain };
-}
-
-describe('markPaidManually — per-keeper paid_out independence', () => {
-  it('lead payout: total = lead clean earnings + lead transport only', async () => {
-    const { updateBcChain } = setupPayoutMocks(
-      LEAD_ID, 741_000, 'bc-lead', 2_000, 'ba-lead', 'payout-lead',
-    );
-
-    const result = await markPaidManually(LEAD_ID, 'ba-lead');
-
-    expect(result.total_kobo).toBe(741_000 + 2_000); // 743_000 — not including SECOND's transport
-    expect(result.payout_id).toBe('payout-lead');
-
-    // booking_cleaners update scoped to LEAD's bc row id only
-    const inArgs = vi.mocked(updateBcChain.in).mock.calls[0];
-    expect(inArgs[0]).toBe('id');
-    expect(inArgs[1]).toEqual(['bc-lead']);  // SECOND's row ('bc-second') must not appear here
-  });
-
-  it('second payout: total = second clean earnings + second transport; scoped to second bc row', async () => {
-    const { updateBcChain } = setupPayoutMocks(
-      SECOND_ID, 741_000, 'bc-second', 3_500, 'ba-second', 'payout-second',
-    );
-
-    const result = await markPaidManually(SECOND_ID, 'ba-second');
-
-    expect(result.total_kobo).toBe(741_000 + 3_500); // 744_500
-    expect(result.payout_id).toBe('payout-second');
-
-    const inArgs = vi.mocked(updateBcChain.in).mock.calls[0];
-    expect(inArgs[0]).toBe('id');
-    expect(inArgs[1]).toEqual(['bc-second']); // LEAD's row must not appear here
-  });
-
-  it('lead and second payouts are independent: separate totals and separate payout IDs', async () => {
-    // Lead: 741_000 clean + 2_000 transport = 743_000
-    setupPayoutMocks(LEAD_ID, 741_000, 'bc-l', 2_000, 'ba-l', 'payout-lead-C');
-    const leadResult = await markPaidManually(LEAD_ID, 'ba-l');
-
-    // Reset between calls — clears the from() queue for second call
-    vi.resetAllMocks();
-
-    // Second: 741_000 clean + 3_500 transport = 744_500
-    setupPayoutMocks(SECOND_ID, 741_000, 'bc-s', 3_500, 'ba-s', 'payout-second-C');
-    const secondResult = await markPaidManually(SECOND_ID, 'ba-s');
-
-    expect(leadResult.total_kobo).toBe(743_000);
-    expect(secondResult.total_kobo).toBe(744_500);
-    expect(leadResult.payout_id).not.toBe(secondResult.payout_id); // separate payout rows
-    expect(leadResult.payout_id).toBe('payout-lead-C');
-    expect(secondResult.payout_id).toBe('payout-second-C');
-  });
-
-  it('cleaner_earnings query filters by cleaner_id — never aggregates the other keeper', async () => {
-    // Verify the eq('cleaner_id', LEAD_ID) call is present on the earnings chain.
-    const earningsChain  = chain({ data: [{ id: 'earn-x', earning_kobo: 390_000 }], error: null });
-    const noTransport    = chain({ data: [], error: null }); // empty transport → skip bookings query
-    const payoutChain    = chain({ data: { id: 'payout-x' }, error: null });
-    const updateEarnings = chain({ data: null, error: null });
-
-    mockFrom()
-      .mockReturnValueOnce(earningsChain as any)   // 1. cleaner_earnings select
-      .mockReturnValueOnce(noTransport as any)     // 2. booking_cleaners select (empty → no step 3)
-      .mockReturnValueOnce(payoutChain as any)     // 3. cleaner_payouts insert (step 4)
-      .mockReturnValueOnce(updateEarnings as any); // 4. cleaner_earnings update (step 5)
-
-    await markPaidManually(LEAD_ID, 'ba-d');
-
-    // Verify the cleaner_earnings chain received .eq('cleaner_id', LEAD_ID)
-    const eqCalls = vi.mocked(earningsChain.eq).mock.calls;
-    const cleanerFilter = eqCalls.find(([col]: [string, unknown]) => col === 'cleaner_id');
-    expect(cleanerFilter).toBeDefined();
-    expect(cleanerFilter![1]).toBe(LEAD_ID); // never SECOND_ID
-  });
-
-  it('booking_cleaners transport query filters by cleaner_id — each keeper sees only their row', async () => {
-    // Verify the booking_cleaners select chain received .eq('cleaner_id', SECOND_ID).
-    // This ensures SECOND's transport query cannot see LEAD's booking_cleaners row.
-    const earningsChain = chain({ data: [{ id: 'earn-s', earning_kobo: 741_000 }], error: null });
-    const bcChain       = chain({ data: [], error: null }); // empty — just check the filter
-    const payoutChain   = chain({ data: { id: 'payout-s' }, error: null });
-    const updateChain   = chain({ data: null, error: null });
-
-    mockFrom()
-      .mockReturnValueOnce(earningsChain as any)
-      .mockReturnValueOnce(bcChain as any)
-      .mockReturnValueOnce(payoutChain as any)
-      .mockReturnValueOnce(updateChain as any);
-
-    await markPaidManually(SECOND_ID, 'ba-s2');
-
-    const bcEqCalls = vi.mocked(bcChain.eq).mock.calls;
-    const cleanerFilter = bcEqCalls.find(([col]: [string, unknown]) => col === 'cleaner_id');
-    expect(cleanerFilter).toBeDefined();
-    expect(cleanerFilter![1]).toBe(SECOND_ID); // scoped to SECOND, never LEAD
   });
 });

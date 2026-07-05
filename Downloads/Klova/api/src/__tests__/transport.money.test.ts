@@ -3,7 +3,6 @@ import { vi, describe, it, expect, beforeEach } from 'vitest';
 // Gaps not caught by narrower service tests:
 //   1. Commission / GBV  — earningsService never touches transport_fare
 //   2. Payout formula    — clean earnings + transport only when status='paid'
-//   3. Idempotency       — markPaidManually throws on second call with no unpaid earnings
 //
 // Already verified elsewhere (not duplicated here):
 //   • Dispatch gate      — all 5 transport statuses  → dispatchService.test.ts
@@ -20,7 +19,6 @@ vi.mock('../lib/supabase', () => ({
 
 import { supabase } from '../lib/supabase';
 import { recordEarning } from '../services/earningsService';
-import { markPaidManually } from '../services/payoutService';
 
 // ─── Chain helper ─────────────────────────────────────────────────────────────
 
@@ -299,36 +297,3 @@ describe('keeperWeeklyTotal — payout formula (Payout)', () => {
   });
 });
 
-// ─── Section 3: markPaidManually idempotency ─────────────────────────────────
-//
-// If the admin triggers a second payout run after all earnings are already
-// marked paid, the service must throw rather than create a duplicate ₦0 payout row.
-// This is the guard that makes "mark as paid out" idempotent from the caller's view.
-
-describe('markPaidManually — idempotency guard (Payout)', () => {
-  it('throws when all earnings and transport are already paid (totalKobo === 0)', async () => {
-    // markPaidManually now queries BOTH cleaner_earnings and booking_cleaners transport
-    // before checking the total. The guard fires when both return zero.
-    vi.mocked(supabase.from)
-      .mockReturnValueOnce(chain({ data: [], error: null }) as any)   // earnings: empty
-      .mockReturnValueOnce(chain({ data: [], error: null }) as any);  // transport: empty
-
-    await expect(markPaidManually('cleaner-done', 'ba-001')).rejects.toThrow(
-      'No unpaid earnings or transport fares',
-    );
-
-    // 2 SELECT calls (earnings + transport) — no payout row inserted
-    expect(vi.mocked(supabase.from)).toHaveBeenCalledTimes(2);
-  });
-
-  it('throws when cleaner has no earnings and no transport at all', async () => {
-    vi.mocked(supabase.from)
-      .mockReturnValueOnce(chain({ data: null, error: null }) as any)  // earnings: null
-      .mockReturnValueOnce(chain({ data: null, error: null }) as any); // transport: null
-
-    await expect(markPaidManually('cleaner-new', 'ba-002')).rejects.toThrow(
-      'No unpaid earnings or transport fares',
-    );
-    expect(vi.mocked(supabase.from)).toHaveBeenCalledTimes(2);
-  });
-});

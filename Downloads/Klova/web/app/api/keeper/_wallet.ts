@@ -21,20 +21,18 @@ export interface WalletSummary {
 // Single source of truth for a keeper's wallet balance, derived entirely
 // from the existing ledgers — no dedicated wallet/balance table.
 //
-// The owed-earnings-plus-transport aggregation faithfully mirrors the admin
-// payout aggregation (api/src/services/earningsService.ts
-// getPendingPayoutSummary), scoped to one cleaner_id. That function lives in
-// the Express service and can't be imported here, so this is the shared
-// Next.js equivalent — the numbers a keeper sees match exactly what the
-// admin payout screen would compute as owed to them.
+// Keeper self-service withdrawal (keeper_request_withdrawal /
+// POST /keeper/withdraw) is the ONLY payout path — the earlier admin
+// batch-payout screen has been removed, so there is no second consumer of
+// 'unpaid' cleaner_earnings / paid_out=false booking_cleaners rows to
+// double-book against.
 //
-// available = owed − keeper-initiated non-failed withdrawals. This assumes
-// the (future) keeper-withdrawal write path records a cleaner_payouts row
-// but leaves the underlying earnings 'unpaid' / transport paid_out=false
-// while the withdrawal is pending — otherwise the owed side and the
-// withdrawal subtraction would double-count. When settlement succeeds the
-// underlying rows flip to paid AND the withdrawal stays counted, so the
-// write path must clear one side as it flips the other.
+// available = owed − keeper-initiated non-failed withdrawals. The
+// keeper-withdrawal write path deliberately leaves the underlying earnings
+// 'unpaid' / transport paid_out=false for the entire life of a withdrawal —
+// cleaner_payouts.status (NOT IN 'failed'/'reversed' == counted) is the sole
+// record of what's been taken out; see handleTransferWebhook
+// (api/src/services/payoutService.ts) for where that status is set.
 export async function getWalletSummary(
   admin: SupabaseClient,
   cleanerId: string,
@@ -55,10 +53,9 @@ export async function getWalletSummary(
   }
 
   // ── Transport reimbursements ─────────────────────────────────────────────
-  // Same eligibility as getPendingPayoutSummary: not yet paid out, not
-  // already linked to a payout in flight, a positive fare, and the customer
-  // has actually paid the transport invoice (transport_status = 'paid') so
-  // Klova is holding the money to reimburse.
+  // Eligible: not yet paid out, not already linked to a payout in flight, a
+  // positive fare, and the customer has actually paid the transport invoice
+  // (transport_status = 'paid') so Klova is holding the money to reimburse.
   const { data: transportRows, error: trErr } = await admin
     .from("booking_cleaners")
     .select("transport_fare_kobo, booking:bookings!inner(transport_status)")
