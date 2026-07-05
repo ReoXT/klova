@@ -11,15 +11,19 @@ type WalletSummary = {
   owed_earnings_kobo: number;
   owed_transport_kobo: number;
   withdrawn_or_pending_kobo: number;
+  adjustments_kobo: number;
   available_kobo: number;
   total_earned_kobo: number;
+  total_withdrawn_kobo: number;
 };
 
 type TransactionStatus = "pending" | "processing" | "success" | "failed" | "reversed";
 
 type Transaction = {
   id: string;
-  type: "earning" | "transport" | "withdrawal";
+  type: "earning" | "transport" | "withdrawal" | "adjustment";
+  // Signed only for 'adjustment' (a debit correction is negative). Always
+  // positive for the other three types.
   amount_kobo: number;
   date: string;
   label: string;
@@ -175,7 +179,9 @@ export default function KeeperWalletPage() {
 }
 
 function TransactionRow({ tx }: { tx: Transaction }) {
-  const isCredit = tx.type !== "withdrawal";
+  // Adjustments carry their own sign (a debit correction is a negative
+  // amount_kobo); every other type is always a plain credit.
+  const isCredit = tx.type === "adjustment" ? tx.amount_kobo >= 0 : tx.type !== "withdrawal";
   const statusMeta = tx.status ? STATUS_META[tx.status] : null;
   const isReturned = tx.status === "failed" || tx.status === "reversed";
 
@@ -195,7 +201,7 @@ function TransactionRow({ tx }: { tx: Transaction }) {
             className="text-sm font-semibold tabular-nums"
             style={{ color: isCredit ? "oklch(0.45 0.12 145)" : "var(--text-strong)" }}
           >
-            {isCredit ? "+" : "−"} {ngn(tx.amount_kobo)}
+            {isCredit ? "+" : "−"} {ngn(Math.abs(tx.amount_kobo))}
           </p>
           {statusMeta && (
             <span className={`badge badge-sm badge-soft mt-1 ${statusMeta.badge}`}>
