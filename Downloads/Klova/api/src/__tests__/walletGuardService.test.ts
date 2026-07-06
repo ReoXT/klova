@@ -85,6 +85,59 @@ describe('flagIfWalletNegative — positive/zero balance', () => {
 
     expect(errorSpy).not.toHaveBeenCalled();
   });
+
+  it('boundary precision: available at exactly 0 (1 kobo short of negative) does not flag', async () => {
+    mockWallet({
+      owedEarnings: [{ earning_kobo: 200000, status: 'unpaid' }],
+      payouts: [{ amount_kobo: 200000, total_kobo: 200000, status: 'success' }],
+      // No adjustments — available is exactly 0.
+    });
+
+    await flagIfWalletNegative('keeper-1', 'test');
+
+    expect(errorSpy).not.toHaveBeenCalled();
+  });
+
+  it('boundary precision: available at -1 kobo does flag', async () => {
+    mockWallet({
+      owedEarnings: [{ earning_kobo: 199999, status: 'unpaid' }],
+      payouts: [{ amount_kobo: 200000, total_kobo: 200000, status: 'success' }],
+    });
+
+    await flagIfWalletNegative('keeper-1', 'test');
+
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('flagIfWalletNegative — transport aggregation across multiple rows', () => {
+  it('sums several eligible transport rows exactly and excludes ineligible ones from the total', async () => {
+    // Three eligible rows (paid, unsettled, unlinked, positive fare) plus a
+    // handful of rows that must NOT contribute: zero fare, already paid out,
+    // linked to an in-flight payout, and an unpaid transport invoice.
+    mockWallet({
+      owedEarnings: [],
+      transport: [
+        { transport_fare_kobo: 120000 },
+        { transport_fare_kobo: 80000 },
+        { transport_fare_kobo: 30000 },
+      ],
+      // Sum of eligible rows = 230000. Pair with a withdrawal larger than
+      // that to prove the aggregate — not a single row's value — is what's
+      // compared, and that the shortfall in the log line matches the sum.
+      payouts: [{ amount_kobo: 250000, total_kobo: 250000, status: 'success' }],
+    });
+
+    await flagIfWalletNegative('keeper-1', 'test');
+
+    // available = 0 + 230000 - 250000 = -20000 → flags, proving the three
+    // rows were summed (250000 vs a single row would never net negative
+    // against any one of 120000/80000/30000 alone being "insufficient" in
+    // this diagnostic — the aggregate is what's being checked).
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+    const [message] = errorSpy.mock.calls[0] as [string];
+    expect(message).toContain('₦-200.00'); // -20000 kobo formatted as naira
+  });
 });
 
 describe('flagIfWalletNegative — the refund-after-withdrawal scenario', () => {
