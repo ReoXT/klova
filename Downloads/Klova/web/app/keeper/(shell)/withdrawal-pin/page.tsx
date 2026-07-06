@@ -118,14 +118,24 @@ function PinSetupForm() {
     setReauthError(null);
     setReauthSending(true);
     try {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user?.email) {
+      // Get email from the server-side session — more reliable than the
+      // browser Supabase client's getUser(), which can return null if its
+      // cookie sync lags behind the SSR session.
+      const meRes = await fetch("/api/keeper/me");
+      if (!meRes.ok) {
         setReauthError("Couldn't start verification. Please sign out and in again.");
         return;
       }
+      const { cleaner } = await meRes.json();
+      if (!cleaner?.email) {
+        setReauthError("Couldn't start verification. Please sign out and in again.");
+        return;
+      }
+      // signInWithOtp must still run in the browser so the PKCE code verifier
+      // is stored in localStorage for the callback to exchange.
+      const supabase = createClient();
       const { error } = await supabase.auth.signInWithOtp({
-        email: user.email,
+        email: cleaner.email,
         options: {
           shouldCreateUser: false,
           emailRedirectTo: `${window.location.origin}/keeper/auth/callback?next=/keeper/withdrawal-pin`,

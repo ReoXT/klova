@@ -177,14 +177,19 @@ export default function KeeperBankPage() {
     setReauthError(null);
     setReauthSending(true);
     try {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user?.email) {
+      const meRes = await fetch("/api/keeper/me");
+      if (!meRes.ok) {
         setReauthError("Couldn't start verification. Please sign out and in again.");
         return;
       }
+      const { cleaner } = await meRes.json();
+      if (!cleaner?.email) {
+        setReauthError("Couldn't start verification. Please sign out and in again.");
+        return;
+      }
+      const supabase = createClient();
       const { error } = await supabase.auth.signInWithOtp({
-        email: user.email,
+        email: cleaner.email,
         options: {
           shouldCreateUser: false,
           emailRedirectTo: `${window.location.origin}/keeper/auth/callback?next=/keeper/bank`,
