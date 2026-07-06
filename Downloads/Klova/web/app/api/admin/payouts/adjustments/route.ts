@@ -37,7 +37,10 @@ export async function POST(request: Request) {
     .eq("id", cleanerId)
     .maybeSingle();
 
-  if (cleanerErr) return Response.json({ error: "Database error" }, { status: 500 });
+  if (cleanerErr) {
+    console.error(`[admin-payouts] cleaner lookup failed for ${cleanerId}:`, cleanerErr);
+    return Response.json({ error: "Database error" }, { status: 500 });
+  }
   if (!cleaner) return Response.json({ error: "Keeper not found" }, { status: 404 });
 
   const { data: adjustment, error } = await admin
@@ -46,7 +49,10 @@ export async function POST(request: Request) {
     .select("id")
     .single();
 
-  if (error) return Response.json({ error: "Database error" }, { status: 500 });
+  if (error) {
+    console.error(`[admin-payouts] adjustment insert failed for cleaner ${cleanerId}:`, error);
+    return Response.json({ error: "Database error" }, { status: 500 });
+  }
 
   console.info(`[admin-payouts] adjustment ${adjustment.id} for cleaner ${cleanerId}: ${amountKobo} kobo, note: ${note}`);
 

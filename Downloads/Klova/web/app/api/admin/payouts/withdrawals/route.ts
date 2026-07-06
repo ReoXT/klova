@@ -39,7 +39,10 @@ export async function GET(request: NextRequest) {
   if (status) query = query.eq("status", status);
 
   const { data, error } = await query;
-  if (error) return Response.json({ error: "Database error" }, { status: 500 });
+  if (error) {
+    console.error("[admin-payouts] withdrawals list query failed:", error);
+    return Response.json({ error: "Database error" }, { status: 500 });
+  }
 
   type Row = {
     id: string;

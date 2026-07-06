@@ -58,7 +58,10 @@ export async function POST(
     .select("id, cleaner_id, bank_account_id, amount_kobo, total_kobo")
     .maybeSingle();
 
-  if (claimErr) return Response.json({ error: "Database error" }, { status: 500 });
+  if (claimErr) {
+    console.error(`[admin-payouts] retry claim failed for payout ${id}:`, claimErr);
+    return Response.json({ error: "Database error" }, { status: 500 });
+  }
   if (!claimed) {
     return Response.json(
       { error: "This withdrawal isn't in a retryable state (already retried, or not failed/reversed)." },

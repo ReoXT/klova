@@ -253,6 +253,14 @@ export default function AdminPayoutsPage() {
     );
   });
 
+  // A negative available balance means a refund clawed back money against an
+  // earning this keeper already withdrew (self-service withdrawals never
+  // flip the underlying earning/transport row — see _wallet.ts). Further
+  // withdrawals are already blocked automatically while negative; this is
+  // purely so admin notices and can reconcile manually via an adjustment,
+  // rather than only ever surfacing in backend logs.
+  const negativeKeepers = (keepers ?? []).filter((k) => k.available_kobo < 0);
+
   return (
     <div className="space-y-8">
       <div>
@@ -262,6 +270,15 @@ export default function AdminPayoutsPage() {
           this screen mirrors what each keeper sees in their own wallet.
         </p>
       </div>
+
+      {negativeKeepers.length > 0 && (
+        <Alert variant="error">
+          {negativeKeepers.length === 1
+            ? `${negativeKeepers[0].first_name} ${negativeKeepers[0].last_name} has a negative wallet balance`
+            : `${negativeKeepers.length} keepers have a negative wallet balance`}
+          {" — a refund clawed back money already withdrawn. Further withdrawals are blocked automatically; use an adjustment below to reconcile."}
+        </Alert>
+      )}
 
       {/* ── Keeper wallets ────────────────────────────────────────── */}
       <section className="space-y-3">
@@ -312,8 +329,16 @@ export default function AdminPayoutsPage() {
                       </p>
                       <p className="text-xs" style={{ color: "var(--text-muted)" }}>{k.phone}</p>
                     </td>
-                    <td className="px-5 py-3.5 text-right tabular-nums font-semibold" style={{ color: "var(--color-primary)" }}>
+                    <td
+                      className="px-5 py-3.5 text-right tabular-nums font-semibold"
+                      style={{ color: k.available_kobo < 0 ? "var(--color-error)" : "var(--color-primary)" }}
+                    >
                       {ngn(k.available_kobo)}
+                      {k.available_kobo < 0 && (
+                        <span className="block text-xs font-normal" style={{ color: "var(--color-error)" }}>
+                          negative — needs review
+                        </span>
+                      )}
                     </td>
                     <td className="px-5 py-3.5 text-right tabular-nums" style={{ color: "var(--text-body)" }}>
                       {ngn(k.total_earned_kobo)}

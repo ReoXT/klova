@@ -14,7 +14,8 @@ export async function GET() {
   try {
     const summary = await getWalletSummary(admin, auth.cleanerId);
     return Response.json(summary);
-  } catch {
+  } catch (err) {
+    console.error(`[keeper-wallet] getWalletSummary failed for cleaner ${auth.cleanerId}:`, err);
     return Response.json({ error: "Database error" }, { status: 500 });
   }
 }

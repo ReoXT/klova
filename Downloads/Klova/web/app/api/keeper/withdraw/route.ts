@@ -53,7 +53,10 @@ export async function POST(request: Request) {
     p_submitted_pin: pin,
   });
 
-  if (pinErr) return Response.json({ error: "Database error" }, { status: 500 });
+  if (pinErr) {
+    console.error(`[keeper-withdraw] keeper_verify_withdrawal_pin failed for cleaner ${auth.cleanerId}:`, pinErr);
+    return Response.json({ error: "Database error" }, { status: 500 });
+  }
 
   const pinResult = pinData as unknown as PinRpc;
 
@@ -82,7 +85,10 @@ export async function POST(request: Request) {
     p_amount_kobo: amountKobo,
   });
 
-  if (rpcErr) return Response.json({ error: "Database error" }, { status: 500 });
+  if (rpcErr) {
+    console.error(`[keeper-withdraw] keeper_request_withdrawal failed for cleaner ${auth.cleanerId}:`, rpcErr);
+    return Response.json({ error: "Database error" }, { status: 500 });
+  }
 
   const rpc = rpcData as unknown as WithdrawalRpc;
 

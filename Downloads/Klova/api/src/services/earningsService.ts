@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { flagIfWalletNegative } from './walletGuardService';
 
 /**
  * Called when a booking transitions to 'completed'.
@@ -120,10 +121,10 @@ export async function adjustEarningForRefund(
 ): Promise<void> {
   const { data: earningsData } = await supabase
     .from('cleaner_earnings')
-    .select('id, earning_kobo, status')
+    .select('id, cleaner_id, earning_kobo, status')
     .eq('booking_id', bookingId);
 
-  const earnings = (earningsData ?? []) as { id: string; earning_kobo: number; status: string }[];
+  const earnings = (earningsData ?? []) as { id: string; cleaner_id: string; earning_kobo: number; status: string }[];
   if (earnings.length === 0) return; // Not yet recorded — recordEarning will handle it
 
   if (earnings.some((e) => e.status === 'paid')) {
@@ -151,5 +152,15 @@ export async function adjustEarningForRefund(
         .update({ earning_kobo: newEarning })
         .eq('id', e.id);
     }
+  }
+
+  // A keeper's self-service withdrawal never touches these rows' status (it
+  // reserves against them in cleaner_payouts instead — see
+  // keeper_request_withdrawal.sql), so this refund can shrink or zero an
+  // earning the keeper has already been paid out against. That can drive
+  // their wallet negative; flag it so admin sees it instead of it going
+  // unnoticed until the keeper complains.
+  for (const cleanerId of new Set(toUpdate.map((e) => e.cleaner_id))) {
+    await flagIfWalletNegative(cleanerId, `a refund on booking ${bookingId}`);
   }
 }

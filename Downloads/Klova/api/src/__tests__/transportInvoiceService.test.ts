@@ -12,8 +12,13 @@ vi.mock('../services/notificationService', () => ({
   notifyAdminTransportPaid: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock('../services/walletGuardService', () => ({
+  flagIfWalletNegative: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { supabase } from '../lib/supabase';
 import { notifyAdminTransportPaid } from '../services/notificationService';
+import { flagIfWalletNegative } from '../services/walletGuardService';
 import {
   createTransportInvoice,
   resendTransportInvoice,
@@ -32,7 +37,7 @@ function chain(result: { data: unknown; error: unknown }) {
   b.catch = (fn: (v: any) => any) => Promise.resolve(result).catch(fn);
   b.single = vi.fn().mockResolvedValue(result);
   b.maybeSingle = vi.fn().mockResolvedValue(result);
-  for (const m of ['select', 'eq', 'update', 'not', 'in', 'gte', 'order']) {
+  for (const m of ['select', 'eq', 'update', 'not', 'in', 'gt', 'gte', 'order']) {
     b[m] = vi.fn().mockReturnValue(b);
   }
   return b;
@@ -417,9 +422,9 @@ describe('issueTransportRefund — happy path', () => {
     const BOOKING_ID = 'b-transport-refund-1';
     const TX_REF = 'txn_refund_001';
 
-    vi.mocked(supabase.from).mockReturnValueOnce(
-      chain({ data: null, error: null }) as any, // DB update
-    );
+    vi.mocked(supabase.from)
+      .mockReturnValueOnce(chain({ data: null, error: null }) as any) // DB update -> refunded
+      .mockReturnValueOnce(chain({ data: [{ cleaner_id: 'keeper-1' }], error: null }) as any); // affected keepers lookup
 
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -435,8 +440,13 @@ describe('issueTransportRefund — happy path', () => {
     const body = JSON.parse(opts.body as string);
     expect(body.transaction).toBe(TX_REF);
 
-    // DB update to 'refunded' must have been triggered
-    expect(vi.mocked(supabase.from)).toHaveBeenCalledTimes(1);
+    // DB update to 'refunded', then the affected-keepers lookup for the
+    // negative-wallet flag check.
+    expect(vi.mocked(supabase.from)).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(flagIfWalletNegative)).toHaveBeenCalledWith(
+      'keeper-1',
+      expect.stringContaining(BOOKING_ID),
+    );
   });
 });
 

@@ -19,7 +19,10 @@ export async function GET() {
     .neq("status", "suspended")
     .order("first_name");
 
-  if (error) return Response.json({ error: "Database error" }, { status: 500 });
+  if (error) {
+    console.error("[admin-payouts] failed to list cleaners:", error);
+    return Response.json({ error: "Database error" }, { status: 500 });
+  }
 
   const summaries = await Promise.all(
     (cleaners ?? []).map(async (c) => {
@@ -33,7 +36,8 @@ export async function GET() {
           status: c.status,
           ...wallet,
         };
-      } catch {
+      } catch (err) {
+        console.error(`[admin-payouts] getWalletSummary failed for cleaner ${c.id as string}:`, err);
         return null;
       }
     }),

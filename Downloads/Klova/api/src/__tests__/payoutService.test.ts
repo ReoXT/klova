@@ -53,6 +53,16 @@ describe('handleTransferWebhook — keeper withdrawal, transfer.success', () => 
     expect(vi.mocked(supabase.from)).not.toHaveBeenCalledWith('cleaner_earnings');
     expect(vi.mocked(supabase.from)).not.toHaveBeenCalledWith('booking_cleaners');
   });
+
+  it('throws (does not silently swallow) if the final status-flip UPDATE itself errors', async () => {
+    vi.mocked(supabase.from)
+      .mockReturnValueOnce(chain({ data: payoutRow(), error: null }) as any)
+      .mockReturnValueOnce(chain({ data: null, error: { message: 'db unreachable' } }) as any);
+
+    await expect(
+      handleTransferWebhook('transfer.success', { reference: 'klova-kwd-ref-1b' }),
+    ).rejects.toMatchObject({ message: 'db unreachable' });
+  });
 });
 
 // ─── Keeper withdrawal: transfer.failed returns the amount to available ──────
@@ -106,32 +116,68 @@ describe('handleTransferWebhook — keeper withdrawal, transfer.failed', () => {
 // ─── Admin batch payout: settlement side effects still apply ─────────────────
 
 describe('handleTransferWebhook — admin batch payout (requested_by=admin)', () => {
-  it('on success, flips linked cleaner_earnings and booking_cleaners rows', async () => {
+  it('on success, settles cleaner_earnings and booking_cleaners BEFORE flipping the payout to success', async () => {
     vi.mocked(supabase.from)
       .mockReturnValueOnce(chain({ data: payoutRow({ requested_by: 'admin' }), error: null }) as any)
-      .mockReturnValueOnce(chain({ data: null, error: null }) as any) // UPDATE payout -> success
       .mockReturnValueOnce(chain({ data: null, error: null }) as any) // UPDATE cleaner_earnings -> paid
-      .mockReturnValueOnce(chain({ data: null, error: null }) as any); // UPDATE booking_cleaners -> paid_out
+      .mockReturnValueOnce(chain({ data: null, error: null }) as any) // UPDATE booking_cleaners -> paid_out
+      .mockReturnValueOnce(chain({ data: null, error: null }) as any); // UPDATE payout -> success
 
     await handleTransferWebhook('transfer.success', { reference: 'klova-payout-ref-1' });
 
-    expect(vi.mocked(supabase.from)).toHaveBeenNthCalledWith(3, 'cleaner_earnings');
-    expect(vi.mocked(supabase.from)).toHaveBeenNthCalledWith(4, 'booking_cleaners');
+    // Settlement happens first so a failure there never leaves a payout
+    // marked 'success' while its earnings are still 'unpaid' — see the
+    // ordering comment in payoutService.ts.
+    expect(vi.mocked(supabase.from)).toHaveBeenNthCalledWith(2, 'cleaner_earnings');
+    expect(vi.mocked(supabase.from)).toHaveBeenNthCalledWith(3, 'booking_cleaners');
+    expect(vi.mocked(supabase.from)).toHaveBeenNthCalledWith(4, 'cleaner_payouts');
     expect(vi.mocked(supabase.from)).toHaveBeenCalledTimes(4);
   });
 
-  it('on failure, reverts linked cleaner_earnings and booking_cleaners rows', async () => {
+  it('on failure, reverts linked cleaner_earnings and booking_cleaners rows BEFORE flipping the payout', async () => {
     vi.mocked(supabase.from)
       .mockReturnValueOnce(chain({ data: payoutRow({ requested_by: 'admin', status: 'processing' }), error: null }) as any)
-      .mockReturnValueOnce(chain({ data: null, error: null }) as any) // UPDATE payout -> failed
       .mockReturnValueOnce(chain({ data: null, error: null }) as any) // UPDATE cleaner_earnings -> failed
-      .mockReturnValueOnce(chain({ data: null, error: null }) as any); // UPDATE booking_cleaners -> unlink
+      .mockReturnValueOnce(chain({ data: null, error: null }) as any) // UPDATE booking_cleaners -> unlink
+      .mockReturnValueOnce(chain({ data: null, error: null }) as any); // UPDATE payout -> failed
 
     await handleTransferWebhook('transfer.failed', { reference: 'klova-payout-ref-2' });
 
-    expect(vi.mocked(supabase.from)).toHaveBeenNthCalledWith(3, 'cleaner_earnings');
-    expect(vi.mocked(supabase.from)).toHaveBeenNthCalledWith(4, 'booking_cleaners');
+    expect(vi.mocked(supabase.from)).toHaveBeenNthCalledWith(2, 'cleaner_earnings');
+    expect(vi.mocked(supabase.from)).toHaveBeenNthCalledWith(3, 'booking_cleaners');
+    expect(vi.mocked(supabase.from)).toHaveBeenNthCalledWith(4, 'cleaner_payouts');
     expect(vi.mocked(supabase.from)).toHaveBeenCalledTimes(4);
+  });
+
+  it('never marks the payout success if the cleaner_earnings settlement fails — stays retryable', async () => {
+    vi.mocked(supabase.from)
+      .mockReturnValueOnce(chain({ data: payoutRow({ requested_by: 'admin' }), error: null }) as any)
+      .mockReturnValueOnce(chain({ data: null, error: { message: 'connection reset' } }) as any); // UPDATE cleaner_earnings fails
+
+    await expect(
+      handleTransferWebhook('transfer.success', { reference: 'klova-payout-ref-3' }),
+    ).rejects.toMatchObject({ message: 'connection reset' });
+
+    // Only the SELECT then the failed cleaner_earnings update ran — the
+    // payout row's own status was never touched, so it's still 'processing'
+    // and a retried webhook delivery will re-attempt settlement instead of
+    // being skipped by the idempotency guard.
+    expect(vi.mocked(supabase.from)).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(supabase.from).mock.calls[1][0]).toBe('cleaner_earnings');
+  });
+
+  it('never marks the payout success if the booking_cleaners settlement fails — stays retryable', async () => {
+    vi.mocked(supabase.from)
+      .mockReturnValueOnce(chain({ data: payoutRow({ requested_by: 'admin' }), error: null }) as any)
+      .mockReturnValueOnce(chain({ data: null, error: null }) as any) // UPDATE cleaner_earnings -> paid
+      .mockReturnValueOnce(chain({ data: null, error: { message: 'timeout' } }) as any); // UPDATE booking_cleaners fails
+
+    await expect(
+      handleTransferWebhook('transfer.success', { reference: 'klova-payout-ref-4' }),
+    ).rejects.toMatchObject({ message: 'timeout' });
+
+    expect(vi.mocked(supabase.from)).toHaveBeenCalledTimes(3);
+    expect(vi.mocked(supabase.from).mock.calls[2][0]).toBe('booking_cleaners');
   });
 });
 

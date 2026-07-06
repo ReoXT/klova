@@ -81,7 +81,10 @@ export async function PUT(request: Request) {
     .eq("is_primary", true)
     .maybeSingle();
 
-  if (exErr) return Response.json({ error: "Database error" }, { status: 500 });
+  if (exErr) {
+    console.error(`[keeper-bank] lookup failed for cleaner ${auth.cleanerId}:`, exErr);
+    return Response.json({ error: "Database error" }, { status: 500 });
+  }
 
   const accountNumberChanged = !!existing && existing.account_number !== accountNumber;
   const oldLast4 = existing ? (existing.account_number as string).slice(-4) : null;
@@ -105,7 +108,10 @@ export async function PUT(request: Request) {
       .eq("id", existing.id)
       .select("id, account_name, account_number, bank_code, bank_name")
       .single();
-    if (error || !data) return Response.json({ error: "Update failed" }, { status: 500 });
+    if (error || !data) {
+      console.error(`[keeper-bank] update failed for cleaner ${auth.cleanerId}:`, error);
+      return Response.json({ error: "Update failed" }, { status: 500 });
+    }
     saved = data;
   } else {
     const { data, error } = await admin
@@ -120,7 +126,10 @@ export async function PUT(request: Request) {
       })
       .select("id, account_name, account_number, bank_code, bank_name")
       .single();
-    if (error || !data) return Response.json({ error: "Failed to save bank account" }, { status: 500 });
+    if (error || !data) {
+      console.error(`[keeper-bank] insert failed for cleaner ${auth.cleanerId}:`, error);
+      return Response.json({ error: "Failed to save bank account" }, { status: 500 });
+    }
     saved = data;
   }
 

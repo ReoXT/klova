@@ -2,6 +2,7 @@ import { supabase } from '../lib/supabase';
 import { config } from '../config';
 import { TransportFareError } from './transportFareService';
 import { notifyAdminTransportPaid } from './notificationService';
+import { flagIfWalletNegative } from './walletGuardService';
 
 // ─── Paystack response types ──────────────────────────────────────────────────
 
@@ -303,8 +304,26 @@ export async function issueTransportRefund(
       `[transport-refund] Refund issued on Paystack for booking ${bookingId} (tx: ${transactionRef}) ` +
       `but transport_status DB update failed: ${updateErr.message}. Manual reconciliation needed.`,
     );
-  } else {
-    console.log(`[transport-refund] Transport refund issued for booking ${bookingId} (tx: ${transactionRef})`);
+    return;
+  }
+
+  console.log(`[transport-refund] Transport refund issued for booking ${bookingId} (tx: ${transactionRef})`);
+
+  // transport_status just left 'paid', so any keeper's transport reimbursement
+  // for this booking stops counting as owed (see getWalletSummary / the
+  // keeper_request_withdrawal RPC, both gated on transport_status='paid'). A
+  // keeper who already withdrew against it (withdrawals never flip
+  // booking_cleaners.paid_out — see 20260704000003_keeper_withdrawal_fn.sql)
+  // can now show a negative wallet; flag it for admin the same way a
+  // cleaning-fee refund does.
+  const { data: keepers } = await supabase
+    .from('booking_cleaners')
+    .select('cleaner_id')
+    .eq('booking_id', bookingId)
+    .gt('transport_fare_kobo', 0);
+
+  for (const cleanerId of new Set(((keepers ?? []) as { cleaner_id: string }[]).map((k) => k.cleaner_id))) {
+    await flagIfWalletNegative(cleanerId, `a transport refund on booking ${bookingId}`);
   }
 }
 

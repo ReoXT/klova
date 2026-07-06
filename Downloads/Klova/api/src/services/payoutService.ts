@@ -123,61 +123,109 @@ export async function handleTransferWebhook(
   if (currentStatus === 'success' && event !== 'transfer.reversed') return;
 
   if (event === 'transfer.success') {
-    await supabase
-      .from('cleaner_payouts')
-      .update({ status: 'success', completed_at: new Date().toISOString() })
-      .eq('id', payoutId);
-
     if (!isKeeperWithdrawal) {
-      // Finalize cleaning earnings
-      await supabase
+      // Settle the linked ledger rows BEFORE flipping the payout itself
+      // terminal. If either update below fails, we throw without ever
+      // marking this payout 'success' — so the idempotency guard above
+      // (currentStatus === 'success' -> return) can't block a retry, and
+      // Paystack's at-least-once redelivery will simply try again until
+      // this succeeds. Doing it the other way round (status first) would
+      // let a DB hiccup permanently strand an earning as 'unpaid' even
+      // though the payout row says 'success' — exactly the "shown as owed
+      // after it's been paid" bug this sweep exists to rule out.
+      const { error: earnErr } = await supabase
         .from('cleaner_earnings')
         .update({ status: 'paid' })
         .eq('payout_id', payoutId);
+      if (earnErr) {
+        console.error(`[payout] Failed to mark cleaner_earnings paid for payout ${payoutId}:`, earnErr);
+        throw earnErr;
+      }
 
-      // Finalize transport reimbursements linked to this payout
-      await supabase
+      const { error: transErr } = await supabase
         .from('booking_cleaners')
         .update({ paid_out: true })
         .eq('transport_payout_id', payoutId);
-    } else {
-      await notifyKeeperWithdrawalPaid({
-        email: cleaner?.email ?? null,
-        firstName: cleaner?.first_name ?? 'there',
-        amountNaira,
-        bankName: bankAccount?.bank_name ?? 'your bank',
-        accountLast4: bankAccount?.account_number ? bankAccount.account_number.slice(-4) : '----',
-        walletUrl,
-      });
+      if (transErr) {
+        console.error(`[payout] Failed to mark booking_cleaners paid_out for payout ${payoutId}:`, transErr);
+        throw transErr;
+      }
+    }
+
+    const { error: statusErr } = await supabase
+      .from('cleaner_payouts')
+      .update({ status: 'success', completed_at: new Date().toISOString() })
+      .eq('id', payoutId);
+    if (statusErr) {
+      console.error(`[payout] Failed to flip payout ${payoutId} to success:`, statusErr);
+      throw statusErr;
+    }
+
+    if (isKeeperWithdrawal) {
+      try {
+        await notifyKeeperWithdrawalPaid({
+          email: cleaner?.email ?? null,
+          firstName: cleaner?.first_name ?? 'there',
+          amountNaira,
+          bankName: bankAccount?.bank_name ?? 'your bank',
+          accountLast4: bankAccount?.account_number ? bankAccount.account_number.slice(-4) : '----',
+          walletUrl,
+        });
+      } catch (notifyErr) {
+        // Best-effort only — the transfer already succeeded and is recorded;
+        // a notification failure must never make the webhook look unhandled.
+        console.error(`[payout] withdrawal-paid email failed for payout ${payoutId}:`, notifyErr);
+      }
     }
 
   } else {
     const newStatus = event === 'transfer.reversed' ? 'reversed' : 'failed';
-    await supabase
-      .from('cleaner_payouts')
-      .update({ status: newStatus, failure_reason: data.reason ?? event })
-      .eq('id', payoutId);
 
     if (!isKeeperWithdrawal) {
-      // Revert cleaning earnings so they are re-queued next payout run
-      await supabase
+      // Same ordering rationale as the success branch: revert the linked
+      // ledger rows first so a failure here leaves the payout in its prior
+      // non-terminal state and a retry re-attempts the revert instead of
+      // being short-circuited by the idempotency guard.
+      const { error: earnErr } = await supabase
         .from('cleaner_earnings')
         .update({ status: 'failed' })
         .eq('payout_id', payoutId)
         .eq('status', 'scheduled');
+      if (earnErr) {
+        console.error(`[payout] Failed to revert cleaner_earnings for payout ${payoutId}:`, earnErr);
+        throw earnErr;
+      }
 
-      // Revert transport links so they are re-queued next payout run
-      await supabase
+      const { error: transErr } = await supabase
         .from('booking_cleaners')
         .update({ transport_payout_id: null })
         .eq('transport_payout_id', payoutId);
-    } else {
-      await notifyKeeperWithdrawalFailed({
-        email: cleaner?.email ?? null,
-        firstName: cleaner?.first_name ?? 'there',
-        amountNaira,
-        walletUrl,
-      });
+      if (transErr) {
+        console.error(`[payout] Failed to revert booking_cleaners for payout ${payoutId}:`, transErr);
+        throw transErr;
+      }
+    }
+
+    const { error: statusErr } = await supabase
+      .from('cleaner_payouts')
+      .update({ status: newStatus, failure_reason: data.reason ?? event })
+      .eq('id', payoutId);
+    if (statusErr) {
+      console.error(`[payout] Failed to flip payout ${payoutId} to ${newStatus}:`, statusErr);
+      throw statusErr;
+    }
+
+    if (isKeeperWithdrawal) {
+      try {
+        await notifyKeeperWithdrawalFailed({
+          email: cleaner?.email ?? null,
+          firstName: cleaner?.first_name ?? 'there',
+          amountNaira,
+          walletUrl,
+        });
+      } catch (notifyErr) {
+        console.error(`[payout] withdrawal-failed email failed for payout ${payoutId}:`, notifyErr);
+      }
     }
 
     console.warn(`[payout] Transfer ${event} for reference ${reference}: ${data.reason ?? 'no reason given'}`);
