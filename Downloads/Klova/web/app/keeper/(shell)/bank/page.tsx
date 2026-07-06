@@ -36,6 +36,8 @@ export default function KeeperBankPage() {
   const [savedMsg, setSavedMsg]           = useState<string | null>(null);
   const [reauthNeeded, setReauthNeeded]   = useState(false);
   const [reauthSent, setReauthSent]       = useState(false);
+  const [reauthSending, setReauthSending] = useState(false);
+  const [reauthError, setReauthError]     = useState<string | null>(null);
 
   // Guards the resolve response against a stale request (number/bank changed
   // while a resolve was in flight).
@@ -172,17 +174,30 @@ export default function KeeperBankPage() {
   }
 
   async function sendReauthLink() {
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user?.email) { setSaveError("Couldn't start verification. Please sign out and in again."); return; }
-    await supabase.auth.signInWithOtp({
-      email: user.email,
-      options: {
-        shouldCreateUser: false,
-        emailRedirectTo: `${window.location.origin}/keeper/auth/callback?next=/keeper/bank`,
-      },
-    });
-    setReauthSent(true);
+    setReauthError(null);
+    setReauthSending(true);
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.email) {
+        setReauthError("Couldn't start verification. Please sign out and in again.");
+        return;
+      }
+      const { error } = await supabase.auth.signInWithOtp({
+        email: user.email,
+        options: {
+          shouldCreateUser: false,
+          emailRedirectTo: `${window.location.origin}/keeper/auth/callback?next=/keeper/bank`,
+        },
+      });
+      if (error) {
+        setReauthError(error.message ?? "Couldn't send the email. Please try again.");
+        return;
+      }
+      setReauthSent(true);
+    } finally {
+      setReauthSending(false);
+    }
   }
 
   const canSave = !!resolvedName && !resolving && /^\d{10}$/.test(accountNumber) && !!bankCode;
@@ -246,12 +261,15 @@ export default function KeeperBankPage() {
                   ? " We've emailed you a sign-in link — open it, and you'll come right back here to finish. Your details are saved."
                   : " We'll email you a sign-in link. After you open it you'll return here to finish saving."}
               </p>
+              {reauthError && (
+                <p className="text-sm mt-2 text-error">{reauthError}</p>
+              )}
               {!reauthSent ? (
-                <Button onClick={sendReauthLink} wide className="mt-3">Email me a sign-in link</Button>
+                <Button onClick={sendReauthLink} loading={reauthSending} wide className="mt-3">Email me a sign-in link</Button>
               ) : (
                 <p className="text-xs mt-3" style={{ color: "var(--text-subtle)" }}>
                   Didn&apos;t get it? Check spam, or{" "}
-                  <button className="underline" onClick={() => { setReauthSent(false); }}>try again</button>.
+                  <button className="underline" onClick={() => { setReauthSent(false); setReauthError(null); }}>try again</button>.
                 </p>
               )}
             </Card>
