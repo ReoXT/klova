@@ -105,3 +105,34 @@ export async function PATCH(
   }
   return Response.json({ cleaner: data });
 }
+
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const unauth = await verifyAdmin();
+  if (unauth) return unauth;
+
+  const { id } = await params;
+  const admin = createAdminClient();
+
+  // Block deletion if cleaner has any live bookings
+  const { data: live } = await admin
+    .from("bookings")
+    .select("id")
+    .eq("cleaner_id", id)
+    .in("status", ["matched", "confirmed"])
+    .limit(1);
+
+  if (live && live.length > 0) {
+    return Response.json(
+      { error: "This cleaner has active bookings and cannot be deleted. Reassign or cancel those bookings first." },
+      { status: 409 },
+    );
+  }
+
+  const { error } = await admin.from("cleaners").delete().eq("id", id);
+  if (error) return Response.json({ error: "Delete failed" }, { status: 500 });
+
+  return new Response(null, { status: 204 });
+}

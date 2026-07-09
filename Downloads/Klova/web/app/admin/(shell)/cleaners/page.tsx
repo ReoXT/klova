@@ -121,6 +121,11 @@ export default function CleanersPage() {
     closePanel();
   }
 
+  function onDeleted(id: string) {
+    setCleaners((prev) => prev.filter((c) => c.id !== id));
+    closePanel();
+  }
+
   // Patches a cleaner in the list AND the open panel's selection, without
   // closing the panel — used for in-panel actions like the keeper invite.
   function patchCleaner(id: string, patch: Partial<Cleaner>) {
@@ -216,6 +221,7 @@ export default function CleanersPage() {
           zones={zones}
           onClose={closePanel}
           onSaved={onSaved}
+          onDeleted={onDeleted}
           onCleanerPatched={patchCleaner}
         />
       )}
@@ -226,13 +232,14 @@ export default function CleanersPage() {
 /* ── Panel ───────────────────────────────────────────────────── */
 
 function CleanerPanel({
-  mode, cleaner, zones, onClose, onSaved, onCleanerPatched,
+  mode, cleaner, zones, onClose, onSaved, onDeleted, onCleanerPatched,
 }: {
   mode: "add" | "edit";
   cleaner: Cleaner | null;
   zones: Zone[];
   onClose: () => void;
   onSaved: (c: Cleaner) => void;
+  onDeleted: (id: string) => void;
   onCleanerPatched: (id: string, patch: Partial<Cleaner>) => void;
 }) {
   const [form, setForm] = useState<FormState>(
@@ -253,6 +260,9 @@ function CleanerPanel({
   const [saveError, setSaveError]       = useState<string | null>(null);
   const [fieldErrors, setFieldErrors]   = useState<Record<string, string>>({});
   const [bankErrors, setBankErrors]     = useState<Record<string, string>>({});
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting]           = useState(false);
+  const [deleteError, setDeleteError]     = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Load existing bank account when editing
@@ -344,6 +354,24 @@ function CleanerPanel({
     if (!form.zone_id) errs.zone_id = "Select a zone";
     setFieldErrors(errs);
     return Object.keys(errs).length === 0;
+  }
+
+  async function handleDelete() {
+    if (!cleaner) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      const r = await fetch(`/api/admin/cleaners/${cleaner.id}`, { method: "DELETE" });
+      if (r.status === 204) { onDeleted(cleaner.id); return; }
+      const d = await r.json();
+      setDeleteError(d.error ?? "Delete failed");
+      setConfirmDelete(false);
+    } catch {
+      setDeleteError("Something went wrong");
+      setConfirmDelete(false);
+    } finally {
+      setDeleting(false);
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -557,15 +585,57 @@ function CleanerPanel({
         </div>
 
         {/* Footer */}
-        <div className="p-5 border-t" style={{ borderColor: "var(--border-subtle)" }}>
+        <div className="p-5 border-t flex flex-col gap-3" style={{ borderColor: "var(--border-subtle)" }}>
           {mode === "add" && (
-            <p className="text-xs mb-3" style={{ color: "var(--text-muted)" }}>
+            <p className="text-xs" style={{ color: "var(--text-muted)" }}>
               Active cleaners get 90 days of availability seeded automatically. They become matchable straight away.
             </p>
           )}
-          <Button type="submit" className="w-full" disabled={saving}>
+          <Button type="submit" className="w-full" disabled={saving || deleting}>
             {saving ? <Spinner /> : mode === "add" ? "Add cleaner" : "Save changes"}
           </Button>
+
+          {mode === "edit" && (
+            <>
+              {deleteError && (
+                <p className="text-xs text-error text-center">{deleteError}</p>
+              )}
+              {!confirmDelete ? (
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm text-error w-full"
+                  onClick={() => { setConfirmDelete(true); setDeleteError(null); }}
+                  disabled={deleting}
+                >
+                  Delete cleaner
+                </button>
+              ) : (
+                <div className="rounded-xl p-3 flex flex-col gap-2" style={{ background: "oklch(0.97 0.02 25)", border: "1px solid oklch(0.88 0.05 25)" }}>
+                  <p className="text-xs font-medium text-center" style={{ color: "var(--text-strong)" }}>
+                    Delete {cleaner?.first_name} {cleaner?.last_name}? This cannot be undone.
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      className="btn btn-error btn-sm flex-1"
+                      onClick={handleDelete}
+                      disabled={deleting}
+                    >
+                      {deleting ? <Spinner size="sm" /> : "Yes, delete"}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm flex-1"
+                      onClick={() => setConfirmDelete(false)}
+                      disabled={deleting}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </div>
       </form>
     </div>
