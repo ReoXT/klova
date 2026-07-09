@@ -80,7 +80,7 @@ export async function PATCH(
     photoUrl = admin.storage.from("cleaner-photos").getPublicUrl(path).data.publicUrl;
   }
 
-  const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  const patch: Record<string, unknown> = {};
   if (firstName   !== undefined) patch.first_name   = firstName;
   if (lastName    !== undefined) patch.last_name    = lastName;
   if (phone       !== undefined) patch.phone        = phone;
