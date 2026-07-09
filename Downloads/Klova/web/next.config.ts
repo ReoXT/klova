@@ -29,8 +29,8 @@ const securityHeaders = [
       "img-src 'self' data: https:",
       // Fonts are self-hosted by next/font at build time
       "font-src 'self'",
-      // API, Supabase (browser client auth calls), and Paystack API calls
-      `connect-src 'self' ${process.env.NEXT_PUBLIC_SUPABASE_URL} https://klova-production.up.railway.app https://api.paystack.co`,
+      // API, Supabase (browser client auth calls), Paystack, and Nominatim (address autocomplete)
+      `connect-src 'self' ${process.env.NEXT_PUBLIC_SUPABASE_URL} https://klova-production.up.railway.app https://api.paystack.co https://nominatim.openstreetmap.org`,
       // Paystack hosted checkout page (iframe/redirect)
       "frame-src https://checkout.paystack.com",
       "object-src 'none'",
