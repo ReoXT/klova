@@ -54,17 +54,6 @@ export function KeeperCard({ firstName, photoUrl, rating, totalJobs }: KeeperCar
         boxShadow:   "var(--shadow-md)",
       }}
     >
-      {/* ── Verified header strip ─────────────────────── */}
-      <div
-        className="w-full py-2 px-4 flex items-center justify-center gap-2"
-        style={{ background: "var(--klova-success-soft)", color: "var(--klova-success)" }}
-      >
-        <Shield className="w-3.5 h-3.5" />
-        <span className="text-xs font-semibold tracking-wide">
-          Thoroughly vetted · Background checked
-        </span>
-      </div>
-
       {/* ── Body ─────────────────────────────────────── */}
       <div className="px-6 pt-6 pb-7 flex flex-col items-center text-center gap-0">
 
