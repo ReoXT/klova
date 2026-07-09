@@ -80,6 +80,10 @@ export async function POST(request: Request) {
     .single();
 
   if (insertErr || !cleaner) {
+    // Unique constraint on phone
+    if (insertErr?.code === "23505" && insertErr.message.includes("phone")) {
+      return Response.json({ errors: { phone: "A cleaner with this phone number already exists" } }, { status: 422 });
+    }
     return Response.json({ error: "Failed to create cleaner" }, { status: 500 });
   }
 

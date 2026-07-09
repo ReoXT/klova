@@ -97,6 +97,11 @@ export async function PATCH(
     .select("*, zone:zones(id, name, slug)")
     .single();
 
-  if (error) return Response.json({ error: "Update failed" }, { status: 500 });
+  if (error) {
+    if (error.code === "23505" && error.message.includes("phone")) {
+      return Response.json({ errors: { phone: "A cleaner with this phone number already exists" } }, { status: 422 });
+    }
+    return Response.json({ error: "Update failed" }, { status: 500 });
+  }
   return Response.json({ cleaner: data });
 }
