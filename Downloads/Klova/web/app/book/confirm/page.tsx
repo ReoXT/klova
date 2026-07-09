@@ -152,9 +152,9 @@ export default function BookConfirmPage() {
           <Button variant="primary" className="w-full">Back to home</Button>
         </Link>
         <p className="text-xs text-center" style={{ color: "var(--text-subtle)" }}>
-          Questions? WhatsApp us at{" "}
+          Questions?{" "}
           <a href={`https://wa.me/${SUPPORT_PHONE}`} className="underline" target="_blank" rel="noopener">
-            WhatsApp
+            Message us on WhatsApp
           </a>
         </p>
       </div>

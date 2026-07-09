@@ -366,7 +366,7 @@ export default function BookingStatusPage() {
               target="_blank"
               rel="noopener noreferrer"
             >
-              WhatsApp us
+              Message us on WhatsApp
             </a>
           ) : (
             "Contact our support team."
