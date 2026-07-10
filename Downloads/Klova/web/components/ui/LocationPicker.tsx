@@ -58,8 +58,8 @@ export function LocationPicker({ lat, lng, onChange }: LocationPickerProps) {
       try {
         const r = await fetch(`/api/admin/geocode?q=${encodeURIComponent(q)}`);
         const d = await r.json() as { results?: GeoResult[]; error?: string };
-        if (!r.ok) {
-          setGeoError("Geocoding unavailable — try again");
+        if (r.status === 503) {
+          setGeoError(d.error ?? "Geocoding not configured");
           return;
         }
         const list = d.results ?? [];
