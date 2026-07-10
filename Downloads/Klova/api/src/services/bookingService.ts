@@ -321,6 +321,8 @@ export async function createBooking(input: BookingInput): Promise<BookingResult>
     booking_date: input.booking_date,
     requested_cleaner_id: input.requested_cleaner_id ?? null,
     keeper_count: keeperCount,
+    latitude:  input.latitude  ?? null,
+    longitude: input.longitude ?? null,
   });
 
   if (assignment.outcome === 'no_match') {

@@ -11,6 +11,8 @@ export interface BookingForMatch {
   booking_date: string; // YYYY-MM-DD
   requested_cleaner_id: string | null;
   keeper_count?: number;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 interface Candidate {
