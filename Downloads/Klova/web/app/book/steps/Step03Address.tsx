@@ -48,7 +48,7 @@ export default function Step03Address({ data, patch, price, onNext, onBack }: Pr
       </h1>
       <p className="text-sm mb-5" style={{ color: "var(--text-muted)" }}>
         Search your street name, select it, then <strong>drag the pin to your exact building</strong>.
-        If your keeper can&apos;t find you, it&apos;ll delay your clean.
+        If your keeper cannot find you, it will delay your clean.
       </p>
 
       <LocationPicker
@@ -118,36 +118,47 @@ export default function Step03Address({ data, patch, price, onNext, onBack }: Pr
         </div>
       </div>
 
-      {/* Address confirmation sheet */}
+      {/* Address confirmation sheet
+          zIndex 10000 — must exceed LocationPicker search container (9999) */}
       {showConfirm && (
         <div
-          className="fixed inset-0 z-50 flex items-end justify-center"
-          style={{ background: "oklch(0.1 0 0 / 0.55)" }}
+          className="fixed inset-0 flex items-end justify-center"
+          style={{ zIndex: 10000, background: "oklch(0.1 0 0 / 0.55)" }}
           onClick={() => setShowConfirm(false)}
         >
           <div
-            className="w-full max-w-lg rounded-t-3xl px-6 pt-6 pb-10"
+            className="w-full max-w-lg mx-auto rounded-t-3xl px-6 pt-6 pb-10"
             style={{ background: "var(--surface-card)" }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Drag handle */}
-            <div className="w-10 h-1 rounded-full mx-auto mb-5" style={{ background: "var(--border-default)" }} />
+            <div className="w-10 h-1 rounded-full mx-auto mb-6" style={{ background: "var(--border-default)" }} />
 
-            <div
-              className="w-12 h-12 rounded-2xl flex items-center justify-center mb-4"
-              style={{ background: "oklch(0.94 0.06 145)" }}
-            >
-              <LocationIcon />
+            {/* Icon — centred */}
+            <div className="flex justify-center mb-4">
+              <div
+                className="w-12 h-12 rounded-2xl flex items-center justify-center"
+                style={{ background: "oklch(0.94 0.06 145)" }}
+              >
+                <LocationIcon />
+              </div>
             </div>
 
-            <h2 className="text-lg font-semibold mb-1" style={{ color: "var(--text-strong)" }}>
+            {/* Heading + description — centred */}
+            <h2
+              className="text-lg font-semibold mb-2 text-center"
+              style={{ color: "var(--text-strong)" }}
+            >
               Is this your correct address?
             </h2>
-            <p className="text-sm mb-4" style={{ color: "var(--text-muted)" }}>
-              Your keeper will use this to find you. If it&apos;s wrong, they could get lost on the day.
+            <p
+              className="text-sm mb-5 text-center"
+              style={{ color: "var(--text-muted)" }}
+            >
+              Your keeper will use this to find you. If it is wrong, they could get lost on the day.
             </p>
 
-            {/* Address display */}
+            {/* Address display — full width, text centred */}
             <div
               className="flex items-start gap-3 rounded-2xl px-4 py-3 mb-6"
               style={{ background: "var(--surface-subtle)", border: "1px solid var(--border-default)" }}
@@ -158,13 +169,22 @@ export default function Step03Address({ data, patch, price, onNext, onBack }: Pr
               </p>
             </div>
 
-            <div className="flex flex-col gap-3">
-              <Button variant="primary" wide onClick={handleConfirm}>
-                Yes, that&apos;s correct — continue
-              </Button>
-              <Button variant="ghost" wide onClick={() => setShowConfirm(false)}>
+            {/* Buttons — full width, stacked, centred */}
+            <div className="flex flex-col gap-3 w-full">
+              <button
+                onClick={handleConfirm}
+                className="w-full py-3.5 rounded-2xl text-sm font-semibold text-center active:scale-[0.98] transition-transform"
+                style={{ background: "var(--klova-primary)", color: "var(--text-on-primary)" }}
+              >
+                Yes, this is correct
+              </button>
+              <button
+                onClick={() => setShowConfirm(false)}
+                className="w-full py-3.5 rounded-2xl text-sm font-semibold text-center active:scale-[0.98] transition-transform"
+                style={{ background: "var(--surface-subtle)", color: "var(--text-strong)" }}
+              >
                 No, let me adjust
-              </Button>
+              </button>
             </div>
           </div>
         </div>
@@ -185,8 +205,7 @@ function WarningIcon({ className = "" }: { className?: string }) {
 function LocationIcon() {
   return (
     <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="oklch(0.45 0.15 145)" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round"
-        d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
       <path strokeLinecap="round" strokeLinejoin="round"
         d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
     </svg>
@@ -197,8 +216,7 @@ function PinIcon() {
   return (
     <svg className="w-4 h-4 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
       style={{ color: "var(--klova-primary)" }}>
-      <path strokeLinecap="round" strokeLinejoin="round"
-        d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
       <path strokeLinecap="round" strokeLinejoin="round"
         d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
     </svg>
