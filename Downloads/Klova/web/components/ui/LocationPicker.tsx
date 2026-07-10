@@ -38,14 +38,20 @@ export interface LocationPickerProps {
   geocodeEndpoint?: string;
   /** Whether to show the "Clear location" button. Defaults to true. */
   allowClear?: boolean;
+  /** Initial text to show in the search box (set once on mount). */
+  value?: string;
+  /** Called on every keystroke and when a geocode result is selected. */
+  onQueryChange?: (q: string) => void;
 }
 
 export function LocationPicker({
   lat, lng, onChange,
   geocodeEndpoint = "/api/admin/geocode",
   allowClear = true,
+  value,
+  onQueryChange,
 }: LocationPickerProps) {
-  const [query, setQuery]       = useState("");
+  const [query, setQuery]       = useState(value ?? "");
   const [results, setResults]   = useState<GeoResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [open, setOpen]         = useState(false);
@@ -57,6 +63,7 @@ export function LocationPicker({
 
   function doSearch(q: string) {
     setQuery(q);
+    onQueryChange?.(q);
     clearTimeout(debounceRef.current);
     if (q.trim().length < 2) { setResults([]); setOpen(false); return; }
 
@@ -83,6 +90,7 @@ export function LocationPicker({
 
   function select(r: GeoResult) {
     setQuery(r.label);
+    onQueryChange?.(r.label);
     setResults([]);
     setOpen(false);
     onChange(r.lat, r.lng);
@@ -90,6 +98,7 @@ export function LocationPicker({
 
   function clear() {
     setQuery("");
+    onQueryChange?.("");
     setResults([]);
     setOpen(false);
     onChange(null, null);

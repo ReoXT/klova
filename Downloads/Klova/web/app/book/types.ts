@@ -39,6 +39,8 @@ export interface BookingData {
 
   // Step 3 — address
   address: string;
+  latitude: number | null;
+  longitude: number | null;
 
   // Step 4 — date + time
   bookingDate: string | null; // YYYY-MM-DD

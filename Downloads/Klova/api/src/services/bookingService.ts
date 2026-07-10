@@ -63,6 +63,8 @@ export interface BookingInput {
   keeper_count?: number;
   wants_insurance?: boolean;
   requested_cleaner_id?: string;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 export interface CleanerProfile {
@@ -172,6 +174,8 @@ export function validateBookingInput(body: Record<string, unknown>): BookingInpu
       typeof body.requested_cleaner_id === 'string' && body.requested_cleaner_id.trim()
         ? body.requested_cleaner_id.trim()
         : undefined,
+    latitude:  typeof body.latitude  === 'number' && isFinite(body.latitude)  ? body.latitude  : null,
+    longitude: typeof body.longitude === 'number' && isFinite(body.longitude) ? body.longitude : null,
   };
 }
 
@@ -290,6 +294,8 @@ export async function createBooking(input: BookingInput): Promise<BookingResult>
       requested_cleaner_id: input.requested_cleaner_id ?? null,
       status:               'pending_payment',
       keeper_count:         keeperCount,
+      latitude:             input.latitude  ?? null,
+      longitude:            input.longitude ?? null,
     })
     .select('id')
     .single();

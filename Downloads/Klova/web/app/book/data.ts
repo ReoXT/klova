@@ -110,6 +110,8 @@ export const DEFAULT_BOOKING: BookingData = {
   recurringPattern: null,
   recurringMonths: 1,
   address: "",
+  latitude: null,
+  longitude: null,
   bookingDate: null,
   timeSlot: null,
   extras: {
@@ -259,6 +261,8 @@ export function buildBookingPayload(data: BookingData) {
     keeper_count:         data.keeperCount,
     wants_insurance:      data.wantsInsurance,
     requested_cleaner_id: data.requestedCleanerId ?? null,
+    latitude:             data.latitude  ?? null,
+    longitude:            data.longitude ?? null,
   };
 }
 
