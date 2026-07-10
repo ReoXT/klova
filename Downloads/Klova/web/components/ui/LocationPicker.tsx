@@ -34,9 +34,17 @@ export interface LocationPickerProps {
   lat: number | null;
   lng: number | null;
   onChange: (lat: number | null, lng: number | null) => void;
+  /** API route to call for geocode search. Defaults to /api/admin/geocode */
+  geocodeEndpoint?: string;
+  /** Whether to show the "Clear location" button. Defaults to true. */
+  allowClear?: boolean;
 }
 
-export function LocationPicker({ lat, lng, onChange }: LocationPickerProps) {
+export function LocationPicker({
+  lat, lng, onChange,
+  geocodeEndpoint = "/api/admin/geocode",
+  allowClear = true,
+}: LocationPickerProps) {
   const [query, setQuery]       = useState("");
   const [results, setResults]   = useState<GeoResult[]>([]);
   const [searching, setSearching] = useState(false);
@@ -56,7 +64,7 @@ export function LocationPicker({ lat, lng, onChange }: LocationPickerProps) {
       setSearching(true);
       setGeoError(null);
       try {
-        const r = await fetch(`/api/admin/geocode?q=${encodeURIComponent(q)}`);
+        const r = await fetch(`${geocodeEndpoint}?q=${encodeURIComponent(q)}`);
         const d = await r.json() as { results?: GeoResult[]; error?: string };
         if (r.status === 503) {
           setGeoError(d.error ?? "Geocoding not configured");
@@ -168,7 +176,7 @@ export function LocationPicker({ lat, lng, onChange }: LocationPickerProps) {
       {/* Map */}
       <MapComponent lat={lat} lng={lng} onChange={(newLat, newLng) => onChange(newLat, newLng)} />
 
-      {lat != null && lng != null && (
+      {allowClear && lat != null && lng != null && (
         <button
           type="button"
           className="btn btn-ghost btn-xs self-start text-error"

@@ -50,11 +50,16 @@ export async function matchCleaner(booking: BookingForMatch): Promise<MatchResul
   if (availableIds.length === 0) return NO_MATCH;
 
   // ── Step 2: Intersect with active cleaners in the booking's zone ─────────────
+  // Cleaners without coordinates are excluded — location is required for
+  // transport estimate calculation. They remain excluded until an admin or
+  // the keeper sets valid lat/lng via the location picker.
   const { data: cleaners, error: cleanersErr } = await supabase
     .from('cleaners')
     .select('id, rating')
     .eq('zone_id', booking.zone_id)
     .eq('status', 'active')
+    .not('latitude', 'is', null)
+    .not('longitude', 'is', null)
     .in('id', availableIds);
 
   if (cleanersErr) throw cleanersErr;

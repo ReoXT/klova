@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { SelectField } from "@/components/ui/FormField";
 import { Skeleton, SkeletonAvatar, Spinner } from "@/components/ui/Skeleton";
+import { LocationPicker } from "@/components/ui/LocationPicker";
 
 type Cleaner = {
   id: string;
@@ -19,6 +20,8 @@ type Cleaner = {
   rating: string | null;
   total_jobs: number;
   home_area: string | null;
+  latitude: number | null;
+  longitude: number | null;
   zone: { name: string } | null;
 };
 
@@ -36,6 +39,8 @@ export default function KeeperProfilePage() {
   const [signingOut, setSigningOut]     = useState(false);
 
   const [homeArea, setHomeArea]         = useState("");
+  const [coordLat, setCoordLat]         = useState<number | null>(null);
+  const [coordLng, setCoordLng]         = useState<number | null>(null);
   const [photoFile, setPhotoFile]       = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [saving, setSaving]             = useState(false);
@@ -54,6 +59,8 @@ export default function KeeperProfilePage() {
         setCleaner(d.cleaner);
         setAreas(d.available_areas ?? []);
         setHomeArea(d.cleaner.home_area ?? "");
+        setCoordLat(d.cleaner.latitude ?? null);
+        setCoordLng(d.cleaner.longitude ?? null);
       })
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
@@ -85,7 +92,8 @@ export default function KeeperProfilePage() {
     setPhotoPreview(URL.createObjectURL(file));
   }
 
-  const dirty = photoFile !== null || homeArea !== (cleaner?.home_area ?? "");
+  const locationDirty = coordLat !== (cleaner?.latitude ?? null) || coordLng !== (cleaner?.longitude ?? null);
+  const dirty = photoFile !== null || homeArea !== (cleaner?.home_area ?? "") || locationDirty;
 
   async function handleSave() {
     if (!dirty) return;
@@ -96,6 +104,10 @@ export default function KeeperProfilePage() {
     const fd = new FormData();
     if (photoFile) fd.set("photo", photoFile);
     if (homeArea !== (cleaner?.home_area ?? "")) fd.set("home_area", homeArea);
+    if (locationDirty && coordLat != null && coordLng != null) {
+      fd.set("latitude",  String(coordLat));
+      fd.set("longitude", String(coordLng));
+    }
 
     try {
       const r = await fetch("/api/keeper/profile", { method: "PATCH", body: fd });
@@ -104,6 +116,8 @@ export default function KeeperProfilePage() {
       if (!r.ok) throw new Error(d.error ?? "Failed to save");
       setCleaner(d.cleaner);
       setHomeArea(d.cleaner.home_area ?? "");
+      setCoordLat(d.cleaner.latitude ?? null);
+      setCoordLng(d.cleaner.longitude ?? null);
       setPhotoFile(null);
       setPhotoPreview(null);
       setSaveMsg({ text: "Saved.", isError: false });
@@ -241,6 +255,35 @@ export default function KeeperProfilePage() {
             <option value="">Not set</option>
             {areas.map((a) => <option key={a} value={a}>{a}</option>)}
           </SelectField>
+        )}
+      </Card>
+
+      {/* Editable: location */}
+      <Card shadow="sm" className="p-4 mt-4">
+        <p className="text-sm font-semibold mb-0.5" style={{ color: "var(--text-strong)" }}>
+          Your location
+        </p>
+        <p className="text-xs mb-3" style={{ color: "var(--text-muted)" }}>
+          Helps us calculate your transport reimbursement for each job.
+          Search your address or drop a pin on the map.
+        </p>
+        {loading ? (
+          <Skeleton className="h-60 w-full rounded-xl" />
+        ) : (
+          <LocationPicker
+            lat={coordLat}
+            lng={coordLng}
+            onChange={(lat, lng) => {
+              setCoordLat(lat);
+              setCoordLng(lng);
+              setFieldErrors((e) => { const n = { ...e }; delete n.location; return n; });
+            }}
+            geocodeEndpoint="/api/keeper/geocode"
+            allowClear={false}
+          />
+        )}
+        {fieldErrors.location && (
+          <p className="text-xs text-error mt-2">{fieldErrors.location}</p>
         )}
       </Card>
 

@@ -85,6 +85,17 @@ export async function PATCH(
     photoUrl = admin.storage.from("cleaner-photos").getPublicUrl(path).data.publicUrl;
   }
 
+  // Fetch old coordinates before update so we can log the change
+  let oldLat: number | null = null;
+  let oldLng: number | null = null;
+  const coordsChanging = latitude !== undefined || longitude !== undefined;
+  if (coordsChanging) {
+    const { data: cur } = await admin
+      .from("cleaners").select("latitude, longitude").eq("id", id).single();
+    oldLat = (cur as { latitude: number | null } | null)?.latitude ?? null;
+    oldLng = (cur as { longitude: number | null } | null)?.longitude ?? null;
+  }
+
   const patch: Record<string, unknown> = {};
   if (firstName   !== undefined) patch.first_name   = firstName;
   if (lastName    !== undefined) patch.last_name    = lastName;
@@ -110,6 +121,19 @@ export async function PATCH(
     }
     return Response.json({ error: "Update failed" }, { status: 500 });
   }
+
+  // Log coordinate changes for audit trail
+  if (coordsChanging && data) {
+    const newLat = (data as unknown as { latitude: number | null }).latitude ?? null;
+    const newLng = (data as unknown as { longitude: number | null }).longitude ?? null;
+    if (newLat !== oldLat || newLng !== oldLng) {
+      await admin.from("cleaner_location_log").insert({
+        cleaner_id: id, old_latitude: oldLat, old_longitude: oldLng,
+        new_latitude: newLat, new_longitude: newLng, changed_by_role: "admin",
+      });
+    }
+  }
+
   return Response.json({ cleaner: data });
 }
 
