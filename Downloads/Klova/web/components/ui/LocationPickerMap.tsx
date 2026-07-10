@@ -27,6 +27,9 @@ export default function LocationPickerMap({ lat, lng, onChange, onUserInteract }
   const stateRef          = useRef<MapState | null>(null);
   const onChangeRef       = useRef(onChange);
   const onUserInteractRef = useRef(onUserInteract);
+  // True when the coming lat/lng update was caused by the user dragging or
+  // tapping — tells the sync effect not to reset the zoom level.
+  const userMovedPinRef   = useRef(false);
   // Keep callback refs current without re-running effects
   useEffect(() => { onChangeRef.current = onChange; });
   useEffect(() => { onUserInteractRef.current = onUserInteract; });
@@ -57,6 +60,7 @@ export default function LocationPickerMap({ lat, lng, onChange, onUserInteract }
       const attachDrag = (m: LType.Marker) => {
         m.on("dragend", () => {
           const p = m.getLatLng();
+          userMovedPinRef.current = true;
           onChangeRef.current(p.lat, p.lng);
           onUserInteractRef.current?.();
         });
@@ -82,6 +86,7 @@ export default function LocationPickerMap({ lat, lng, onChange, onUserInteract }
           state.marker = L.marker(e.latlng, { draggable: true, icon: makeIcon() }).addTo(map);
           attachDrag(state.marker);
         }
+        userMovedPinRef.current = true;
         onChangeRef.current(e.latlng.lat, e.latlng.lng);
         onUserInteractRef.current?.();
       });
@@ -96,11 +101,15 @@ export default function LocationPickerMap({ lat, lng, onChange, onUserInteract }
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Sync marker when lat/lng are updated externally (geocode selection)
+  // Sync marker when lat/lng change (geocode selection OR user drag/tap).
+  // Only re-center + zoom when the update came from a geocode selection;
+  // skip setView for user-driven moves so the zoom level they set is kept.
   useEffect(() => {
     if (lat == null || lng == null || !stateRef.current) return;
     const { map, L } = stateRef.current;
     const latlng = L.latLng(lat, lng);
+    const wasUserMove = userMovedPinRef.current;
+    userMovedPinRef.current = false; // consume the flag
 
     if (stateRef.current.marker) {
       stateRef.current.marker.setLatLng(latlng);
@@ -109,12 +118,18 @@ export default function LocationPickerMap({ lat, lng, onChange, onUserInteract }
       const m = L.marker(latlng, { draggable: true, icon }).addTo(map);
       m.on("dragend", () => {
         const p = m.getLatLng();
+        userMovedPinRef.current = true;
         onChangeRef.current(p.lat, p.lng);
         onUserInteractRef.current?.();
       });
       stateRef.current.marker = m;
     }
-    map.setView(latlng, 14);
+
+    // Geocode selections: pan + zoom to the result so the customer can see it.
+    // User drag/tap: they already chose the zoom — leave it alone.
+    if (!wasUserMove) {
+      map.setView(latlng, 16);
+    }
   }, [lat, lng]);
 
   return (
