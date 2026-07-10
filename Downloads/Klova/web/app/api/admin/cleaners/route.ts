@@ -36,6 +36,10 @@ export async function POST(request: Request) {
   const ninVerified = fd.get("nin_verified") === "true";
   const status     = (fd.get("status")      as string | null) ?? "active";
   const photo      = fd.get("photo") as File | null;
+  const latRaw     = (fd.get("latitude")    as string | null)?.trim();
+  const lngRaw     = (fd.get("longitude")   as string | null)?.trim();
+  const latitude   = latRaw  ? parseFloat(latRaw)  : null;
+  const longitude  = lngRaw ? parseFloat(lngRaw) : null;
 
   // Validate
   const errs: Record<string, string> = {};
@@ -75,7 +79,8 @@ export async function POST(request: Request) {
   const { data: cleaner, error: insertErr } = await admin
     .from("cleaners")
     .insert({ first_name: firstName, last_name: lastName, phone, zone_id: zoneId,
-              address: address || null, nin_verified: ninVerified, status, photo_url: photoUrl })
+              address: address || null, nin_verified: ninVerified, status, photo_url: photoUrl,
+              latitude, longitude })
     .select("*")
     .single();
 

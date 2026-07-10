@@ -47,6 +47,11 @@ export async function PATCH(
   const ninVerified = fd.has("nin_verified") ? fd.get("nin_verified") === "true" : undefined;
   const status      = (fd.get("status")      as string | null) ?? undefined;
   const photo       = fd.get("photo") as File | null;
+  // Always sent from the form; empty string means "clear to null"
+  const latRaw      = (fd.get("latitude")    as string | null);
+  const lngRaw      = (fd.get("longitude")   as string | null);
+  const latitude    = latRaw  !== null ? (latRaw.trim()  ? parseFloat(latRaw.trim())  : null) : undefined;
+  const longitude   = lngRaw !== null ? (lngRaw.trim() ? parseFloat(lngRaw.trim()) : null) : undefined;
 
   const errs: Record<string, string> = {};
   if (firstName !== undefined && !firstName)  errs.first_name = "Required";
@@ -89,6 +94,8 @@ export async function PATCH(
   if (ninVerified !== undefined) patch.nin_verified = ninVerified;
   if (status      !== undefined) patch.status       = status;
   if (photoUrl    !== undefined) patch.photo_url    = photoUrl;
+  if (latitude    !== undefined) patch.latitude     = latitude;
+  if (longitude   !== undefined) patch.longitude    = longitude;
 
   const { data, error } = await admin
     .from("cleaners")

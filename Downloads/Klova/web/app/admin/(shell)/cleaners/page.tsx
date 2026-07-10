@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef, useTransition } from "react";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { LocationPicker } from "@/components/ui/LocationPicker";
 import { NIGERIAN_BANKS } from "@/lib/nigerianBanks";
 
 /* ── Types ───────────────────────────────────────────────────── */
@@ -26,6 +27,8 @@ type Cleaner = {
   created_at: string;
   email: string | null;
   auth_user_id: string | null;
+  latitude: number | null;
+  longitude: number | null;
 };
 
 type FormState = {
@@ -36,6 +39,8 @@ type FormState = {
   address: string;
   nin_verified: boolean;
   status: "active" | "inactive" | "suspended";
+  latitude: number | null;
+  longitude: number | null;
 };
 
 type BankFormState = {
@@ -49,6 +54,7 @@ const BLANK_FORM: FormState = {
   first_name: "", last_name: "", phone: "",
   zone_id: "", address: "",
   nin_verified: false, status: "active",
+  latitude: null, longitude: null,
 };
 
 const BLANK_BANK: BankFormState = {
@@ -183,7 +189,17 @@ export default function CleanersPage() {
                         <div className="flex items-center gap-3">
                           <Avatar url={c.photo_url} name={`${c.first_name} ${c.last_name}`} />
                           <div>
-                            <p className="font-medium">{c.first_name} {c.last_name}</p>
+                            <div className="flex items-center gap-1.5">
+                              <p className="font-medium">{c.first_name} {c.last_name}</p>
+                              {c.status === "active" && (c.latitude == null || c.longitude == null) && (
+                                <span
+                                  className="badge badge-xs badge-soft badge-warning"
+                                  title="No coordinates set — transport estimate unavailable"
+                                >
+                                  no GPS
+                                </span>
+                              )}
+                            </div>
                             <p className="text-xs" style={{ color: "var(--text-muted)" }}>
                               {c.id.slice(0, 8).toUpperCase()}
                             </p>
@@ -247,7 +263,8 @@ function CleanerPanel({
       ? { first_name: cleaner.first_name, last_name: cleaner.last_name,
           phone: cleaner.phone, zone_id: cleaner.zone_id,
           address: cleaner.address ?? "", nin_verified: cleaner.nin_verified,
-          status: cleaner.status }
+          status: cleaner.status,
+          latitude: cleaner.latitude ?? null, longitude: cleaner.longitude ?? null }
       : BLANK_FORM,
   );
   const [bankForm, setBankForm]         = useState<BankFormState>(BLANK_BANK);
@@ -388,6 +405,8 @@ function CleanerPanel({
     fd.set("address",      form.address);
     fd.set("nin_verified", String(form.nin_verified));
     fd.set("status",       form.status);
+    fd.set("latitude",     form.latitude  != null ? String(form.latitude)  : "");
+    fd.set("longitude",    form.longitude != null ? String(form.longitude) : "");
     if (photoFile) fd.set("photo", photoFile);
 
     try {
@@ -482,6 +501,21 @@ function CleanerPanel({
               value={form.address} onChange={(e) => setField("address", e.target.value)}
               placeholder="14 Admiralty Way, Lekki" />
           </PanelField>
+
+          {/* Location */}
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>
+              Location coordinates
+            </label>
+            <p className="text-xs mb-1" style={{ color: "var(--text-subtle)" }}>
+              Search an address or drop a pin. Used for transport estimates.
+            </p>
+            <LocationPicker
+              lat={form.latitude}
+              lng={form.longitude}
+              onChange={(lat, lng) => setForm((f) => ({ ...f, latitude: lat, longitude: lng }))}
+            />
+          </div>
 
           {/* Status (edit only) */}
           {mode === "edit" && (
