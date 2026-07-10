@@ -35,7 +35,7 @@ export default function Step03Address({ data, patch, price, onNext, onBack }: Pr
         Where are we cleaning?
       </h1>
       <p className="text-sm mb-5" style={{ color: "var(--text-muted)" }}>
-        Search your address then drag the pin to your exact spot. We serve Lekki and Ajah.
+        Search your street name, select it, then drag the pin to your building. We serve Lekki and Ajah.
       </p>
 
       <LocationPicker
@@ -46,6 +46,7 @@ export default function Step03Address({ data, patch, price, onNext, onBack }: Pr
         value={data.address}
         geocodeEndpoint="/api/booking/geocode"
         allowClear={false}
+        showCoords={false}
       />
 
       {addressError && (

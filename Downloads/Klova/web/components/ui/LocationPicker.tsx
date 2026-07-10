@@ -38,6 +38,8 @@ export interface LocationPickerProps {
   geocodeEndpoint?: string;
   /** Whether to show the "Clear location" button. Defaults to true. */
   allowClear?: boolean;
+  /** Whether to show the lat/lng readout below the search box. Defaults to true. */
+  showCoords?: boolean;
   /** Initial text to show in the search box (set once on mount). */
   value?: string;
   /** Called on every keystroke and when a geocode result is selected. */
@@ -48,6 +50,7 @@ export function LocationPicker({
   lat, lng, onChange,
   geocodeEndpoint = "/api/admin/geocode",
   allowClear = true,
+  showCoords = true,
   value,
   onQueryChange,
 }: LocationPickerProps) {
@@ -165,15 +168,17 @@ export function LocationPicker({
 
       {geoError && <p className="text-xs text-error">{geoError}</p>}
 
-      {/* Coordinate readout */}
-      {lat != null && lng != null ? (
-        <p className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
-          {lat.toFixed(6)}, {lng.toFixed(6)}
-        </p>
-      ) : (
-        <p className="text-xs" style={{ color: "var(--text-subtle)" }}>
-          Search above or click the map to place a pin
-        </p>
+      {/* Coordinate readout — shown to staff, hidden for customers */}
+      {showCoords && (
+        lat != null && lng != null ? (
+          <p className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
+            {lat.toFixed(6)}, {lng.toFixed(6)}
+          </p>
+        ) : (
+          <p className="text-xs" style={{ color: "var(--text-subtle)" }}>
+            Search above or click the map to place a pin
+          </p>
+        )
       )}
 
       {outOfBounds && (
