@@ -12,11 +12,13 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const url = new URL("https://api.openrouteservice.org/geocode/search");
+  const url = new URL("https://api.openrouteservice.org/geocode/autocomplete");
   url.searchParams.set("api_key", apiKey);
-  url.searchParams.set("text", `${q} Lagos Nigeria`);
+  url.searchParams.set("text", q);
   url.searchParams.set("boundary.country", "NG");
-  url.searchParams.set("size", "5");
+  url.searchParams.set("size", "6");
+  url.searchParams.set("layers", "address,venue,street");
+  // Bias toward Lagos centre so Nigerian results rank above global matches
   url.searchParams.set("focus.point.lat", "6.5244");
   url.searchParams.set("focus.point.lon", "3.3792");
 

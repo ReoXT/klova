@@ -117,8 +117,8 @@ export function LocationPicker({
 
   return (
     <div className="flex flex-col gap-2">
-      {/* Geocode search */}
-      <div ref={dropdownRef} className="relative">
+      {/* Geocode search — zIndex must beat Leaflet's internal panes (up to ~700) */}
+      <div ref={dropdownRef} className="relative" style={{ zIndex: 9999, position: "relative" }}>
         <input
           className="input input-bordered w-full text-sm pr-8"
           placeholder="Search address or area…"
