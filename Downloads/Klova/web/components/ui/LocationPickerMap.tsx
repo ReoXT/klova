@@ -11,6 +11,8 @@ interface Props {
   lat: number | null;
   lng: number | null;
   onChange: (lat: number, lng: number) => void;
+  /** Fires only when the customer manually taps or drags the pin — not on geocode placement. */
+  onUserInteract?: () => void;
 }
 
 // Holds live Leaflet state — typed loosely because the module is loaded async
@@ -20,12 +22,14 @@ type MapState = {
   L:      typeof LType;
 };
 
-export default function LocationPickerMap({ lat, lng, onChange }: Props) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const stateRef     = useRef<MapState | null>(null);
-  const onChangeRef  = useRef(onChange);
-  // Keep callback ref current without re-running effects
+export default function LocationPickerMap({ lat, lng, onChange, onUserInteract }: Props) {
+  const containerRef      = useRef<HTMLDivElement>(null);
+  const stateRef          = useRef<MapState | null>(null);
+  const onChangeRef       = useRef(onChange);
+  const onUserInteractRef = useRef(onUserInteract);
+  // Keep callback refs current without re-running effects
   useEffect(() => { onChangeRef.current = onChange; });
+  useEffect(() => { onUserInteractRef.current = onUserInteract; });
 
   // Initialize map once on mount
   useEffect(() => {
@@ -54,6 +58,7 @@ export default function LocationPickerMap({ lat, lng, onChange }: Props) {
         m.on("dragend", () => {
           const p = m.getLatLng();
           onChangeRef.current(p.lat, p.lng);
+          onUserInteractRef.current?.();
         });
       };
 
@@ -78,6 +83,7 @@ export default function LocationPickerMap({ lat, lng, onChange }: Props) {
           attachDrag(state.marker);
         }
         onChangeRef.current(e.latlng.lat, e.latlng.lng);
+        onUserInteractRef.current?.();
       });
 
       stateRef.current = state;
@@ -104,6 +110,7 @@ export default function LocationPickerMap({ lat, lng, onChange }: Props) {
       m.on("dragend", () => {
         const p = m.getLatLng();
         onChangeRef.current(p.lat, p.lng);
+        onUserInteractRef.current?.();
       });
       stateRef.current.marker = m;
     }

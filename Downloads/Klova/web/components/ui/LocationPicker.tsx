@@ -44,6 +44,8 @@ export interface LocationPickerProps {
   value?: string;
   /** Called on every keystroke and when a geocode result is selected. */
   onQueryChange?: (q: string) => void;
+  /** Fires only when the customer manually taps or drags the pin — not on geocode auto-placement. */
+  onUserInteract?: () => void;
 }
 
 export function LocationPicker({
@@ -53,6 +55,7 @@ export function LocationPicker({
   showCoords = true,
   value,
   onQueryChange,
+  onUserInteract,
 }: LocationPickerProps) {
   const [query, setQuery]       = useState(value ?? "");
   const [results, setResults]   = useState<GeoResult[]>([]);
@@ -188,7 +191,7 @@ export function LocationPicker({
       )}
 
       {/* Map */}
-      <MapComponent lat={lat} lng={lng} onChange={(newLat, newLng) => onChange(newLat, newLng)} />
+      <MapComponent lat={lat} lng={lng} onChange={(newLat, newLng) => onChange(newLat, newLng)} onUserInteract={onUserInteract} />
 
       {allowClear && lat != null && lng != null && (
         <button

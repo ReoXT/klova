@@ -15,19 +15,32 @@ interface Props {
 }
 
 export default function Step03Address({ data, patch, price, onNext, onBack }: Props) {
-  const [touched, setTouched] = useState(false);
+  // True only after the customer manually taps or drags the pin —
+  // a geocode auto-drop does NOT set this.
+  const [pinConfirmed, setPinConfirmed] = useState(false);
   const [addressError, setAddressError] = useState<string | null>(null);
 
+  const hasAddress  = data.address.trim().length >= 8;
+  const hasPin      = data.latitude != null;
+  // Both address AND manual pin interaction required to proceed
+  const canContinue = hasAddress && hasPin && pinConfirmed;
+
+  // Determine the inline hint the customer should see
+  const hint: string | null = !hasAddress
+    ? null  // no address yet — search box placeholder is enough
+    : !hasPin
+    ? "Drag the pin to your exact building to continue."
+    : !pinConfirmed
+    ? "Drag the pin to your exact building to confirm your location."
+    : null;
+
   function handleNext() {
-    setTouched(true);
-    if (data.address.trim().length < 8) {
+    if (!hasAddress) {
       setAddressError("Please enter your full address.");
       return;
     }
-    onNext();
+    if (canContinue) onNext();
   }
-
-  const noPin = touched && data.latitude == null;
 
   return (
     <div className="max-w-lg mx-auto px-4 pt-6 pb-40">
@@ -35,7 +48,8 @@ export default function Step03Address({ data, patch, price, onNext, onBack }: Pr
         Where are we cleaning?
       </h1>
       <p className="text-sm mb-5" style={{ color: "var(--text-muted)" }}>
-        Search your street name, select it, then drag the pin to your building. We serve Lekki and Ajah.
+        Search your street name, select it, then <strong>drag the pin to your exact building</strong>.
+        If your keeper can&apos;t find you, it&apos;ll delay your clean.
       </p>
 
       <LocationPicker
@@ -43,24 +57,29 @@ export default function Step03Address({ data, patch, price, onNext, onBack }: Pr
         lng={data.longitude}
         onChange={(lat, lng) => patch({ latitude: lat, longitude: lng })}
         onQueryChange={(q) => { patch({ address: q }); setAddressError(null); }}
+        onUserInteract={() => setPinConfirmed(true)}
         value={data.address}
         geocodeEndpoint="/api/booking/geocode"
         allowClear={false}
         showCoords={false}
       />
 
+      {/* Address validation error */}
       {addressError && (
         <p className="text-xs text-error mt-2 flex items-center gap-1">
-          <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-          </svg>
+          <WarningIcon />
           {addressError}
         </p>
       )}
 
-      {noPin && !addressError && (
-        <div className="alert alert-soft alert-warning text-xs py-2 mt-2">
-          No pin set yet — tap the map to drop one so your keeper finds you easily.
+      {/* Pin confirmation nudge — only after an address is typed/selected */}
+      {hint && !addressError && (
+        <div
+          className="flex items-start gap-2 rounded-xl px-3 py-2.5 mt-3 text-sm"
+          style={{ background: "oklch(0.97 0.03 85)", color: "oklch(0.45 0.12 60)" }}
+        >
+          <WarningIcon className="mt-0.5 shrink-0" />
+          <span>{hint}</span>
         </div>
       )}
 
@@ -90,10 +109,32 @@ export default function Step03Address({ data, patch, price, onNext, onBack }: Pr
           )}
           <div className="flex gap-3">
             <Button variant="ghost" onClick={onBack} className="flex-1">Back</Button>
-            <Button variant="primary" onClick={handleNext} className="flex-1">Continue</Button>
+            <Button
+              variant="primary"
+              onClick={handleNext}
+              disabled={!canContinue}
+              className="flex-1"
+            >
+              Continue
+            </Button>
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+function WarningIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg
+      className={`w-4 h-4 ${className}`}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2}
+    >
+      <path strokeLinecap="round" strokeLinejoin="round"
+        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+    </svg>
   );
 }
