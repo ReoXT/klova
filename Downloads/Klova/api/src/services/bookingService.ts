@@ -78,8 +78,9 @@ export interface CleanerProfile {
 
 export interface BookingResult {
   booking_id: string;
-  total_amount: number;      // NGN
-  commission_amount: number; // NGN
+  total_amount: number;        // NGN — cleaning + insurance + transport
+  transport_estimate: number;  // NGN — keeper travel reimbursement; 0 if coordinates missing
+  commission_amount: number;   // NGN — 22% of cleaning fee + 100% of insurance; transport excluded
   commission_rate: number;
   cleaners: CleanerProfile[];
 }
@@ -330,6 +331,19 @@ export async function createBooking(input: BookingInput): Promise<BookingResult>
     throw new NoAvailabilityError(input.zone_slug, input.booking_date);
   }
 
+  // Fold transport into the charged total so Paystack collects cleaning + transport in one charge.
+  // Commission is already stored (cleaning only) — this update does not touch it.
+  const transportKobo = assignment.transport_estimate_kobo;
+  if (transportKobo > 0) {
+    const { error: tErr } = await supabase
+      .from('bookings')
+      .update({ total_amount_kobo: totalKobo + transportKobo })
+      .eq('id', booking.id);
+    if (tErr) {
+      console.error(`[booking] ${booking.id}: failed to fold transport into total — ${tErr.message}`);
+    }
+  }
+
   console.log(`[booking] ${booking.id}: matched ${assignment.cleanerIds.length} keeper(s) — ${assignment.cleanerIds.join(', ')}`);
 
   // 7. Read the authoritative keeper list from booking_cleaners (role ASC = lead first)
@@ -373,7 +387,8 @@ export async function createBooking(input: BookingInput): Promise<BookingResult>
 
   return {
     booking_id: booking.id,
-    total_amount: breakdown.total_amount,
+    total_amount: breakdown.total_amount + transportKobo / 100,
+    transport_estimate: transportKobo / 100,
     commission_amount: breakdown.commission_amount,
     commission_rate: breakdown.commission_rate,
     cleaners,

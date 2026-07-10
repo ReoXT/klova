@@ -3,7 +3,7 @@ import { matchCleaner, NO_MATCH, type BookingForMatch } from './matchingService'
 import { estimateTransportFare } from './fareEstimatorService';
 
 export type AssignResult =
-  | { outcome: 'matched'; cleanerIds: string[] }
+  | { outcome: 'matched'; cleanerIds: string[]; transport_estimate_kobo: number }
   | { outcome: 'no_match' };
 
 /**
@@ -58,9 +58,9 @@ export async function assignCleaner(
       return { outcome: 'no_match' };
     }
 
-    await storeTransportFares(bookingId, cleanerIds, booking);
+    const transportKobo = await storeTransportFares(bookingId, cleanerIds, booking);
 
-    return { outcome: 'matched', cleanerIds };
+    return { outcome: 'matched', cleanerIds, transport_estimate_kobo: transportKobo };
   }
 
   // RPC exhausted the candidate list before filling all required slots.
@@ -91,7 +91,7 @@ async function storeTransportFares(
   bookingId: string,
   cleanerIds: string[],
   booking: BookingForMatch,
-): Promise<void> {
+): Promise<number> {
   try {
     const { data: keeperRows, error: kErr } = await supabase
       .from('cleaners')
@@ -150,7 +150,10 @@ async function storeTransportFares(
     if (bErr) {
       console.error(`[assignment] ${bookingId}: failed to store transport estimate — ${bErr.message}`);
     }
+
+    return totalKobo;
   } catch (err) {
     console.error(`[assignment] ${bookingId}: unexpected error in transport estimation — ${err}`);
+    return 0;
   }
 }

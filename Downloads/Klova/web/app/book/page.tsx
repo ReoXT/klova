@@ -72,6 +72,7 @@ export default function BookPage() {
   const [bookingId, setBookingId] = useState<string | null>(null);
   const [matchedCleaners, setMatchedCleaners] = useState<ApiCleaner[]>([]);
   const [serverTotal, setServerTotal] = useState<number | null>(null);
+  const [serverTransport, setServerTransport] = useState<number>(0);
 
   type SubmitStatus = "idle" | "submitting" | "paying" | "redirecting";
   const [submitStatus, setSubmitStatus] = useState<SubmitStatus>("idle");
@@ -219,10 +220,11 @@ export default function BookPage() {
       // Success — exit any overlay and advance to keeper reveal
       if (dateOverride)        patch({ bookingDate: dateOverride });
       if (keeperCountOverride) patch({ keeperCount: keeperCountOverride });
-      const { booking_id, total_amount, cleaners } = json.data;
+      const { booking_id, total_amount, transport_estimate, cleaners } = json.data;
       setBookingId(booking_id);
       setMatchedCleaners(cleaners as ApiCleaner[]);
       setServerTotal(total_amount);
+      setServerTransport((transport_estimate as number) ?? 0);
       sessionStorage.setItem("klova_booking_id", booking_id);
       setNoMatchDates(null);
       setPartialAvailData(null);
@@ -323,9 +325,11 @@ export default function BookPage() {
   }, [bookingId, data, serverTotal, matchedCleaners]);
 
   // ─── Price (live from API when available, hardcoded fallback) ───────────
-  const price = livePricing
-    ? computePriceFromLive(data, livePricing)
-    : computePrice(data);
+  // serverTransport is 0 before booking is created; populated after Step 11 matching.
+  const price = {
+    ...(livePricing ? computePriceFromLive(data, livePricing) : computePrice(data)),
+    transport: serverTransport,
+  };
 
   const steps = getSteps(data);
   const stepIndex = getStepIndex(step, data);

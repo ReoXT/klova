@@ -118,7 +118,7 @@ describe('assignCleaner — RPC outcomes', () => {
 
     const result = await assignCleaner(BOOKING_ID, bookingCtx);
 
-    expect(result).toEqual({ outcome: 'matched', cleanerIds: ['c1'] });
+    expect(result).toMatchObject({ outcome: 'matched', cleanerIds: ['c1'] });
     expect(mockRpc()).toHaveBeenCalledWith('assign_cleaner', {
       p_booking_id:    BOOKING_ID,
       p_candidate_ids: ['c1', 'c2'],
@@ -134,7 +134,7 @@ describe('assignCleaner — RPC outcomes', () => {
 
     const result = await assignCleaner(BOOKING_ID, { ...bookingCtx, keeper_count: 2 });
 
-    expect(result).toEqual({ outcome: 'matched', cleanerIds: ['c1', 'c2'] });
+    expect(result).toMatchObject({ outcome: 'matched', cleanerIds: ['c1', 'c2'] });
     expect(mockRpc()).toHaveBeenCalledWith('assign_cleaner', {
       p_booking_id:    BOOKING_ID,
       p_candidate_ids: ['c1', 'c2', 'c3'],
@@ -244,7 +244,7 @@ describe('assignCleaner — transport fare storage (single keeper)', () => {
 
     const result = await assignCleaner(BOOKING_ID, { ...bookingCtx, latitude: null, longitude: null });
 
-    expect(result).toEqual({ outcome: 'matched', cleanerIds: ['c1'] });
+    expect(result).toMatchObject({ outcome: 'matched', cleanerIds: ['c1'] });
   });
 });
 
@@ -277,7 +277,7 @@ describe('assignCleaner — transport fare storage (two keepers)', () => {
 
     const result = await assignCleaner(BOOKING_ID, { ...bookingCtxWithCoords, keeper_count: 2 });
 
-    expect(result).toEqual({ outcome: 'matched', cleanerIds: ['c1', 'c2'] });
+    expect(result).toMatchObject({ outcome: 'matched', cleanerIds: ['c1', 'c2'], transport_estimate_kobo: 265_000 });
 
     // Per-keeper storage
     expect(bc1Chain.update).toHaveBeenCalledWith({ transport_fare_kobo: 110_000 });

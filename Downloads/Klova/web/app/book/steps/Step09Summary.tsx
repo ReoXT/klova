@@ -54,6 +54,7 @@ export default function Step09Summary({ data, price, onNext, onBack }: Props) {
     .join(" · ");
 
   const perVisitNet = price.base + price.keeperSurcharge + price.extras - price.discount;
+  const fullTotal = perVisitNet + price.insurance + price.transport;
 
   return (
     <div className="max-w-lg mx-auto px-4 pt-6 pb-72">
@@ -168,7 +169,19 @@ export default function Step09Summary({ data, price, onNext, onBack }: Props) {
                 <span style={{ color: "var(--klova-success)" }}>−{formatNGN(price.discount)}</span>
               </div>
             )}
+            {price.transport > 0 && (
+              <div className="flex justify-between">
+                <span style={{ color: "var(--text-muted)" }}>Transport estimate</span>
+                <span style={{ color: "var(--text-body)" }}>{formatNGN(price.transport)}</span>
+              </div>
+            )}
           </div>
+
+          {price.transport > 0 && (
+            <p className="text-xs mb-3" style={{ color: "var(--text-muted)" }}>
+              Transport covers your keeper's travel to your home and goes directly to them.
+            </p>
+          )}
 
           <div
             className="flex items-baseline justify-between py-3 mb-4"
@@ -178,7 +191,7 @@ export default function Step09Summary({ data, price, onNext, onBack }: Props) {
               Total amount
             </span>
             <span className="text-xl font-bold" style={{ color: "var(--klova-accent)" }}>
-              {formatNGN(perVisitNet + price.insurance)}
+              {formatNGN(fullTotal)}
             </span>
           </div>
 

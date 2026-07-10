@@ -73,7 +73,7 @@ export default function Step10Checkout({ data, patch, price, onSubmit, submitSta
   ];
 
   const perVisitGross = price.base + price.keeperSurcharge + price.extras;
-  const grandTotal = price.monthlyTotal;
+  const grandTotal = price.monthlyTotal + price.transport;
 
   return (
     <div className="max-w-lg mx-auto px-4 pt-6 pb-80">
@@ -244,7 +244,19 @@ export default function Step10Checkout({ data, patch, price, onSubmit, submitSta
                 </span>
               </div>
             )}
+            {price.transport > 0 && (
+              <div className="flex justify-between">
+                <span style={{ color: "var(--text-muted)" }}>Transport estimate</span>
+                <span style={{ color: "var(--text-body)" }}>{formatNGN(price.transport)}</span>
+              </div>
+            )}
           </div>
+
+          {price.transport > 0 && (
+            <p className="text-xs mb-3" style={{ color: "var(--text-muted)" }}>
+              Transport covers your keeper's travel to your home and goes directly to them.
+            </p>
+          )}
 
           <div
             className="flex items-baseline justify-between py-3 mb-4"

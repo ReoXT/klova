@@ -75,9 +75,10 @@ export interface PriceBreakdown {
   extras: number;
   keeperSurcharge: number;
   insurance: number;
+  transport: number; // keeper travel reimbursement; 0 until server responds after matching
   discount: number;
   total: number;
-  monthlyTotal: number; // total × payMonths
+  monthlyTotal: number; // total × payMonths (transport not multiplied — it is per booking)
 }
 
 export interface ApiCleaner {

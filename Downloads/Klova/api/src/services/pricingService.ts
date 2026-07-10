@@ -20,8 +20,9 @@ export interface PriceBreakdown {
   base_amount: number;       // NGN — cleaning fee only
   addons_amount: number;     // NGN — add-ons total
   insurance_amount: number;  // NGN — 100% retained by Klova, cleaner never sees this
-  total_amount: number;      // NGN — what the customer pays
-  commission_amount: number; // NGN — 22% of cleaning fee + 100% of insurance
+  transport_amount: number;  // NGN — keeper travel reimbursement; 0 until keeper is matched
+  total_amount: number;      // NGN — what the customer pays (cleaning + insurance; transport added after matching)
+  commission_amount: number; // NGN — 22% of cleaning fee + 100% of insurance; transport excluded
   commission_rate: number;
 }
 
@@ -126,6 +127,7 @@ export async function computePrice(
     base_amount: baseKobo / 100,
     addons_amount: addonsKobo / 100,
     insurance_amount: insuranceKobo / 100,
+    transport_amount: 0,  // populated by assignmentService after keeper is matched
     total_amount: totalKobo / 100,
     commission_amount: commissionKobo / 100,
     commission_rate: config.commissionRate,

@@ -180,7 +180,7 @@ export function computePrice(data: BookingData): PriceBreakdown {
   const total = perVisit - discount + insurance;
   const monthlyTotal = (perVisit - discount + insurance) * data.payMonths;
 
-  return { base, extras, keeperSurcharge, insurance, discount, total, monthlyTotal };
+  return { base, extras, keeperSurcharge, insurance, transport: 0, discount, total, monthlyTotal };
 }
 
 export function formatNGN(amount: number): string {
@@ -237,7 +237,7 @@ export function computePriceFromLive(data: BookingData, live: LivePricingData): 
   const total = perVisit - discount + insurance;
   const monthlyTotal = (perVisit - discount + insurance) * data.payMonths;
 
-  return { base, extras, keeperSurcharge, insurance, discount, total, monthlyTotal };
+  return { base, extras, keeperSurcharge, insurance, transport: 0, discount, total, monthlyTotal };
 }
 
 // ─── Build POST /bookings payload ─────────────────────────────────────────────
